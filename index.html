@@ -86,6 +86,12 @@
       <div><label class="block text-xs font-medium text-slate-500 mb-1">搜尋</label><input type="text" id="searchInput" placeholder="姓名、員工編號或身份證" class="text-sm w-full max-w-xs" oninput="applyScheduleFilters()">
       </div>
      </div>
+     <div class="bg-white rounded-xl shadow-sm p-4">
+      <div class="flex items-center gap-2 flex-wrap">
+       <span class="text-sm font-medium text-slate-700 flex items-center gap-1"><i data-lucide="eye" class="w-4 h-4 text-purple-600"></i>檢視人員（主管）：</span>
+       <div id="supervisorChips" class="flex flex-wrap gap-2"></div>
+      </div>
+     </div>
      <div class="bg-white rounded-xl shadow-sm overflow-hidden">
       <div class="overflow-x-auto">
        <table class="w-full text-sm" id="scheduleTable">
@@ -322,6 +328,16 @@
         </label>`).join('');
     }
     renderActiveFilters();
+    renderSupervisorChips();
+  }
+
+  function renderSupervisorChips(){
+    const c = document.getElementById('supervisorChips');
+    if (!c) return;
+    const list = (G.supervisors || []);
+    if (!list.length) { c.innerHTML = '<span class="text-xs text-slate-400">尚未設定</span>'; return; }
+    c.innerHTML = list.map(s => `<span class="chip bg-purple-50 text-purple-700"><i data-lucide="user" class="w-3 h-3"></i>${s}</span>`).join('');
+    if (window.lucide) lucide.createIcons();
   }
   function togglePositionFilter(v){ const i=selectedPositions.indexOf(v); i>-1?selectedPositions.splice(i,1):selectedPositions.push(v); }
   function toggleShiftFilter(v){ const i=selectedShifts.indexOf(v); i>-1?selectedShifts.splice(i,1):selectedShifts.push(v); }
