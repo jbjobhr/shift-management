@@ -63,7 +63,7 @@
         <div id="holidayGroupList" class="space-y-2"></div><button onclick="showAddHolidayGroup()" class="mt-3 px-3 py-1.5 bg-red-50 text-red-600 rounded-md text-sm font-medium hover:bg-red-100 transition flex items-center gap-1"><i data-lucide="plus" class="w-4 h-4"></i>新增假別組</button>
        </div>
        <div>
-        <label class="block text-sm font-medium text-slate-600 mb-2">個別假日日期</label>
+        <label class="block text-sm font-medium text-slate-600 mb-2">臨時假期</label>
         <div class="flex gap-2 mb-3">
          <input type="date" id="addIndividualHolidayDate" class="flex-1 max-w-xs"> <button onclick="addIndividualHolidayDate()" class="px-3 py-1.5 bg-red-50 text-red-600 rounded-md text-sm font-medium hover:bg-red-100 transition flex items-center gap-1"><i data-lucide="plus" class="w-4 h-4"></i>新增</button>
         </div>
@@ -79,7 +79,7 @@
         <div class="space-y-2" id="attendanceGroupList"></div><button onclick="showAddAttendanceGroup()" class="mt-3 px-3 py-1.5 bg-green-50 text-green-700 rounded-md text-sm font-medium hover:bg-green-100 transition flex items-center gap-1"><i data-lucide="plus" class="w-4 h-4"></i>新增考勤組</button>
        </div>
        <div>
-        <label class="block text-sm font-medium text-slate-600 mb-2">個別人員</label>
+        <label class="block text-sm font-medium text-slate-600 mb-2">臨時人員</label>
         <div class="flex gap-2 mb-2">
          <input type="text" id="searchPersonByIdInput" placeholder="員工編號或身份證" class="flex-1"> <button onclick="searchPersonById()" class="px-3 py-1.5 bg-green-50 text-green-700 rounded-md text-sm font-medium hover:bg-green-100 transition">搜尋</button>
         </div>
@@ -466,7 +466,7 @@
   function renderIndividualHolidays() {
     const container = document.getElementById('individualHolidayList');
     if (individualHolidays.length === 0) {
-      container.innerHTML = '<div class="text-sm text-slate-500">尚未新增個別假日</div>';
+      container.innerHTML = '<div class="text-sm text-slate-500">尚未新增臨時假期</div>';
       return;
     }
     container.innerHTML = individualHolidays.map(date => 
