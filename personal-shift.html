@@ -1,0 +1,727 @@
+<!doctype html>
+<html lang="zh-TW" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>個人排班</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&amp;display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Noto Sans TC', sans-serif; }
+    html, body { height: 100%; width: 100%; box-sizing: border-box; }
+    .calendar-cell {
+      min-height: 78px; border: 1px solid #e2e8f0; padding: 6px;
+      font-size: 12px; vertical-align: top; background: #ffffff;
+      cursor: pointer; transition: background 0.15s;
+    }
+    .calendar-cell:hover { background: #f1f5f9; }
+    .calendar-cell.other-month { background: #f8fafc; color: #cbd5e1; cursor: default; }
+    .calendar-cell.other-month:hover { background: #f8fafc; }
+    .calendar-cell.out-of-range { background: #f1f5f9; color: #94a3b8; cursor: not-allowed; }
+    .calendar-cell.out-of-range:hover { background: #f1f5f9; }
+    .calendar-cell.today { box-shadow: inset 0 0 0 2px #3b82f6; }
+    .calendar-cell.holiday { background: #fef2f2; }
+    .calendar-cell.holiday .date-num { color: #dc2626; font-weight: 600; }
+    .shift-tag { display: block; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-top: 3px; text-align: center; }
+    .shift-tag.work { background: #fef3c7; color: #b45309; }
+    .shift-tag.off { background: #fee2e2; color: #b91c1c; }
+    .tag-item { display: inline-flex; align-items: center; gap: 6px; background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 4px; font-size: 13px; margin: 3px; }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 50; }
+    input[type="date"], input[type="time"], input[type="text"], select { border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 10px; font-size: 14px; }
+    input:focus, select:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.1); }
+  </style>
+ </head>
+ <body class="h-full bg-slate-50 w-full">
+  <div id="app" class="h-full w-full flex flex-col overflow-auto">
+   <header class="bg-[#1e3a5f] text-white px-6 py-4 flex items-center justify-between shrink-0">
+    <h1 class="text-xl font-bold tracking-wide flex items-center gap-2">
+     <i data-lucide="user-circle" class="w-5 h-5"></i><span id="pageTitle">個人排班</span>
+    </h1>
+    <nav class="flex gap-2">
+     <button onclick="savePersonal()" class="px-4 py-1.5 rounded-md text-sm font-medium transition bg-blue-600 hover:bg-blue-700 flex items-center gap-2">
+      <i data-lucide="save" class="w-4 h-4"></i>儲存
+     </button>
+     <a href="index.html" class="px-4 py-1.5 rounded-md text-sm font-medium transition bg-transparent hover:bg-white/10 text-white flex items-center gap-2">
+      <i data-lucide="arrow-left" class="w-4 h-4"></i>返回
+     </a>
+    </nav>
+   </header>
+
+   <main class="flex-1 overflow-auto p-6">
+    <div class="max-w-6xl mx-auto space-y-6">
+
+     <!-- 個人資訊 + 區間 -->
+     <section class="bg-white rounded-xl shadow-sm p-5 space-y-4">
+      <div class="flex items-center gap-3">
+       <div class="w-12 h-12 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-lg font-bold" id="empAvatar">?</div>
+       <div class="flex-1">
+        <div class="text-lg font-bold text-slate-800" id="empName">未指定員工</div>
+        <div class="text-sm text-slate-500" id="empMeta">員工編號：-</div>
+       </div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+       <div>
+        <label class="block text-sm font-medium text-slate-600 mb-1">起始日期</label>
+        <input type="date" id="rangeStart" class="w-full">
+       </div>
+       <div>
+        <label class="block text-sm font-medium text-slate-600 mb-1">結束日期</label>
+        <input type="date" id="rangeEnd" class="w-full">
+       </div>
+       <div class="flex items-end gap-2">
+        <button onclick="prevMonth()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-md text-sm flex items-center gap-1">
+         <i data-lucide="chevron-left" class="w-4 h-4"></i>上月
+        </button>
+        <button onclick="nextMonth()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-md text-sm flex items-center gap-1">
+         下月<i data-lucide="chevron-right" class="w-4 h-4"></i>
+        </button>
+        <button onclick="goToday()" class="px-3 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-md text-sm">今天</button>
+       </div>
+      </div>
+     </section>
+
+     <!-- 月曆 -->
+     <section class="bg-white rounded-xl shadow-sm p-5">
+      <div class="flex items-center justify-between mb-4">
+       <h2 id="calendarTitle" class="font-bold text-lg text-slate-800"></h2>
+       <div class="flex items-center gap-3 text-xs text-slate-600">
+        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-blue-200 inline-block"></span>已排班</span>
+        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-red-200 inline-block"></span>休假/節假日</span>
+        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded border-2 border-blue-500 inline-block"></span>今天</span>
+       </div>
+      </div>
+      <table class="w-full border-collapse table-fixed">
+       <thead>
+        <tr class="bg-slate-100 text-slate-600 text-sm">
+         <th class="p-2 border border-slate-200">日</th>
+         <th class="p-2 border border-slate-200">一</th>
+         <th class="p-2 border border-slate-200">二</th>
+         <th class="p-2 border border-slate-200">三</th>
+         <th class="p-2 border border-slate-200">四</th>
+         <th class="p-2 border border-slate-200">五</th>
+         <th class="p-2 border border-slate-200">六</th>
+        </tr>
+       </thead>
+       <tbody id="calendarBody"></tbody>
+      </table>
+      <p class="text-xs text-slate-500 mt-3 flex items-center gap-1">
+       <i data-lucide="info" class="w-3.5 h-3.5"></i>
+       點擊區間內的日期可指派班別／休假，再次點擊可清除。
+      </p>
+     </section>
+
+     <!-- 個人化指派：假別組/考勤組/班別/崗位/標籤 -->
+     <div class="flex items-center justify-between">
+      <h2 class="text-lg font-bold text-slate-700 flex items-center gap-2">
+       <i data-lucide="settings" class="w-5 h-5 text-slate-500"></i>個人化指派
+      </h2>
+      <div class="flex items-center gap-3">
+       <span id="applyDirtyHint" class="text-xs text-amber-600 hidden">有未套用的變更</span>
+       <button onclick="applyPersonalSettings()" class="px-5 py-2 bg-[#1e3a5f] text-white rounded-lg text-sm font-medium hover:bg-[#2a4f7f] transition flex items-center gap-1">
+        <i data-lucide="check" class="w-4 h-4"></i>套用
+       </button>
+      </div>
+     </div>
+     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <!-- 假別組 -->
+      <section class="bg-white rounded-xl shadow-sm p-5 space-y-3">
+       <h2 class="font-bold text-lg text-slate-800 flex items-center gap-2">
+        <i data-lucide="calendar-off" class="w-5 h-5 text-red-500"></i>適用假別組
+       </h2>
+       <div id="personalHolidayGroups" class="space-y-2"></div>
+      </section>
+
+      <!-- 考勤組 -->
+      <section class="bg-white rounded-xl shadow-sm p-5 space-y-3">
+       <h2 class="font-bold text-lg text-slate-800 flex items-center gap-2">
+        <i data-lucide="users" class="w-5 h-5 text-green-600"></i>所屬考勤組
+       </h2>
+       <div id="personalAttendanceGroups" class="space-y-2"></div>
+      </section>
+
+      <!-- 班別 -->
+      <section class="bg-white rounded-xl shadow-sm p-5 space-y-3 hidden">
+       <h2 class="font-bold text-lg text-slate-800 flex items-center gap-2">
+        <i data-lucide="clock" class="w-5 h-5 text-amber-600"></i>可排班別
+       </h2>
+       <div id="personalShifts" class="space-y-2"></div>
+      </section>
+
+      <!-- 崗位 -->
+      <section class="bg-white rounded-xl shadow-sm p-5 space-y-3">
+       <h2 class="font-bold text-lg text-slate-800 flex items-center gap-2">
+        <i data-lucide="briefcase" class="w-5 h-5 text-teal-600"></i>崗位
+       </h2>
+       <select id="personalPositionSelect" class="w-full" onchange="addPersonalPosition()">
+        <option value="">-- 選擇崗位 --</option>
+       </select>
+       <div id="personalPositionList" class="flex flex-wrap"></div>
+      </section>
+
+      <!-- 標籤 -->
+      <section class="bg-white rounded-xl shadow-sm p-5 space-y-3 md:col-span-2">
+       <h2 class="font-bold text-lg text-slate-800 flex items-center gap-2">
+        <i data-lucide="tag" class="w-5 h-5 text-teal-600"></i>標籤
+       </h2>
+       <div class="flex gap-2">
+        <input type="text" id="personalTagInput" placeholder="搜尋或輸入新標籤" class="flex-1 max-w-sm">
+        <button onclick="addPersonalTag()" class="px-3 py-1.5 bg-teal-50 text-teal-700 rounded-md text-sm font-medium hover:bg-teal-100 transition">新增</button>
+       </div>
+       <div id="personalTagList" class="flex flex-wrap"></div>
+      </section>
+     </div>
+
+    </div>
+   </main>
+  </div>
+
+  <!-- 指派班別 modal -->
+  <div id="assignModal" class="modal-overlay hidden">
+   <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm space-y-4">
+    <h3 class="font-bold text-lg flex items-center gap-2">
+     <i data-lucide="calendar-check" class="w-5 h-5 text-blue-600"></i>
+     指派班別 <span id="assignDateLabel" class="text-sm text-slate-500 font-normal"></span>
+    </h3>
+    <div>
+     <label class="block text-sm font-medium text-slate-600 mb-2">選擇班別</label>
+     <div id="assignShiftOptions" class="space-y-2 max-h-60 overflow-y-auto"></div>
+    </div>
+    <div class="flex justify-between items-center pt-2 border-t">
+     <button onclick="clearAssignment()" class="px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md flex items-center gap-1">
+      <i data-lucide="trash-2" class="w-4 h-4"></i>清除
+     </button>
+     <div class="flex gap-2">
+      <button onclick="closeAssignModal()" class="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-md">取消</button>
+     </div>
+    </div>
+   </div>
+  </div>
+
+  <script>
+  // ===== 全域資料：自 localStorage 載入（由 index.html 同步） =====
+  const FALLBACK = {
+    persons: [
+      { name: '王小明', id: 'EMP001' },
+      { name: '李小華', id: 'EMP002' },
+      { name: '張大偉', id: 'EMP003' },
+      { name: '陳美玲', id: 'EMP004' },
+      { name: '林志豪', id: 'EMP005' }
+    ],
+    supervisors: [],
+    shifts: [
+      { name: '早班', shortName: '早', start: '08:00', end: '12:00', hours: 4 },
+      { name: '午班', shortName: '午', start: '13:00', end: '17:00', hours: 4 },
+      { name: '晚班', shortName: '晚', start: '18:00', end: '22:00', hours: 4 }
+    ],
+    holidayGroups: { '台灣國定假日': ['2024-01-01'] },
+    individualHolidays: [],
+    attendanceGroups: [
+      { name: 'A組 - 倉儲', members: ['EMP001', 'EMP002'], scheduleType: 'auto',
+        weekdayShifts: { mon:['早班'], tue:['早班'], wed:['早班'], thu:['早班'], fri:['早班'], sat:[], sun:[] } },
+      { name: 'B組 - 物流', members: ['EMP003'], scheduleType: 'auto',
+        weekdayShifts: { mon:['早班','午班'], tue:['早班','午班'], wed:['早班','午班'], thu:['早班','午班'], fri:['早班','午班'], sat:[], sun:[] } },
+      { name: 'C組 - 客服', members: ['EMP004', 'EMP005'], scheduleType: 'auto',
+        weekdayShifts: { mon:['早班','午班','晚班'], tue:['早班','午班','晚班'], wed:['早班','午班','晚班'], thu:['早班','午班','晚班'], fri:['早班','午班','晚班'], sat:[], sun:[] } }
+    ],
+    allPositions: ['揀貨員','包裝員','理貨員','搬運工','品檢員','分類員','叉車手','司機'],
+    positions: ['理貨員','包裝員'],
+    tags: ['可加班','新人','夜班優先'],
+    schedules: []
+  };
+  let G = FALLBACK;
+  const DATA_VERSION = 2;
+  try {
+    const raw = localStorage.getItem('shiftMgmt:global');
+    if (raw) {
+      const stored = JSON.parse(raw);
+      G = Object.assign({}, FALLBACK, stored);
+      if ((stored.__version || 0) < DATA_VERSION) {
+        G.attendanceGroups = FALLBACK.attendanceGroups;
+        G.__version = DATA_VERSION;
+        try { localStorage.setItem('shiftMgmt:global', JSON.stringify(G)); } catch(e){}
+      }
+    }
+  } catch (e) { console.warn('load global failed', e); }
+
+  // ===== 取得目前員工 =====
+  const params = new URLSearchParams(location.search);
+  const empId = params.get('empId') || '';
+  const employee = G.persons.find(p => p.id === empId) || { name: '(未指定)', id: empId || '-' };
+
+  // ===== 個人配置：自 localStorage 載入 =====
+  const PKEY = `shiftMgmt:personal:${empId || '_anon'}`;
+  let personal = {
+    rangeStart: '',
+    rangeEnd: '',
+    assignments: {},   // { 'YYYY-MM-DD': { type:'work'|'off', shiftName? } }
+    holidayGroups: [], // 適用的假別組名稱
+    attendanceGroups: [],
+    shifts: [],        // 可排班別名稱
+    positions: [],
+    tags: []
+  };
+  try {
+    const raw = localStorage.getItem(PKEY);
+    if (raw) personal = Object.assign(personal, JSON.parse(raw));
+  } catch (e) { console.warn('load personal failed', e); }
+
+  // 草稿：使用者選取後需點「Apply」才套用到 personal / localStorage
+  let draft = {
+    holidayGroups: [...personal.holidayGroups],
+    attendanceGroups: [...personal.attendanceGroups],
+    shifts: [...personal.shifts],
+    positions: [...personal.positions]
+  };
+  function setDirty(flag){
+    const el = document.getElementById('applyDirtyHint');
+    if (el) el.classList.toggle('hidden', !flag);
+  }
+
+  // 預設區間：當前月份
+  const today = new Date();
+  if (!personal.rangeStart) personal.rangeStart = fmt(new Date(today.getFullYear(), today.getMonth(), 1));
+  if (!personal.rangeEnd)   personal.rangeEnd   = fmt(new Date(today.getFullYear(), today.getMonth()+1, 0));
+
+  let viewMonth = new Date(personal.rangeStart);
+  viewMonth.setDate(1);
+
+  // ===== 工具 =====
+  function pad(n){ return String(n).padStart(2,'0'); }
+  function fmt(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+  function parseDate(s){ const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); }
+  function isHolidayDate(dateStr, dow){
+    if (dow === 0 || dow === 6) return true;
+    if ((G.individualHolidays||[]).includes(dateStr)) return true;
+    for (const grp of personal.holidayGroups) {
+      const dates = (G.holidayGroups||{})[grp] || [];
+      if (dates.includes(dateStr)) return true;
+    }
+    return false;
+  }
+
+  // ===== 渲染：頂部資訊 =====
+  function renderHeader(){
+    document.getElementById('pageTitle').textContent = `個人排班 - ${employee.name}`;
+    document.getElementById('empName').textContent = employee.name;
+    document.getElementById('empMeta').textContent = `員工編號：${employee.id}`;
+    document.getElementById('empAvatar').textContent = (employee.name||'?').charAt(0);
+    document.getElementById('rangeStart').value = personal.rangeStart;
+    document.getElementById('rangeEnd').value = personal.rangeEnd;
+  }
+
+  // ===== 渲染：月曆 =====
+  function renderCalendar(){
+    const year = viewMonth.getFullYear();
+    const month = viewMonth.getMonth();
+    document.getElementById('calendarTitle').textContent = `${year} 年 ${month+1} 月`;
+
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month+1, 0).getDate();
+    const todayStr = fmt(new Date());
+    const rs = personal.rangeStart, re = personal.rangeEnd;
+
+    const cells = [];
+    const prevMonthDays = new Date(year, month, 0).getDate();
+    for (let i = firstDay-1; i >= 0; i--) cells.push({ date: new Date(year, month-1, prevMonthDays-i), other: true });
+    for (let i = 1; i <= daysInMonth; i++) cells.push({ date: new Date(year, month, i), other: false });
+    let extra = 1;
+    while (cells.length % 7 !== 0 || cells.length < 35) cells.push({ date: new Date(year, month+1, extra++), other: true });
+
+    const tbody = document.getElementById('calendarBody');
+    tbody.innerHTML = '';
+
+    for (let r = 0; r < cells.length/7; r++){
+      const tr = document.createElement('tr');
+      for (let c = 0; c < 7; c++){
+        const cell = cells[r*7+c];
+        const td = document.createElement('td');
+        td.className = 'calendar-cell';
+        const ds = fmt(cell.date);
+        const dow = cell.date.getDay();
+        const inRange = (!rs || ds >= rs) && (!re || ds <= re);
+
+        if (cell.other) td.classList.add('other-month');
+        else if (!inRange) td.classList.add('out-of-range');
+
+        if (!cell.other && isHolidayDate(ds, dow)) td.classList.add('holiday');
+        if (ds === todayStr) td.classList.add('today');
+
+        const a = personal.assignments[ds];
+        let body = '';
+        if (a){
+          if (a.type === 'off') body = `<div class="shift-tag off">休</div>`;
+          else if (a.type === 'work') {
+            const names = a.shiftNames || (a.shiftName ? [a.shiftName] : []);
+            body = names.length
+              ? names.map(n => `<div class="shift-tag work">${n}</div>`).join('')
+              : `<div class="shift-tag work">已排</div>`;
+          }
+        }
+        td.innerHTML = `<div class="date-num text-right text-slate-700">${cell.date.getDate()}</div>${body}`;
+
+        if (!cell.other && inRange) {
+          td.addEventListener('click', () => openAssignModal(ds));
+        }
+        tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+    }
+    lucide.createIcons();
+  }
+
+  function prevMonth(){ viewMonth.setMonth(viewMonth.getMonth()-1); renderCalendar(); }
+  function nextMonth(){ viewMonth.setMonth(viewMonth.getMonth()+1); renderCalendar(); }
+  function goToday(){ viewMonth = new Date(); viewMonth.setDate(1); renderCalendar(); }
+
+  // ===== 指派 modal =====
+  let assigningDate = null;
+  let assigningSelected = [];
+  function openAssignModal(ds){
+    assigningDate = ds;
+    document.getElementById('assignDateLabel').textContent = `(${ds})`;
+
+    const enabledShiftNames = personal.shifts.length ? personal.shifts : G.shifts.map(s => s.name);
+    const shiftList = G.shifts.filter(s => enabledShiftNames.includes(s.name));
+
+    const current = personal.assignments[ds];
+    if (current?.type === 'work') {
+      assigningSelected = current.shiftNames ? [...current.shiftNames] : (current.shiftName ? [current.shiftName] : []);
+    } else {
+      assigningSelected = [];
+    }
+    renderAssignOptions(shiftList, current);
+    document.getElementById('assignModal').classList.remove('hidden');
+    lucide.createIcons();
+  }
+  function renderAssignOptions(shiftList, current){
+    const isOff = current?.type === 'off';
+    const opts = document.getElementById('assignShiftOptions');
+    opts.innerHTML = `
+      <button onclick="setAssignment('off')" class="w-full text-left px-3 py-2 rounded-md border ${isOff?'border-red-400 bg-red-50':'border-slate-200 hover:bg-slate-50'} text-sm flex items-center justify-between">
+        <span>休假</span>
+        ${isOff?'<i data-lucide=\"check\" class=\"w-4 h-4 text-red-600\"></i>':''}
+      </button>
+      ${shiftList.map(s => `
+        <label class="w-full px-3 py-2 rounded-md border ${assigningSelected.includes(s.name)?'border-blue-400 bg-blue-50':'border-slate-200 hover:bg-slate-50'} text-sm flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" ${assigningSelected.includes(s.name)?'checked':''} onchange="toggleAssignShift('${s.name.replace(/'/g, "\\'")}')">
+          <span class="flex-1"><span class="font-medium">${s.name}</span> <span class="text-xs text-slate-500">${s.start||''}~${s.end||''}</span></span>
+        </label>
+      `).join('') || '<div class="text-sm text-slate-400 px-3 py-2">尚無可選班別</div>'}
+      ${shiftList.length ? `<button onclick="confirmAssignShifts()" class="w-full mt-2 px-3 py-2 bg-[#1e3a5f] text-white rounded-md text-sm font-medium hover:bg-[#2a4f7f]">確認班別</button>` : ''}
+    `;
+    lucide.createIcons();
+  }
+  function toggleAssignShift(name){
+    const i = assigningSelected.indexOf(name);
+    if (i >= 0) assigningSelected.splice(i, 1);
+    else assigningSelected.push(name);
+    const enabledShiftNames = personal.shifts.length ? personal.shifts : G.shifts.map(s => s.name);
+    const shiftList = G.shifts.filter(s => enabledShiftNames.includes(s.name));
+    renderAssignOptions(shiftList, personal.assignments[assigningDate]);
+  }
+  function confirmAssignShifts(){
+    if (!assigningDate) return;
+    if (assigningSelected.length === 0) {
+      delete personal.assignments[assigningDate];
+    } else {
+      personal.assignments[assigningDate] = { type: 'work', shiftNames: [...assigningSelected] };
+    }
+    persistPersonal();
+    renderCalendar();
+    closeAssignModal();
+  }
+  function closeAssignModal(){
+    assigningDate = null;
+    assigningSelected = [];
+    document.getElementById('assignModal').classList.add('hidden');
+  }
+  function setAssignment(type, shiftName){
+    if (!assigningDate) return;
+    if (type === 'off') {
+      personal.assignments[assigningDate] = { type:'off' };
+    } else {
+      personal.assignments[assigningDate] = { type:'work', shiftNames: shiftName ? [shiftName] : [] };
+    }
+    persistPersonal();
+    renderCalendar();
+    closeAssignModal();
+  }
+  function clearAssignment(){
+    if (!assigningDate) return;
+    delete personal.assignments[assigningDate];
+    persistPersonal();
+    renderCalendar();
+    closeAssignModal();
+  }
+
+  // ===== 個人化分組設定 =====
+  function renderHolidayGroupsPanel(){
+    const c = document.getElementById('personalHolidayGroups');
+    const names = Object.keys(G.holidayGroups || {});
+    if (!names.length) { c.innerHTML = '<div class="text-sm text-slate-400">尚未建立任何假別組</div>'; return; }
+    c.innerHTML = names.map(n => `
+      <label class="flex items-center gap-3 p-2 bg-red-50 rounded-lg cursor-pointer">
+        <input type="radio" name="personalHolidayGroup" ${draft.holidayGroups.includes(n)?'checked':''} onclick="selectDraftSingle('holidayGroups','${n.replace(/'/g,"\\'")}')">
+        <div class="flex-1">
+          <div class="text-sm font-medium">${n}</div>
+          <div class="text-xs text-slate-500">${(G.holidayGroups[n]||[]).length} 個假日</div>
+        </div>
+      </label>
+    `).join('');
+  }
+  function renderAttendanceGroupsPanel(){
+    const c = document.getElementById('personalAttendanceGroups');
+    const list = G.attendanceGroups || [];
+    if (!list.length) { c.innerHTML = '<div class="text-sm text-slate-400">尚未建立任何考勤組</div>'; return; }
+    const DOW_LABELS = [['mon','一'],['tue','二'],['wed','三'],['thu','四'],['fri','五'],['sat','六'],['sun','日']];
+    c.innerHTML = list.map(g => {
+      const isAuto = (g.scheduleType || 'auto') === 'auto';
+      // 若考勤組沒設定 weekdayShifts，提供預設：週一到週五 = 第一個班別、週六日休
+      let ws = g.weekdayShifts;
+      if (!ws) {
+        const first = (G.shifts && G.shifts[0] && G.shifts[0].name) ? [G.shifts[0].name] : [];
+        ws = { mon: first, tue: first, wed: first, thu: first, fri: first, sat: [], sun: [] };
+      }
+      let weekdayHtml = '';
+      if (isAuto) {
+        weekdayHtml = `<div class="mt-2 grid grid-cols-7 gap-1">` + DOW_LABELS.map(([k, label]) => {
+          const v = ws[k];
+          const arr = Array.isArray(v) ? v : (typeof v === 'string' && v ? [v] : []);
+          const isWeekend = (k === 'sat' || k === 'sun');
+          const cellLabelCls = isWeekend ? 'text-red-500' : 'text-slate-500';
+          const content = arr.length
+            ? arr.map(n => `<div class="text-[10px] px-1 py-0.5 bg-amber-100 text-amber-700 rounded mb-0.5 truncate" title="${n}">${n}</div>`).join('')
+            : `<div class="text-[10px] text-slate-400">休</div>`;
+          return `<div class="bg-white border border-slate-200 rounded p-1 text-center">
+            <div class="text-[10px] ${cellLabelCls} mb-1">${label}</div>
+            ${content}
+          </div>`;
+        }).join('') + `</div>`;
+      } else {
+        weekdayHtml = `<div class="mt-2 text-xs text-slate-500">手動排班</div>`;
+      }
+      return `
+      <label class="flex items-start gap-3 p-2 bg-green-50 rounded-lg cursor-pointer">
+        <input type="radio" name="personalAttendanceGroup" class="mt-1" ${draft.attendanceGroups.includes(g.name)?'checked':''} onclick="selectDraftSingle('attendanceGroups','${g.name.replace(/'/g,"\\'")}')">
+        <div class="flex-1 min-w-0">
+          <div class="text-sm font-medium">${g.name}</div>
+          <div class="text-xs text-slate-500">${(g.members||[]).length} 人</div>
+          ${weekdayHtml}
+        </div>
+      </label>
+    `;}).join('');
+  }
+  function renderShiftsPanel(){
+    const c = document.getElementById('personalShifts');
+    const list = G.shifts || [];
+    if (!list.length) { c.innerHTML = '<div class="text-sm text-slate-400">尚未建立任何班別</div>'; return; }
+    c.innerHTML = list.map(s => `
+      <label class="flex items-center gap-3 p-2 bg-amber-50 rounded-lg cursor-pointer">
+        <input type="checkbox" ${draft.shifts.includes(s.name)?'checked':''} onchange="toggleDraftArr('shifts','${s.name.replace(/'/g,"\\'")}')">
+        <div class="flex-1">
+          <div class="text-sm font-medium">${s.name} <span class="text-xs text-slate-500">(${s.shortName||''})</span></div>
+          <div class="text-xs text-slate-500">${s.start||''} - ${s.end||''} · 工時 ${s.hours||0}h</div>
+        </div>
+      </label>
+    `).join('');
+  }
+  function renderPositionsPanel(){
+    const sel = document.getElementById('personalPositionSelect');
+    const all = G.allPositions || [];
+    const available = all.filter(p => !draft.positions.includes(p));
+    sel.innerHTML = `<option value="">-- 選擇崗位 --</option>` + available.map(p => `<option value="${p}">${p}</option>`).join('');
+    document.getElementById('personalPositionList').innerHTML = draft.positions.map((p, i) => `
+      <span class="tag-item bg-blue-50 text-blue-700">${p}<button onclick="removePersonalPosition(${i})" class="ml-1 text-red-400 hover:text-red-600">×</button></span>
+    `).join('');
+  }
+  function addPersonalPosition(){
+    const sel = document.getElementById('personalPositionSelect');
+    const v = sel.value;
+    if (v && !draft.positions.includes(v)) {
+      draft.positions.push(v);
+      setDirty(true);
+      renderPositionsPanel();
+    }
+    sel.value = '';
+  }
+  function removePersonalPosition(i){
+    draft.positions.splice(i,1);
+    setDirty(true);
+    renderPositionsPanel();
+  }
+  function renderTagsPanel(){
+    document.getElementById('personalTagList').innerHTML = personal.tags.map((t, i) => `
+      <span class="tag-item bg-teal-50 text-teal-700">${t}<button onclick="removePersonalTag(${i})" class="ml-1 text-red-400 hover:text-red-600">×</button></span>
+    `).join('');
+  }
+  function addPersonalTag(){
+    const input = document.getElementById('personalTagInput');
+    const v = input.value.trim();
+    if (v && !personal.tags.includes(v)) {
+      personal.tags.push(v);
+      // 同時補入全域標籤庫，方便其他頁面使用
+      if (!G.tags.includes(v)) {
+        G.tags.push(v);
+        try { localStorage.setItem('shiftMgmt:global', JSON.stringify(G)); } catch(e){}
+      }
+      persistPersonal(); renderTagsPanel();
+    }
+    input.value = '';
+  }
+  function removePersonalTag(i){
+    personal.tags.splice(i,1);
+    persistPersonal(); renderTagsPanel();
+  }
+
+  function togglePersonalArr(key, value){
+    const arr = personal[key];
+    const idx = arr.indexOf(value);
+    if (idx >= 0) arr.splice(idx, 1);
+    else arr.push(value);
+    persistPersonal();
+    if (key === 'holidayGroups') renderCalendar();
+  }
+
+  // 草稿切換：僅更新 draft，不立即套用
+  function toggleDraftArr(key, value){
+    const arr = draft[key];
+    const idx = arr.indexOf(value);
+    if (idx >= 0) arr.splice(idx, 1);
+    else arr.push(value);
+    setDirty(true);
+  }
+
+  // 單選：再次點擊可取消，選新的取代舊的
+  function selectDraftSingle(key, value){
+    const arr = draft[key];
+    const wasSelected = arr.includes(value);
+    draft[key] = wasSelected ? [] : [value];
+    setDirty(true);
+    if (key === 'holidayGroups') renderHolidayGroupsPanel();
+    if (key === 'attendanceGroups') renderAttendanceGroupsPanel();
+  }
+
+  function applyPersonalSettings(){
+    personal.holidayGroups = [...draft.holidayGroups];
+    personal.attendanceGroups = [...draft.attendanceGroups];
+    personal.shifts = [...draft.shifts];
+    personal.positions = [...draft.positions];
+    autoFillAssignments();
+    persistPersonal();
+    renderCalendar();
+    setDirty(false);
+  }
+
+  // 依目前設定，將區間內每一天填入班別或休假
+  function autoFillAssignments(){
+    const rs = personal.rangeStart, re = personal.rangeEnd;
+    if (!rs || !re) return;
+    const shiftNames = personal.shifts.length ? [...personal.shifts] : [];
+    // 若有選考勤組，優先採用考勤組的週一～週日排班（自動排班型態）
+    const DOW_KEYS = ['sun','mon','tue','wed','thu','fri','sat'];
+    const groupWeekday = {};
+    let useGroup = false;
+    (personal.attendanceGroups || []).forEach(name => {
+      const g = (G.attendanceGroups || []).find(x => x.name === name);
+      if (!g || g.scheduleType === 'manual') return;
+      useGroup = true;
+      // 若考勤組未設定，套用預設：週一到五為第一個班別
+      let ws = g.weekdayShifts;
+      if (!ws) {
+        const first = (G.shifts && G.shifts[0] && G.shifts[0].name) ? [G.shifts[0].name] : [];
+        ws = { mon: first, tue: first, wed: first, thu: first, fri: first, sat: [], sun: [] };
+      }
+      DOW_KEYS.forEach(k => {
+        const v = ws[k];
+        const arr = Array.isArray(v) ? v : (typeof v === 'string' && v ? [v] : []);
+        if (!groupWeekday[k]) groupWeekday[k] = [];
+        arr.forEach(n => { if (!groupWeekday[k].includes(n)) groupWeekday[k].push(n); });
+      });
+    });
+
+    // 假別組指定的日期（不含週末預設）
+    function isExplicitHoliday(dateStr){
+      if ((G.individualHolidays||[]).includes(dateStr)) return true;
+      for (const grp of personal.holidayGroups) {
+        const dates = (G.holidayGroups||{})[grp] || [];
+        if (dates.includes(dateStr)) return true;
+      }
+      return false;
+    }
+
+    const start = parseDate(rs), end = parseDate(re);
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate()+1)){
+      const ds = fmt(d);
+      const dow = d.getDay();
+      // 假別組明確列出的日期 → 一定休
+      if (isExplicitHoliday(ds)) {
+        personal.assignments[ds] = { type: 'off' };
+        continue;
+      }
+      let dayShifts;
+      if (useGroup) {
+        // 採用考勤組的設定（即使週末，只要有排班就排）
+        dayShifts = groupWeekday[DOW_KEYS[dow]] || [];
+      } else {
+        // 沒選考勤組：週末預設休，平日用可排班別
+        if (dow === 0 || dow === 6) { personal.assignments[ds] = { type: 'off' }; continue; }
+        dayShifts = shiftNames;
+      }
+      if (dayShifts.length) {
+        personal.assignments[ds] = { type: 'work', shiftNames: [...dayShifts] };
+      } else {
+        personal.assignments[ds] = { type: 'off' };
+      }
+    }
+  }
+
+  // ===== 持久化 =====
+  function persistPersonal(){
+    try { localStorage.setItem(PKEY, JSON.stringify(personal)); } catch(e){}
+  }
+  function savePersonal(){
+    persistPersonal();
+    alert('已儲存個人排班設定');
+  }
+
+  // ===== 事件繫結 =====
+  document.getElementById('rangeStart').addEventListener('change', e => {
+    personal.rangeStart = e.target.value; persistPersonal();
+    if (personal.rangeStart) { viewMonth = new Date(personal.rangeStart); viewMonth.setDate(1); }
+    renderCalendar();
+  });
+  document.getElementById('rangeEnd').addEventListener('change', e => {
+    personal.rangeEnd = e.target.value; persistPersonal();
+    renderCalendar();
+  });
+
+  // ===== 初始化 =====
+  document.addEventListener('DOMContentLoaded', () => {
+    renderHeader();
+    renderCalendar();
+    renderHolidayGroupsPanel();
+    renderAttendanceGroupsPanel();
+    renderShiftsPanel();
+    renderPositionsPanel();
+    renderTagsPanel();
+    lucide.createIcons();
+  });
+
+  // 暴露給 inline handler
+  window.prevMonth = prevMonth;
+  window.nextMonth = nextMonth;
+  window.goToday = goToday;
+  window.openAssignModal = openAssignModal;
+  window.closeAssignModal = closeAssignModal;
+  window.setAssignment = setAssignment;
+  window.clearAssignment = clearAssignment;
+  window.togglePersonalArr = togglePersonalArr;
+  window.addPersonalPosition = addPersonalPosition;
+  window.removePersonalPosition = removePersonalPosition;
+  window.addPersonalTag = addPersonalTag;
+  window.removePersonalTag = removePersonalTag;
+  window.savePersonal = savePersonal;
+  </script>
+ </body>
+</html>
