@@ -118,8 +118,11 @@
       </h2>
       <div class="flex items-center gap-3">
        <span id="applyDirtyHint" class="text-xs text-amber-600 hidden">有未套用的變更</span>
-       <button onclick="applyPersonalSettings()" class="px-5 py-2 bg-[#1e3a5f] text-white rounded-lg text-sm font-medium hover:bg-[#2a4f7f] transition flex items-center gap-1">
-        <i data-lucide="check" class="w-4 h-4"></i>套用
+       <button onclick="applyPersonalSettings('keep')" class="px-4 py-2 bg-white border border-[#1e3a5f] text-[#1e3a5f] rounded-lg text-sm font-medium hover:bg-slate-100 transition flex items-center gap-1" title="保留原本已指派的日期，只填入未指派的日期">
+        <i data-lucide="plus" class="w-4 h-4"></i>保留並套用
+       </button>
+       <button onclick="applyPersonalSettings('clear')" class="px-4 py-2 bg-[#1e3a5f] text-white rounded-lg text-sm font-medium hover:bg-[#2a4f7f] transition flex items-center gap-1" title="清除區間內原有的指派並重新套用">
+        <i data-lucide="refresh-cw" class="w-4 h-4"></i>清除並套用
        </button>
       </div>
      </div>
@@ -602,19 +605,26 @@
     if (key === 'attendanceGroups') renderAttendanceGroupsPanel();
   }
 
-  function applyPersonalSettings(){
+  function applyPersonalSettings(mode){
+    // mode: 'clear' = 清除原資料後重新套用；'keep' = 保留已指派，僅補未指派日期
+    if (mode !== 'keep' && mode !== 'clear') mode = 'clear';
+    if (mode === 'clear') {
+      if (!confirm('將清除區間內原有的指派並重新套用，確定繼續？')) return;
+    }
     personal.holidayGroups = [...draft.holidayGroups];
     personal.attendanceGroups = [...draft.attendanceGroups];
     personal.shifts = [...draft.shifts];
     personal.positions = [...draft.positions];
-    autoFillAssignments();
+    autoFillAssignments(mode);
     persistPersonal();
     renderCalendar();
     setDirty(false);
   }
 
   // 依目前設定，將區間內每一天填入班別或休假
-  function autoFillAssignments(){
+  // mode: 'clear' 覆寫所有日期；'keep' 僅填入尚未指派的日期
+  function autoFillAssignments(mode){
+    if (mode !== 'keep') mode = 'clear';
     const rs = personal.rangeStart, re = personal.rangeEnd;
     if (!rs || !re) return;
     const shiftNames = personal.shifts.length ? [...personal.shifts] : [];
@@ -654,6 +664,8 @@
     for (let d = new Date(start); d <= end; d.setDate(d.getDate()+1)){
       const ds = fmt(d);
       const dow = d.getDay();
+      // 保留模式：若該日已有指派就跳過
+      if (mode === 'keep' && personal.assignments[ds]) continue;
       // 假別組明確列出的日期 → 一定休
       if (isExplicitHoliday(ds)) {
         personal.assignments[ds] = { type: 'off' };
@@ -717,6 +729,7 @@
   window.setAssignment = setAssignment;
   window.clearAssignment = clearAssignment;
   window.togglePersonalArr = togglePersonalArr;
+  window.applyPersonalSettings = applyPersonalSettings;
   window.addPersonalPosition = addPersonalPosition;
   window.removePersonalPosition = removePersonalPosition;
   window.addPersonalTag = addPersonalTag;

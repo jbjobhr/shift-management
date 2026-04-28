@@ -178,7 +178,13 @@
      </div>
      <div id="searchResultsList" class="border border-slate-200 rounded-md max-h-40 overflow-y-auto bg-slate-50"></div>
     </div>
-    <div><label class="block text-sm font-medium text-slate-600 mb-1">已選人員</label>
+    <div>
+     <div class="flex items-center justify-between mb-1">
+      <label class="block text-sm font-medium text-slate-600">已選人員</label>
+      <button type="button" onclick="syncAssigneeList()" class="px-2.5 py-1 text-xs font-medium text-red-600 border border-red-300 rounded-md hover:bg-red-50 transition flex items-center gap-1">
+       <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>同步派任名單
+      </button>
+     </div>
      <div id="selectedPersonsInGroup" class="bg-slate-50 border border-slate-200 rounded-md p-2 min-h-[60px] space-y-1 max-h-40 overflow-y-auto"></div>
     </div>
     <div class="flex justify-end gap-2 pt-2">
@@ -635,6 +641,11 @@
 
   function closeAttendanceGroupModal() {
     document.getElementById('attendanceGroupModal').classList.add('hidden');
+  }
+
+  function syncAssigneeList() {
+    // TODO: 同步派任名單功能（暫無實作）
+    alert('同步派任名單功能尚未實作');
   }
 
   function searchPersonForGroup() {
