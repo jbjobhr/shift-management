@@ -1,0 +1,1090 @@
+<!doctype html>
+<html lang="zh-TW" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>派遣排班系統</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&amp;display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Noto Sans TC', sans-serif; }
+    html, body { height: 100%; width: 100%; }
+    .tab-active { background: #e2e8f0; color: #1e3a5f; }
+    .tab-inactive { background: transparent; color: #ffffff; }
+    .chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 9999px; font-size: 12px; }
+    .calendar-cell { min-width: 50px; min-height: 40px; border: 1px solid #e2e8f0; text-align: center; font-size: 12px; padding: 4px; }
+    .calendar-cell.holiday { background: #fef2f2; color: #dc2626; }
+    .calendar-cell.assigned { background: #dbeafe; color: #1e40af; font-weight: 500; }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 50; }
+    .tag-item { display: inline-flex; align-items: center; gap: 6px; background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 4px; font-size: 13px; margin: 3px; }
+    input[type="date"], input[type="time"], input[type="text"], select { border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 10px; font-size: 14px; }
+    input:focus, select:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.1); }
+  </style>
+  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
+  <style>body { box-sizing: border-box; }</style>
+ </head>
+ <body class="h-full bg-slate-50 w-full">
+  <div id="app" class="h-full w-full flex flex-col overflow-auto">
+   <header class="bg-[#1e3a5f] text-white px-6 py-4 flex items-center justify-between shrink-0">
+    <h1 id="appTitle" class="text-xl font-bold tracking-wide">派遣排班系統</h1>
+    <div class="flex gap-2">
+     <button onclick="showNewScheduleModal()" class="px-4 py-1.5 rounded-md text-sm font-medium transition bg-blue-600 hover:bg-blue-700 flex items-center gap-2"><i data-lucide="plus" class="w-4 h-4"></i>新增班表</button> <button onclick="switchTab('settings')" id="tabSettings" class="px-4 py-1.5 rounded-md text-sm font-medium transition tab-active">排班設定</button> <button onclick="switchTab('schedule')" id="tabSchedule" class="px-4 py-1.5 rounded-md text-sm font-medium transition tab-inactive">排班班表</button>
+    </div>
+   </header>
+   <div id="pageSettings" class="flex-1 overflow-auto p-6">
+    <div class="max-w-4xl mx-auto space-y-6">
+     <section class="bg-white rounded-xl shadow-sm p-5 space-y-4">
+      <h2 class="font-bold text-lg text-slate-800 flex items-center gap-2"><i data-lucide="clipboard-list" class="w-5 h-5 text-blue-600"></i>基本資訊</h2>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+       <div>
+        <label class="block text-sm font-medium text-slate-600 mb-1">班表名稱</label> <input type="text" id="scheduleName" value="2024年1月排班" class="w-full">
+       </div>
+       <div>
+        <label class="block text-sm font-medium text-slate-600 mb-1">起始日期</label> <input type="date" id="startDate" value="2024-01-01" class="w-full">
+       </div>
+       <div>
+        <label class="block text-sm font-medium text-slate-600 mb-1">結束日期</label> <input type="date" id="endDate" value="2024-01-31" class="w-full">
+       </div>
+      </div>
+     </section>
+     <section class="bg-white rounded-xl shadow-sm p-5 space-y-4">
+      <h2 class="font-bold text-lg text-slate-800 flex items-center gap-2"><i data-lucide="calendar-off" class="w-5 h-5 text-red-500"></i>節假日設定</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+       <div>
+        <label class="block text-sm font-medium text-slate-600 mb-2">假別組管理</label>
+        <div id="holidayGroupList" class="space-y-2"></div><button onclick="showAddHolidayGroup()" class="mt-3 px-3 py-1.5 bg-red-50 text-red-600 rounded-md text-sm font-medium hover:bg-red-100 transition flex items-center gap-1"><i data-lucide="plus" class="w-4 h-4"></i>新增假別組</button>
+       </div>
+       <div>
+        <label class="block text-sm font-medium text-slate-600 mb-2">個別假日日期</label>
+        <div class="flex gap-2 mb-3">
+         <input type="date" id="addIndividualHolidayDate" class="flex-1 max-w-xs"> <button onclick="addIndividualHolidayDate()" class="px-3 py-1.5 bg-red-50 text-red-600 rounded-md text-sm font-medium hover:bg-red-100 transition flex items-center gap-1"><i data-lucide="plus" class="w-4 h-4"></i>新增</button>
+        </div>
+        <div id="individualHolidayList" class="flex flex-wrap gap-2"></div>
+       </div>
+      </div>
+     </section>
+     <section class="bg-white rounded-xl shadow-sm p-5 space-y-4">
+      <h2 class="font-bold text-lg text-slate-800 flex items-center gap-2"><i data-lucide="users" class="w-5 h-5 text-green-600"></i>排班人員</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+       <div>
+        <label class="block text-sm font-medium text-slate-600 mb-2">考勤組</label>
+        <div class="space-y-2" id="attendanceGroupList"></div><button onclick="showAddAttendanceGroup()" class="mt-3 px-3 py-1.5 bg-green-50 text-green-700 rounded-md text-sm font-medium hover:bg-green-100 transition flex items-center gap-1"><i data-lucide="plus" class="w-4 h-4"></i>新增考勤組</button>
+       </div>
+       <div>
+        <label class="block text-sm font-medium text-slate-600 mb-2">個別人員</label>
+        <div class="flex gap-2 mb-2">
+         <input type="text" id="searchPersonByIdInput" placeholder="員工編號或身份證" class="flex-1"> <button onclick="searchPersonById()" class="px-3 py-1.5 bg-green-50 text-green-700 rounded-md text-sm font-medium hover:bg-green-100 transition">搜尋</button>
+        </div>
+        <div id="searchPersonByIdResults" class="border border-slate-200 rounded-md max-h-40 overflow-y-auto bg-slate-50 mb-2"></div>
+        <div id="personList" class="flex flex-wrap gap-1"></div>
+       </div>
+      </div>
+     </section>
+     <section class="bg-white rounded-xl shadow-sm p-5 space-y-4">
+      <h2 class="font-bold text-lg text-slate-800 flex items-center gap-2"><i data-lucide="eye" class="w-5 h-5 text-purple-600"></i>檢視人員（主管）</h2>
+      <div class="flex gap-2">
+       <input type="text" id="addSupervisor" placeholder="主管姓名" class="flex-1 max-w-xs"> <button onclick="addSupervisorFn()" class="px-3 py-1.5 bg-purple-50 text-purple-700 rounded-md text-sm font-medium hover:bg-purple-100 transition">新增</button>
+      </div>
+      <div id="supervisorList" class="flex flex-wrap gap-1"></div>
+     </section>
+     <section class="bg-white rounded-xl shadow-sm p-5 space-y-4">
+      <h2 class="font-bold text-lg text-slate-800 flex items-center gap-2"><i data-lucide="clock" class="w-5 h-5 text-amber-600"></i>班別排班</h2>
+      <div id="shiftList" class="space-y-2"></div><button onclick="showAddShift()" class="px-4 py-2 bg-amber-50 text-amber-700 rounded-md text-sm font-medium hover:bg-amber-100 transition flex items-center gap-1"><i data-lucide="plus" class="w-4 h-4"></i>新增班別</button>
+     </section>
+     <section class="bg-white rounded-xl shadow-sm p-5 space-y-4">
+      <h2 class="font-bold text-lg text-slate-800 flex items-center gap-2"><i data-lucide="briefcase" class="w-5 h-5 text-teal-600"></i>職缺</h2><select id="positionSelect" class="w-full" onchange="addPositionFromSelect()"> <option value="">-- 選擇職缺 --</option> </select>
+      <div id="positionList" class="flex flex-wrap gap-1"></div>
+     </section>
+     <section class="bg-white rounded-xl shadow-sm p-5 space-y-4">
+      <h2 class="font-bold text-lg text-slate-800 flex items-center gap-2"><i data-lucide="tag" class="w-5 h-5 text-teal-600"></i>標籤</h2>
+      <div class="flex gap-2">
+       <div class="relative flex-1"><input type="text" id="tagInput" placeholder="搜尋或輸入新標籤" class="w-full" oninput="filterTagDropdown()" onfocus="filterTagDropdown()">
+        <div id="tagDropdown" class="absolute top-full left-0 right-0 bg-white border border-slate-200 rounded-md shadow-lg mt-1 max-h-40 overflow-y-auto z-10 hidden"></div>
+       </div><button onclick="addCustomTag()" class="px-3 py-1.5 bg-teal-50 text-teal-700 rounded-md text-sm font-medium hover:bg-teal-100 transition">新增</button>
+      </div>
+      <div id="tagList" class="flex flex-wrap gap-1"></div>
+     </section>
+     <div class="flex justify-end">
+      <button onclick="switchTab('schedule')" class="px-6 py-2.5 bg-[#1e3a5f] text-white rounded-lg font-medium hover:bg-[#2a4f7f] transition">儲存並前往班表 →</button>
+     </div>
+    </div>
+   </div>
+   <div id="pageSchedule" class="flex-1 overflow-auto p-6 hidden">
+    <div class="w-full space-y-4">
+     <div class="bg-white rounded-xl shadow-sm p-4 space-y-3">
+      <div class="flex items-center justify-between border-b border-slate-200 pb-3 mb-3">
+       <div class="flex items-center gap-3">
+        <h2 class="text-lg font-bold text-slate-800" id="schedulePageTitle">2024年1月排班</h2><button onclick="toggleScheduleList()" class="text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-600 transition">切換班表</button>
+       </div>
+       <div id="scheduleListDropdown" class="hidden absolute top-20 left-6 bg-white border border-slate-300 rounded-lg shadow-lg z-30 min-w-[200px]">
+        <div class="p-2 space-y-1" id="scheduleListContainer"></div>
+       </div>
+      </div>
+     </div>
+     <div class="bg-white rounded-xl shadow-sm p-4 space-y-3">
+      <div class="flex flex-wrap gap-4">
+       <div class="relative"><label class="block text-xs font-medium text-slate-500 mb-2">職缺</label> <button onclick="toggleFilterDropdown('positionFilter')" class="text-sm border border-slate-300 rounded-md px-3 py-1.5 bg-white hover:bg-slate-50">▼ 選擇職缺</button>
+        <div id="positionFilter" class="hidden absolute top-full left-0 bg-white border border-slate-300 rounded-md shadow-lg mt-1 min-w-[180px] z-20">
+         <div id="positionFilterList" class="p-2 space-y-1"></div>
+        </div>
+       </div>
+       <div class="relative"><label class="block text-xs font-medium text-slate-500 mb-2">班別</label> <button onclick="toggleFilterDropdown('shiftFilter')" class="text-sm border border-slate-300 rounded-md px-3 py-1.5 bg-white hover:bg-slate-50">▼ 選擇班別</button>
+        <div id="shiftFilter" class="hidden absolute top-full left-0 bg-white border border-slate-300 rounded-md shadow-lg mt-1 min-w-[180px] z-20">
+         <div id="shiftFilterList" class="p-2 space-y-1"></div>
+        </div>
+       </div>
+       <div class="relative"><label class="block text-xs font-medium text-slate-500 mb-2">節假日</label> <button onclick="toggleFilterDropdown('holidayFilter')" class="text-sm border border-slate-300 rounded-md px-3 py-1.5 bg-white hover:bg-slate-50">▼ 選擇假別</button>
+        <div id="holidayFilter" class="hidden absolute top-full left-0 bg-white border border-slate-300 rounded-md shadow-lg mt-1 min-w-[200px] z-20 max-h-64 overflow-y-auto">
+         <div id="holidayGroupFilterList" class="p-2 space-y-1 border-b border-slate-200"></div>
+         <div id="holidayDateFilterList" class="p-2 space-y-1"></div>
+        </div>
+       </div>
+       <div class="relative"><label class="block text-xs font-medium text-slate-500 mb-2">考勤組</label> <button onclick="toggleFilterDropdown('groupFilter')" class="text-sm border border-slate-300 rounded-md px-3 py-1.5 bg-white hover:bg-slate-50">▼ 選擇考勤組</button>
+        <div id="groupFilter" class="hidden absolute top-full left-0 bg-white border border-slate-300 rounded-md shadow-lg mt-1 min-w-[180px] z-20">
+         <div id="groupFilterList" class="p-2 space-y-1"></div>
+        </div>
+       </div>
+       <div class="relative"><label class="block text-xs font-medium text-slate-500 mb-2">標籤</label> <button onclick="toggleFilterDropdown('tagFilter')" class="text-sm border border-slate-300 rounded-md px-3 py-1.5 bg-white hover:bg-slate-50">▼ 選擇標籤</button>
+        <div id="tagFilter" class="hidden absolute top-full left-0 bg-white border border-slate-300 rounded-md shadow-lg mt-1 min-w-[180px] z-20">
+         <div id="tagFilterList" class="p-2 space-y-1"></div>
+        </div>
+       </div>
+      </div>
+      <div class="pt-3 border-t border-slate-200">
+       <div class="text-xs font-medium text-slate-600 mb-2">
+        已選篩選條件
+       </div>
+       <div class="flex flex-wrap gap-2" id="activeFilters"><span class="text-xs text-slate-500">尚未選擇</span>
+       </div>
+      </div>
+      <div><label class="block text-xs font-medium text-slate-500 mb-1">搜尋</label><input type="text" id="searchInput" placeholder="姓名、員工編號或身份證" class="text-sm w-full max-w-xs" oninput="applyScheduleFilters()">
+      </div>
+     </div>
+     <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div class="overflow-x-auto">
+       <table class="w-full text-sm" id="scheduleTable">
+        <thead id="scheduleHead"></thead>
+        <tbody id="scheduleBody"></tbody>
+       </table>
+      </div>
+     </div>
+    </div>
+   </div>
+  </div>
+  <div id="shiftModal" class="modal-overlay hidden">
+   <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm space-y-4">
+    <h3 class="font-bold text-lg">新增班別</h3>
+    <div><label class="block text-sm font-medium text-slate-600 mb-1">班別名稱</label><input type="text" id="shiftName" placeholder="如：早班" class="w-full">
+    </div>
+    <div><label class="block text-sm font-medium text-slate-600 mb-1">班別簡稱</label><input type="text" id="shiftShortName" placeholder="如：早" class="w-full" maxlength="4">
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+     <div><label class="block text-sm font-medium text-slate-600 mb-1">起始</label><input type="time" id="shiftStart" value="08:00" class="w-full">
+     </div>
+     <div><label class="block text-sm font-medium text-slate-600 mb-1">結束</label><input type="time" id="shiftEnd" value="12:00" class="w-full">
+     </div>
+    </div>
+    <div><label class="block text-sm font-medium text-slate-600 mb-1">總工時數（小時）</label><input type="number" id="shiftHours" min="0" step="0.5" placeholder="4" class="w-full">
+    </div>
+    <div class="border-t border-slate-200 pt-4 mt-4">
+     <label class="block text-sm font-medium text-slate-600 mb-3 flex items-center gap-2"><i data-lucide="timer" class="w-4 h-4 text-orange-600"></i>可加班時段（此班別專用）</label>
+     <div class="grid grid-cols-2 gap-3">
+      <div><label class="block text-sm font-medium text-slate-600 mb-1">起始時間</label><input type="time" id="shiftOtStart" class="w-full">
+      </div>
+      <div><label class="block text-sm font-medium text-slate-600 mb-1">結束時間</label><input type="time" id="shiftOtEnd" class="w-full">
+      </div>
+     </div>
+    </div>
+    <div class="flex justify-end gap-2 pt-2">
+     <button onclick="closeShiftModal()" class="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-md">取消</button> <button onclick="confirmAddShift()" class="px-4 py-2 text-sm bg-[#1e3a5f] text-white rounded-md hover:bg-[#2a4f7f]">確認</button>
+    </div>
+   </div>
+  </div>
+  <div id="newScheduleModal" class="modal-overlay hidden">
+   <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-md space-y-4">
+    <h3 class="font-bold text-lg">新增班表</h3>
+    <div><label class="block text-sm font-medium text-slate-600 mb-1">班表名稱</label><input type="text" id="newScheduleName" placeholder="如：2024年2月排班" class="w-full">
+    </div>
+    <div><label class="block text-sm font-medium text-slate-600 mb-1">起始日期</label><input type="date" id="newScheduleStart" class="w-full">
+    </div>
+    <div><label class="block text-sm font-medium text-slate-600 mb-1">結束日期</label><input type="date" id="newScheduleEnd" class="w-full">
+    </div>
+    <div class="flex justify-end gap-2 pt-2">
+     <button onclick="closeNewScheduleModal()" class="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-md">取消</button> <button onclick="confirmNewSchedule()" class="px-4 py-2 text-sm bg-[#1e3a5f] text-white rounded-md hover:bg-[#2a4f7f]">確認</button>
+    </div>
+   </div>
+  </div>
+  <div id="attendanceGroupModal" class="modal-overlay hidden">
+   <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-md space-y-4">
+    <h3 class="font-bold text-lg">新增考勤組</h3>
+    <div><label class="block text-sm font-medium text-slate-600 mb-1">考勤組名稱</label><input type="text" id="groupName" placeholder="如：A組 - 倉儲" class="w-full">
+    </div>
+    <div><label class="block text-sm font-medium text-slate-600 mb-2">搜尋人員</label>
+     <div class="flex gap-2 mb-2">
+      <input type="text" id="searchPersonInput" placeholder="員工編號或身份證" class="flex-1"> <button onclick="searchPersonForGroup()" class="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-md text-sm font-medium hover:bg-blue-100 transition">搜尋</button>
+     </div>
+     <div id="searchResultsList" class="border border-slate-200 rounded-md max-h-40 overflow-y-auto bg-slate-50"></div>
+    </div>
+    <div><label class="block text-sm font-medium text-slate-600 mb-1">已選人員</label>
+     <div id="selectedPersonsInGroup" class="bg-slate-50 border border-slate-200 rounded-md p-2 min-h-[60px] space-y-1 max-h-40 overflow-y-auto"></div>
+    </div>
+    <div class="flex justify-end gap-2 pt-2">
+     <button onclick="closeAttendanceGroupModal()" class="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-md">取消</button> <button onclick="confirmAddAttendanceGroup()" class="px-4 py-2 text-sm bg-[#1e3a5f] text-white rounded-md hover:bg-[#2a4f7f]">確認</button>
+    </div>
+   </div>
+  </div>
+  <div id="holidayGroupModal" class="modal-overlay hidden">
+   <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-md space-y-4">
+    <h3 class="font-bold text-lg" id="holidayModalTitle">新增假別組</h3>
+    <div><label class="block text-sm font-medium text-slate-600 mb-1">假別組名稱</label><input type="text" id="holidayGroupName" placeholder="如：台灣國定假日" class="w-full">
+    </div>
+    <div><label class="block text-sm font-medium text-slate-600 mb-2">假日日期</label>
+     <div class="flex gap-2 mb-2">
+      <input type="date" id="addHolidayDateInModal" class="flex-1"> <button onclick="addHolidayDateToGroup()" class="px-3 py-1.5 bg-red-50 text-red-600 rounded-md text-sm font-medium hover:bg-red-100 transition">新增</button>
+     </div>
+     <div id="holidayDateListInModal" class="flex flex-wrap gap-1"></div>
+    </div>
+    <div class="flex justify-end gap-2 pt-2">
+     <button onclick="closeHolidayGroupModal()" class="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-md">取消</button> <button onclick="confirmAddHolidayGroup()" class="px-4 py-2 text-sm bg-[#1e3a5f] text-white rounded-md hover:bg-[#2a4f7f]">確認</button>
+    </div>
+   </div>
+  </div>
+  <script>
+  let holidayGroups = {
+    '台灣國定假日': ['2024-01-01', '2024-02-28', '2024-04-04', '2024-06-10'],
+    '自訂假別A': ['2024-01-15', '2024-02-15'],
+    '自訂假別B': ['2024-03-01', '2024-03-15']
+  };
+  let individualHolidays = ['2024-01-20', '2024-02-20'];
+  let selectedHolidayGroup = '台灣國定假日';
+  let holidays = holidayGroups[selectedHolidayGroup] || [];
+  let editingHolidayGroup = null;
+  let editingHolidayDates = [];
+  let persons = [
+    { name: '王小明', id: 'EMP001' },
+    { name: '李小華', id: 'EMP002' },
+    { name: '張大偉', id: 'EMP003' },
+    { name: '陳美玲', id: 'EMP004' },
+    { name: '林志豪', id: 'EMP005' }
+  ];
+  let supervisors = ['劉經理'];
+  let shifts = [
+    { name: '早班', shortName: '早', start: '08:00', end: '12:00', hours: 4, otStart: '', otEnd: '' },
+    { name: '午班', shortName: '午', start: '13:00', end: '17:00', hours: 4, otStart: '', otEnd: '' },
+    { name: '晚班', shortName: '晚', start: '18:00', end: '22:00', hours: 4, otStart: '18:00', otEnd: '21:00' }
+  ];
+  let attendanceGroups = [
+    { name: 'A組 - 倉儲', members: ['EMP001', 'EMP002'] },
+    { name: 'B組 - 物流', members: ['EMP003'] },
+    { name: 'C組 - 客服', members: ['EMP004', 'EMP005'] }
+  ];
+  let currentGroupMembers = [];
+  let allPositions = ['揀貨員', '包裝員', '理貨員', '搬運工', '品檢員', '分類員', '叉車手', '司機'];
+  let positions = ['理貨員', '包裝員'];
+  let tags = ['可加班', '新人', '夜班優先'];
+
+  let selectedPositions = [];
+  let selectedShifts = [];
+  let selectedHolidays = [];
+  let selectedGroups = [];
+  let selectedTags = [];
+
+  // 班表列表
+  let schedules = [
+    { name: '2024年1月排班', start: '2024-01-01', end: '2024-01-31' },
+    { name: '2024年2月排班', start: '2024-02-01', end: '2024-02-29' },
+    { name: '2024年3月排班', start: '2024-03-01', end: '2024-03-31' }
+  ];
+  let currentScheduleIndex = 0;
+
+  const defaultConfig = {
+    app_title: '派遣排班系統',
+    background_color: '#f8fafc',
+    header_color: '#1e3a5f',
+    text_color: '#1e293b',
+    accent_color: '#3b82f6',
+    surface_color: '#ffffff',
+    font_family: 'Noto Sans TC',
+    font_size: 14
+  };
+
+  function applyConfig(config) {
+    document.getElementById('appTitle').textContent = config.app_title || defaultConfig.app_title;
+    document.body.style.fontFamily = `${config.font_family || defaultConfig.font_family}, sans-serif`;
+    document.querySelector('header').style.background = config.header_color || defaultConfig.header_color;
+    document.getElementById('app').style.background = config.background_color || defaultConfig.background_color;
+  }
+
+  // Always apply defaults so local preview works even without SDK.
+  applyConfig(defaultConfig);
+
+  if (window.elementSdk && typeof window.elementSdk.init === 'function') {
+    window.elementSdk.init({
+      defaultConfig,
+      onConfigChange: async (config) => { applyConfig(config); },
+      mapToCapabilities: (config) => ({
+        recolorables: [
+          { get: () => config.background_color || defaultConfig.background_color, set: (v) => { config.background_color = v; window.elementSdk.setConfig({ background_color: v }); } },
+          { get: () => config.surface_color || defaultConfig.surface_color, set: (v) => { config.surface_color = v; window.elementSdk.setConfig({ surface_color: v }); } },
+          { get: () => config.text_color || defaultConfig.text_color, set: (v) => { config.text_color = v; window.elementSdk.setConfig({ text_color: v }); } },
+          { get: () => config.header_color || defaultConfig.header_color, set: (v) => { config.header_color = v; window.elementSdk.setConfig({ header_color: v }); } },
+          { get: () => config.accent_color || defaultConfig.accent_color, set: (v) => { config.accent_color = v; window.elementSdk.setConfig({ accent_color: v }); } }
+        ],
+        borderables: [],
+        fontEditable: { get: () => config.font_family || defaultConfig.font_family, set: (v) => { config.font_family = v; window.elementSdk.setConfig({ font_family: v }); } },
+        fontSizeable: { get: () => config.font_size || defaultConfig.font_size, set: (v) => { config.font_size = v; window.elementSdk.setConfig({ font_size: v }); } }
+      }),
+      mapToEditPanelValues: (config) => new Map([
+        ['app_title', config.app_title || defaultConfig.app_title]
+      ])
+    });
+  }
+
+  function switchTab(tab) {
+    document.getElementById('pageSettings').classList.toggle('hidden', tab !== 'settings');
+    document.getElementById('pageSchedule').classList.toggle('hidden', tab !== 'schedule');
+    document.getElementById('tabSettings').className = `px-4 py-1.5 rounded-md text-sm font-medium transition ${tab === 'settings' ? 'tab-active' : 'tab-inactive'}`;
+    document.getElementById('tabSchedule').className = `px-4 py-1.5 rounded-md text-sm font-medium transition ${tab === 'schedule' ? 'tab-active' : 'tab-inactive'}`;
+    if (tab === 'schedule') { 
+      updateSchedulePageTitle();
+      renderScheduleFilters();
+      renderSchedule(); 
+    }
+  }
+
+  function updateSchedulePageTitle() {
+    const currentSchedule = schedules[currentScheduleIndex];
+    if (currentSchedule) {
+      document.getElementById('schedulePageTitle').textContent = currentSchedule.name;
+      document.getElementById('scheduleName').value = currentSchedule.name;
+      document.getElementById('startDate').value = currentSchedule.start;
+      document.getElementById('endDate').value = currentSchedule.end;
+    }
+  }
+
+  function toggleScheduleList() {
+    const dropdown = document.getElementById('scheduleListDropdown');
+    dropdown.classList.toggle('hidden');
+    if (!dropdown.classList.contains('hidden')) {
+      renderScheduleList();
+    }
+  }
+
+  function renderScheduleList() {
+    const container = document.getElementById('scheduleListContainer');
+    container.innerHTML = schedules.map((schedule, index) => `
+      <button onclick="switchToSchedule(${index})" class="w-full text-left px-3 py-2 text-sm rounded transition ${index === currentScheduleIndex ? 'bg-blue-100 text-blue-700 font-medium' : 'hover:bg-slate-100 text-slate-700'}">
+        ${schedule.name}
+      </button>
+    `).join('');
+  }
+
+  function switchToSchedule(index) {
+    currentScheduleIndex = index;
+    updateSchedulePageTitle();
+    renderScheduleFilters();
+    renderSchedule();
+    document.getElementById('scheduleListDropdown').classList.add('hidden');
+  }
+
+  function addHoliday() {
+    const d = document.getElementById('addHolidayDate').value;
+    if (d && !holidays.includes(d)) { holidays.push(d); renderHolidays(); }
+  }
+
+  function renderHolidays() {
+    const container = document.getElementById('holidayGroupList');
+    container.innerHTML = Object.keys(holidayGroups).map(groupName => {
+      const dates = holidayGroups[groupName];
+      return `<div class="flex items-center gap-3 p-3 bg-red-50 rounded-lg">
+        <input type="checkbox" checked class="rounded">
+        <div class="flex-1">
+          <div class="font-medium text-sm">${groupName}</div>
+          <div class="text-xs text-slate-500">${dates.length} 個假日</div>
+        </div>
+        <button onclick="editHolidayGroup('${groupName}')" class="text-blue-400 hover:text-blue-600 text-sm px-2">編輯</button>
+        <button onclick="deleteHolidayGroup('${groupName}')" class="text-red-400 hover:text-red-600 text-sm">刪除</button>
+      </div>`;
+    }).join('');
+  }
+
+  function searchPersonById() {
+    const query = document.getElementById('searchPersonByIdInput').value.toLowerCase().trim();
+    const resultsList = document.getElementById('searchPersonByIdResults');
+    
+    if (!query) {
+      resultsList.innerHTML = '';
+      return;
+    }
+
+    const filtered = persons.filter(p => 
+      !personList.some(existing => existing.id === p.id) &&
+      (p.id.toLowerCase().includes(query) || p.name.toLowerCase().includes(query))
+    );
+
+    if (filtered.length === 0) {
+      resultsList.innerHTML = '<div class="px-3 py-2 text-sm text-slate-500">未找到符合的人員</div>';
+      return;
+    }
+
+    resultsList.innerHTML = filtered.map(p => `
+      <div class="px-3 py-2 text-sm hover:bg-white cursor-pointer border-b border-slate-200 flex items-center justify-between" onclick="addPersonFromSearch('${p.id}', '${p.name}')">
+        <span>${p.name} (${p.id})</span>
+        <span class="text-green-500 font-medium">+ 新增</span>
+      </div>
+    `).join('');
+  }
+
+  function addPersonFromSearch(empId, name) {
+    if (!personList.some(p => p.id === empId)) {
+      personList.push({ name, id: empId });
+      renderPersons();
+      document.getElementById('searchPersonByIdInput').value = '';
+      document.getElementById('searchPersonByIdResults').innerHTML = '';
+    }
+  }
+
+  let personList = [];
+
+  function renderPersons() {
+    document.getElementById('personList').innerHTML = personList.map((p, idx) => `<span class="tag-item">${p.name} (${p.id})<button onclick="personList.splice(${idx},1);renderPersons()" class="ml-1 text-red-400 hover:text-red-600">×</button></span>`).join('');
+  }
+
+  function showAddHolidayGroup() {
+    editingHolidayGroup = null;
+    editingHolidayDates = [];
+    document.getElementById('holidayGroupName').value = '';
+    document.getElementById('addHolidayDateInModal').value = '';
+    document.getElementById('holidayModalTitle').textContent = '新增假別組';
+    renderHolidayDateList();
+    document.getElementById('holidayGroupModal').classList.remove('hidden');
+  }
+
+  function editHolidayGroup(groupName) {
+    editingHolidayGroup = groupName;
+    editingHolidayDates = [...holidayGroups[groupName]];
+    document.getElementById('holidayGroupName').value = groupName;
+    document.getElementById('addHolidayDateInModal').value = '';
+    document.getElementById('holidayModalTitle').textContent = `編輯假別組：${groupName}`;
+    renderHolidayDateList();
+    document.getElementById('holidayGroupModal').classList.remove('hidden');
+  }
+
+  function deleteHolidayGroup(groupName) {
+    if (confirm(`確定要刪除「${groupName}」嗎？`)) {
+      delete holidayGroups[groupName];
+      renderHolidays();
+    }
+  }
+
+  function addHolidayDateToGroup() {
+    const date = document.getElementById('addHolidayDateInModal').value;
+    if (date && !editingHolidayDates.includes(date)) {
+      editingHolidayDates.push(date);
+      editingHolidayDates.sort();
+      renderHolidayDateList();
+      document.getElementById('addHolidayDateInModal').value = '';
+    }
+  }
+
+  function renderHolidayDateList() {
+    document.getElementById('holidayDateListInModal').innerHTML = editingHolidayDates.map((date, idx) => 
+      `<span class="tag-item bg-red-100 text-red-700">${date}<button onclick="editingHolidayDates.splice(${idx},1);renderHolidayDateList()" class="ml-1 text-red-400 hover:text-red-600">×</button></span>`
+    ).join('');
+  }
+
+  function closeHolidayGroupModal() {
+    document.getElementById('holidayGroupModal').classList.add('hidden');
+    editingHolidayGroup = null;
+    editingHolidayDates = [];
+  }
+
+  function confirmAddHolidayGroup() {
+    const groupName = document.getElementById('holidayGroupName').value.trim();
+    if (!groupName) {
+      alert('請輸入假別組名稱');
+      return;
+    }
+    if (editingHolidayDates.length === 0) {
+      alert('請至少新增一個假日日期');
+      return;
+    }
+
+    if (editingHolidayGroup && editingHolidayGroup !== groupName) {
+      delete holidayGroups[editingHolidayGroup];
+    }
+
+    holidayGroups[groupName] = [...editingHolidayDates];
+    renderHolidays();
+    closeHolidayGroupModal();
+  }
+
+  function addIndividualHolidayDate() {
+    const date = document.getElementById('addIndividualHolidayDate').value;
+    if (date && !individualHolidays.includes(date)) {
+      individualHolidays.push(date);
+      individualHolidays.sort();
+      renderIndividualHolidays();
+      document.getElementById('addIndividualHolidayDate').value = '';
+    }
+  }
+
+  function deleteIndividualHolidayDate(date) {
+    const idx = individualHolidays.indexOf(date);
+    if (idx > -1) {
+      individualHolidays.splice(idx, 1);
+      renderIndividualHolidays();
+    }
+  }
+
+  function renderIndividualHolidays() {
+    const container = document.getElementById('individualHolidayList');
+    if (individualHolidays.length === 0) {
+      container.innerHTML = '<div class="text-sm text-slate-500">尚未新增個別假日</div>';
+      return;
+    }
+    container.innerHTML = individualHolidays.map(date => 
+      `<span class="tag-item bg-red-100 text-red-700">${date}<button onclick="deleteIndividualHolidayDate('${date}')" class="ml-1 text-red-400 hover:text-red-600">×</button></span>`
+    ).join('');
+  }
+
+  function addSupervisorFn() {
+    const v = document.getElementById('addSupervisor').value.trim();
+    if (v && !supervisors.includes(v)) { supervisors.push(v); renderSupervisors(); document.getElementById('addSupervisor').value = ''; }
+  }
+
+  function renderSupervisors() {
+    document.getElementById('supervisorList').innerHTML = supervisors.map(s => `<span class="tag-item bg-purple-50 text-purple-700">${s}<button onclick="supervisors.splice(supervisors.indexOf('${s}'),1);renderSupervisors()" class="ml-1 text-red-400 hover:text-red-600">×</button></span>`).join('');
+  }
+
+  function filterTagDropdown() {
+    const input = document.getElementById('tagInput');
+    const dropdown = document.getElementById('tagDropdown');
+    const query = input.value.toLowerCase().trim();
+    
+    const allTags = ['可加班', '新人', '夜班優先'];
+    const available = allTags.filter(t => !tags.includes(t));
+    
+    const filtered = query.length === 0 ? available : available.filter(t => t.toLowerCase().includes(query));
+    
+    if (filtered.length === 0 && query.length === 0) {
+      dropdown.classList.add('hidden');
+      return;
+    }
+
+    let options = filtered.map(t => `<div class="px-3 py-2 cursor-pointer hover:bg-teal-50" onclick="selectTag('${t}')">${t}</div>`).join('');
+    
+    if (query.length > 0 && !filtered.includes(query) && query.trim() !== '') {
+      options += `<div class="px-3 py-2 cursor-pointer hover:bg-teal-50 font-medium text-teal-600" onclick="selectTag('${query}')">+ 新增「${query}」</div>`;
+    }
+    
+    dropdown.innerHTML = options || `<div class="px-3 py-2 text-slate-500 text-sm">沒有符合的標籤</div>`;
+    dropdown.classList.remove('hidden');
+  }
+
+  function selectTag(tag) {
+    if (!tags.includes(tag)) {
+      tags.push(tag);
+      renderTags();
+    }
+    document.getElementById('tagInput').value = '';
+    document.getElementById('tagDropdown').classList.add('hidden');
+  }
+
+  function addCustomTag() {
+    const v = document.getElementById('tagInput').value.trim();
+    if (v && !tags.includes(v)) {
+      tags.push(v);
+      renderTags();
+      document.getElementById('tagInput').value = '';
+      document.getElementById('tagDropdown').classList.add('hidden');
+    }
+  }
+
+  function renderTags() {
+    document.getElementById('tagList').innerHTML = tags.map(t => `<span class="tag-item bg-teal-50 text-teal-700">${t}<button onclick="tags.splice(tags.indexOf('${t}'),1);renderTags()" class="ml-1 text-red-400 hover:text-red-600">×</button></span>`).join('');
+  }
+
+  function renderPositions() {
+    document.getElementById('positionList').innerHTML = positions.map(p => `<span class="tag-item bg-blue-50 text-blue-700">${p}<button onclick="positions.splice(positions.indexOf('${p}'),1);renderPositions();updatePositionSelect()" class="ml-1 text-red-400 hover:text-red-600">×</button></span>`).join('');
+  }
+
+  function updatePositionSelect() {
+    const select = document.getElementById('positionSelect');
+    const available = allPositions.filter(p => !positions.includes(p));
+    select.innerHTML = `<option value="">-- 選擇職缺 --</option>` + available.map(p => `<option value="${p}">${p}</option>`).join('');
+  }
+
+  function addPositionFromSelect() {
+    const select = document.getElementById('positionSelect');
+    const value = select.value;
+    if (value && !positions.includes(value)) {
+      positions.push(value);
+      renderPositions();
+      updatePositionSelect();
+      select.value = '';
+    }
+  }
+
+  function calcRestHours(start, end, workHours) {
+    const [sh, sm] = start.split(':').map(Number);
+    const [eh, em] = end.split(':').map(Number);
+    const totalMinutes = (eh * 60 + em) - (sh * 60 + sm);
+    const totalHours = totalMinutes / 60;
+    return Math.max(0, totalHours - workHours);
+  }
+
+  function renderShifts() {
+    document.getElementById('shiftList').innerHTML = shifts.map((s, i) => {
+      const restHours = calcRestHours(s.start, s.end, s.hours);
+      return `<div class="flex items-center gap-3 p-3 bg-amber-50 rounded-lg">
+        <input type="checkbox" checked class="rounded">
+        <div class="flex-1">
+          <span class="font-medium text-sm">${s.name}</span>
+          <span class="text-xs text-slate-500 ml-2">簡稱：${s.shortName}</span>
+        </div>
+        <span class="text-xs text-slate-500">${s.start} - ${s.end}</span>
+        <span class="chip bg-amber-100 text-amber-800">工時 ${s.hours}h</span>
+        <span class="chip bg-orange-100 text-orange-800">休息 ${restHours.toFixed(1)}h</span>
+        <button onclick="shifts.splice(${i},1);renderShifts()" class="ml-auto text-red-400 hover:text-red-600 text-sm">刪除</button>
+      </div>`;
+    }).join('');
+    lucide.createIcons();
+  }
+
+  function renderAttendanceGroups() {
+    document.getElementById('attendanceGroupList').innerHTML = attendanceGroups.map((g, i) => `<div class="flex items-center gap-2 p-2 bg-green-50 rounded-lg">
+      <input type="checkbox" checked class="rounded">
+      <div class="flex-1">
+        <div class="font-medium text-sm">${g.name}</div>
+        <div class="text-xs text-slate-500">${g.members.length} 人</div>
+      </div>
+      <button onclick="editAttendanceGroup(${i})" class="text-blue-400 hover:text-blue-600 text-sm px-2">編輯</button>
+      <button onclick="attendanceGroups.splice(${i},1);renderAttendanceGroups()" class="text-red-400 hover:text-red-600 text-sm">刪除</button>
+    </div>`).join('');
+  }
+
+  function showAddAttendanceGroup() {
+    currentGroupMembers = [];
+    document.getElementById('groupName').value = '';
+    document.getElementById('searchPersonInput').value = '';
+    document.getElementById('searchResultsList').innerHTML = '';
+    document.getElementById('selectedPersonsInGroup').innerHTML = '';
+    document.getElementById('attendanceGroupModal').classList.remove('hidden');
+  }
+
+  function closeAttendanceGroupModal() {
+    document.getElementById('attendanceGroupModal').classList.add('hidden');
+  }
+
+  function searchPersonForGroup() {
+    const query = document.getElementById('searchPersonInput').value.toLowerCase().trim();
+    const resultsList = document.getElementById('searchResultsList');
+    
+    if (!query) {
+      resultsList.innerHTML = '';
+      return;
+    }
+
+    const filtered = persons.filter(p => 
+      p.id.toLowerCase().includes(query) || p.name.toLowerCase().includes(query)
+    ).filter(p => !currentGroupMembers.includes(p.id));
+
+    if (filtered.length === 0) {
+      resultsList.innerHTML = '<div class="px-3 py-2 text-sm text-slate-500">未找到符合的人員</div>';
+      return;
+    }
+
+    resultsList.innerHTML = filtered.map(p => `
+      <div class="px-3 py-2 text-sm hover:bg-white cursor-pointer border-b border-slate-200 flex items-center justify-between" onclick="addPersonToGroup('${p.id}', '${p.name}')">
+        <span>${p.name} (${p.id})</span>
+        <span class="text-blue-500 font-medium">+ 添加</span>
+      </div>
+    `).join('');
+  }
+
+  function addPersonToGroup(empId, name) {
+    if (!currentGroupMembers.includes(empId)) {
+      currentGroupMembers.push(empId);
+      renderSelectedPersonsInGroup();
+      document.getElementById('searchPersonInput').value = '';
+      document.getElementById('searchResultsList').innerHTML = '';
+    }
+  }
+
+  function renderSelectedPersonsInGroup() {
+    const container = document.getElementById('selectedPersonsInGroup');
+    if (currentGroupMembers.length === 0) {
+      container.innerHTML = '<div class="text-sm text-slate-500 py-2">尚未添加人員</div>';
+      return;
+    }
+
+    container.innerHTML = currentGroupMembers.map((empId, idx) => {
+      const person = persons.find(p => p.id === empId);
+      return `<div class="flex items-center justify-between bg-white p-2 rounded border border-slate-200">
+        <span class="text-sm">${person?.name} (${empId})</span>
+        <button onclick="currentGroupMembers.splice(${idx}, 1); renderSelectedPersonsInGroup()" class="text-red-400 hover:text-red-600 text-xs">移除</button>
+      </div>`;
+    }).join('');
+  }
+
+  function editAttendanceGroup(index) {
+    const group = attendanceGroups[index];
+    currentGroupMembers = [...group.members];
+    document.getElementById('groupName').value = group.name;
+    document.getElementById('searchPersonInput').value = '';
+    document.getElementById('searchResultsList').innerHTML = '';
+    renderSelectedPersonsInGroup();
+    document.getElementById('attendanceGroupModal').classList.remove('hidden');
+  }
+
+  function confirmAddAttendanceGroup() {
+    const groupName = document.getElementById('groupName').value.trim();
+    if (!groupName) {
+      alert('請輸入考勤組名稱');
+      return;
+    }
+    if (currentGroupMembers.length === 0) {
+      alert('請至少添加一位人員');
+      return;
+    }
+
+    attendanceGroups.push({ name: groupName, members: [...currentGroupMembers] });
+    renderAttendanceGroups();
+    closeAttendanceGroupModal();
+  }
+
+  function calcHours(start, end) {
+    const [sh, sm] = start.split(':').map(Number);
+    const [eh, em] = end.split(':').map(Number);
+    return ((eh * 60 + em) - (sh * 60 + sm)) / 60;
+  }
+
+  function showAddShift() { document.getElementById('shiftModal').classList.remove('hidden'); }
+  function closeShiftModal() { document.getElementById('shiftModal').classList.add('hidden'); }
+
+  function showNewScheduleModal() {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('newScheduleName').value = '';
+    document.getElementById('newScheduleStart').value = today;
+    document.getElementById('newScheduleEnd').value = today;
+    document.getElementById('newScheduleModal').classList.remove('hidden');
+  }
+
+  function closeNewScheduleModal() {
+    document.getElementById('newScheduleModal').classList.add('hidden');
+  }
+
+  function confirmNewSchedule() {
+    const name = document.getElementById('newScheduleName').value.trim();
+    const start = document.getElementById('newScheduleStart').value;
+    const end = document.getElementById('newScheduleEnd').value;
+    
+    if (!name) {
+      alert('請輸入班表名稱');
+      return;
+    }
+    if (!start || !end) {
+      alert('請選擇起始和結束日期');
+      return;
+    }
+    if (start > end) {
+      alert('起始日期不能晚於結束日期');
+      return;
+    }
+    
+    // 新增班表到列表
+    schedules.push({ name, start, end });
+    currentScheduleIndex = schedules.length - 1;
+    
+    // 更新班表資訊
+    document.getElementById('scheduleName').value = name;
+    document.getElementById('startDate').value = start;
+    document.getElementById('endDate').value = end;
+    
+    closeNewScheduleModal();
+    // 自動切換到設定頁面
+    switchTab('settings');
+  }
+
+  function confirmAddShift() {
+    const name = document.getElementById('shiftName').value.trim();
+    const shortName = document.getElementById('shiftShortName').value.trim();
+    const start = document.getElementById('shiftStart').value;
+    const end = document.getElementById('shiftEnd').value;
+    const hours = parseFloat(document.getElementById('shiftHours').value) || 0;
+    const otStart = document.getElementById('shiftOtStart').value || '';
+    const otEnd = document.getElementById('shiftOtEnd').value || '';
+    
+    if (!name) {
+      alert('請輸入班別名稱');
+      return;
+    }
+    if (!shortName) {
+      alert('請輸入班別簡稱');
+      return;
+    }
+    if (hours <= 0) {
+      alert('請輸入正確的工時數');
+      return;
+    }
+    
+    shifts.push({ name, shortName, start, end, hours, otStart, otEnd });
+    renderShifts();
+    closeShiftModal();
+    document.getElementById('shiftName').value = '';
+    document.getElementById('shiftShortName').value = '';
+    document.getElementById('shiftStart').value = '08:00';
+    document.getElementById('shiftEnd').value = '12:00';
+    document.getElementById('shiftHours').value = '';
+    document.getElementById('shiftOtStart').value = '';
+    document.getElementById('shiftOtEnd').value = '';
+  }
+
+  function toggleFilterDropdown(id) {
+    const dropdown = document.getElementById(id);
+    dropdown.classList.toggle('hidden');
+  }
+
+  function renderScheduleFilters() {
+    const positionFilterList = document.getElementById('positionFilterList');
+    if (positionFilterList) {
+      positionFilterList.innerHTML = positions.map(p => `
+        <label class="flex items-center gap-2 text-sm cursor-pointer px-2 py-1 hover:bg-slate-100 rounded">
+          <input type="checkbox" ${selectedPositions.includes(p) ? 'checked' : ''} onchange="togglePositionFilter('${p}'); applyScheduleFilters()">
+          <span>${p}</span>
+        </label>
+      `).join('');
+    }
+
+    const shiftFilterList = document.getElementById('shiftFilterList');
+    if (shiftFilterList) {
+      shiftFilterList.innerHTML = shifts.map(s => `
+        <label class="flex items-center gap-2 text-sm cursor-pointer px-2 py-1 hover:bg-slate-100 rounded">
+          <input type="checkbox" ${selectedShifts.includes(s.name) ? 'checked' : ''} onchange="toggleShiftFilter('${s.name}'); applyScheduleFilters()">
+          <span>${s.name}</span>
+        </label>
+      `).join('');
+    }
+
+    // Holiday groups dropdown
+    const holidayGroupFilterList = document.getElementById('holidayGroupFilterList');
+    if (holidayGroupFilterList) {
+      holidayGroupFilterList.innerHTML = Object.keys(holidayGroups).map(group => `
+        <label class="flex items-center gap-2 text-sm cursor-pointer px-2 py-1 hover:bg-slate-100 rounded">
+          <input type="checkbox" ${selectedHolidays.includes(group) ? 'checked' : ''} onchange="toggleHolidayFilter('${group}'); applyScheduleFilters()">
+          <span class="font-medium text-slate-700">${group}</span>
+        </label>
+      `).join('');
+    }
+
+    // Individual holiday dates dropdown
+    const uniqueHolidayDates = [...new Set([...holidays, ...individualHolidays])].sort();
+    const holidayDateFilterList = document.getElementById('holidayDateFilterList');
+    if (holidayDateFilterList) {
+      holidayDateFilterList.innerHTML = uniqueHolidayDates.map(date => `
+        <label class="flex items-center gap-2 text-sm cursor-pointer px-2 py-1 hover:bg-slate-100 rounded">
+          <input type="checkbox" ${selectedHolidays.includes(date) ? 'checked' : ''} onchange="toggleHolidayFilter('${date}'); applyScheduleFilters()">
+          <span class="text-slate-600 text-xs">${date}</span>
+        </label>
+      `).join('');
+    }
+
+    const attendanceGroups = ['A組 - 倉儲', 'B組 - 物流', 'C組 - 客服'];
+    const groupFilterList = document.getElementById('groupFilterList');
+    if (groupFilterList) {
+      groupFilterList.innerHTML = attendanceGroups.map(g => `
+        <label class="flex items-center gap-2 text-sm cursor-pointer px-2 py-1 hover:bg-slate-100 rounded">
+          <input type="checkbox" ${selectedGroups.includes(g) ? 'checked' : ''} onchange="toggleGroupFilter('${g}'); applyScheduleFilters()">
+          <span>${g}</span>
+        </label>
+      `).join('');
+    }
+
+    const tagFilterList = document.getElementById('tagFilterList');
+    if (tagFilterList) {
+      tagFilterList.innerHTML = tags.map(t => `
+        <label class="flex items-center gap-2 text-sm cursor-pointer px-2 py-1 hover:bg-slate-100 rounded">
+          <input type="checkbox" ${selectedTags.includes(t) ? 'checked' : ''} onchange="toggleTagFilter('${t}'); applyScheduleFilters()">
+          <span>${t}</span>
+        </label>
+      `).join('');
+    }
+
+    renderActiveFilters();
+    renderSchedule();
+  }
+
+  function togglePositionFilter(position) {
+    const idx = selectedPositions.indexOf(position);
+    if (idx > -1) selectedPositions.splice(idx, 1);
+    else selectedPositions.push(position);
+  }
+
+  function toggleShiftFilter(shift) {
+    const idx = selectedShifts.indexOf(shift);
+    if (idx > -1) selectedShifts.splice(idx, 1);
+    else selectedShifts.push(shift);
+  }
+
+  function toggleHolidayFilter(holiday) {
+    const idx = selectedHolidays.indexOf(holiday);
+    if (idx > -1) selectedHolidays.splice(idx, 1);
+    else selectedHolidays.push(holiday);
+  }
+
+  function toggleGroupFilter(group) {
+    const idx = selectedGroups.indexOf(group);
+    if (idx > -1) selectedGroups.splice(idx, 1);
+    else selectedGroups.push(group);
+  }
+
+  function toggleTagFilter(tag) {
+    const idx = selectedTags.indexOf(tag);
+    if (idx > -1) selectedTags.splice(idx, 1);
+    else selectedTags.push(tag);
+  }
+
+  function renderActiveFilters() {
+    const activeFilters = document.getElementById('activeFilters');
+    const all = [
+      ...selectedPositions.map(p => ({ text: p, type: 'position' })),
+      ...selectedShifts.map(s => ({ text: s, type: 'shift' })),
+      ...selectedHolidays.map(h => ({ text: h, type: 'holiday' })),
+      ...selectedGroups.map(g => ({ text: g, type: 'group' })),
+      ...selectedTags.map(t => ({ text: t, type: 'tag' }))
+    ];
+    
+    if (all.length === 0) {
+      activeFilters.innerHTML = '<span class="text-xs text-slate-500">尚未選擇</span>';
+      return;
+    }
+    
+    activeFilters.innerHTML = all.map(f => `
+      <span class="inline-flex items-center gap-2 text-sm bg-blue-50 text-blue-700 px-3 py-1 rounded-full" data-filter-type="${f.type}" data-filter-text="${f.text}">
+        ${f.text}
+        <button class="text-red-400 hover:text-red-600 remove-filter-btn" type="button">×</button>
+      </span>
+    `).join('');
+  }
+
+  document.addEventListener('click', (e) => {
+    if (e.target.classList.contains('remove-filter-btn')) {
+      const span = e.target.closest('[data-filter-type]');
+      const type = span.dataset.filterType;
+      const text = span.dataset.filterText;
+      
+      if (type === 'position') togglePositionFilter(text);
+      else if (type === 'shift') toggleShiftFilter(text);
+      else if (type === 'holiday') toggleHolidayFilter(text);
+      else if (type === 'group') toggleGroupFilter(text);
+      else if (type === 'tag') toggleTagFilter(text);
+      
+      applyScheduleFilters();
+    }
+  });
+
+  function applyScheduleFilters() {
+    renderActiveFilters();
+    renderSchedule();
+  }
+
+  function getPersonTag(personIndex) {
+    return tags[personIndex % tags.length] || '';
+  }
+
+  function renderSchedule() {
+    const start = new Date(document.getElementById('startDate').value || '2024-01-01');
+    const end = new Date(document.getElementById('endDate').value || '2024-01-31');
+    const days = [];
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) days.push(new Date(d));
+
+    let allHolidaysForDisplay = [];
+    if (selectedHolidays.length > 0) {
+      selectedHolidays.forEach(item => {
+        if (holidayGroups[item]) {
+          allHolidaysForDisplay = allHolidaysForDisplay.concat(holidayGroups[item]);
+        } else if (/^\d{4}-\d{2}-\d{2}$/.test(item)) {
+          if (!allHolidaysForDisplay.includes(item)) allHolidaysForDisplay.push(item);
+        }
+      });
+    } else {
+      allHolidaysForDisplay = [...holidays, ...individualHolidays];
+    }
+
+    const head = document.getElementById('scheduleHead');
+    const weekdays = ['日','一','二','三','四','五','六'];
+    head.innerHTML = `<tr class="bg-slate-100">
+      <th class="sticky left-0 bg-slate-100 z-10 px-3 py-2 text-left min-w-[140px]">姓名</th>
+      <th class="px-2 py-2 min-w-[50px]">總工時</th>
+      ${days.map(d => {
+        const dateStr = d.toISOString().split('T')[0];
+        const isHoliday = allHolidaysForDisplay.includes(dateStr) || d.getDay() === 0 || d.getDay() === 6;
+        return `<th class="calendar-cell ${isHoliday ? 'holiday' : ''} text-xs">${d.getDate()}<br><span class="text-[10px]">${weekdays[d.getDay()]}</span></th>`;
+      }).join('')}
+    </tr>`;
+
+    const searchQuery = document.getElementById('searchInput').value.toLowerCase();
+    const body = document.getElementById('scheduleBody');
+    
+    const filteredPersons = persons.filter(p => {
+      if (searchQuery && !p.name.toLowerCase().includes(searchQuery) && !p.id.toLowerCase().includes(searchQuery)) return false;
+      if (selectedPositions.length === 0 && selectedTags.length === 0) return true;
+      if (selectedPositions.length > 0 || selectedTags.length > 0) {
+        const personTag = getPersonTag(persons.indexOf(p));
+        const matchesTag = selectedTags.length === 0 || selectedTags.includes(personTag);
+        return matchesTag;
+      }
+      return true;
+    });
+
+    body.innerHTML = filteredPersons.map(p => {
+      const personIndex = persons.indexOf(p);
+      const assigned = Math.floor(Math.random() * days.length * 0.6);
+      const totalHrs = assigned * 4;
+      const selectedTag = getPersonTag(personIndex);
+      return `<tr class="border-t hover:bg-blue-50/30">
+        <td class="sticky left-0 bg-white z-10 px-3 py-2 font-medium text-sm whitespace-nowrap">
+          <div>${p.name}</div>
+          <div class="text-xs text-slate-500">${p.id}</div>
+        </td>
+        <td class="px-2 py-2 text-center text-xs font-medium text-blue-700">${totalHrs}h</td>
+        ${days.map((d, i) => {
+          const dateStr = d.toISOString().split('T')[0];
+          const isHoliday = allHolidaysForDisplay.includes(dateStr) || d.getDay() === 0 || d.getDay() === 6;
+          const hasShift = !isHoliday && Math.random() > 0.4;
+          const shiftLabel = hasShift ? shifts[Math.floor(Math.random() * shifts.length)]?.name || '' : '';
+          return `<td class="calendar-cell ${isHoliday ? 'holiday' : ''} ${hasShift ? 'assigned' : ''} text-xs">${isHoliday ? '休' : shiftLabel}</td>`;
+        }).join('')}
+      </tr>`;
+    }).join('');
+  }
+
+  renderHolidays();
+  renderIndividualHolidays();
+  renderPersons();
+  renderSupervisors();
+  renderShifts();
+  renderAttendanceGroups();
+  updatePositionSelect();
+  renderPositions();
+  renderTags();
+  lucide.createIcons();
+  
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#tagInput') && !e.target.closest('#tagDropdown')) {
+      document.getElementById('tagDropdown').classList.add('hidden');
+    }
+    if (!e.target.closest('[id$="Filter"]') && !e.target.closest('button[onclick*="toggleFilterDropdown"]')) {
+      document.getElementById('positionFilter').classList.add('hidden');
+      document.getElementById('shiftFilter').classList.add('hidden');
+      document.getElementById('holidayFilter').classList.add('hidden');
+      document.getElementById('groupFilter').classList.add('hidden');
+      document.getElementById('tagFilter').classList.add('hidden');
+    }
+  });
+  </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9f347535477df205',t:'MTc3NzM2MjQzNS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
