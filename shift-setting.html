@@ -49,6 +49,14 @@
        <div>
         <label class="block text-sm font-medium text-slate-600 mb-1">結束日期</label> <input type="date" id="endDate" value="2024-01-31" class="w-full">
        </div>
+       <div>
+        <label class="block text-sm font-medium text-slate-600 mb-1">分公司（分店）</label>
+        <select id="branchSelect" class="w-full"></select>
+       </div>
+       <div>
+        <label class="block text-sm font-medium text-slate-600 mb-1">部門</label>
+        <select id="departmentSelect" class="w-full"></select>
+       </div>
       </div>
      </section>
      <section class="bg-white rounded-xl shadow-sm p-5 space-y-4">
@@ -172,6 +180,11 @@
      <div id="weekdayShiftsBlock" class="border border-slate-200 rounded-md overflow-hidden"></div>
      <p class="text-xs text-slate-500 mt-1" id="weekdayShiftsFooter">請設定固定上班日之班別。</p>
     </div>
+    <div>
+     <label class="block text-sm font-medium text-slate-600 mb-2">打卡地</label>
+     <div id="punchLocationOptions" class="flex flex-wrap gap-x-4 gap-y-1 border border-slate-200 rounded-md px-3 py-2 bg-slate-50"></div>
+     <p class="text-xs text-slate-500 mt-1">可複選適用於本考勤組的打卡地點。</p>
+    </div>
     <div><label class="block text-sm font-medium text-slate-600 mb-2">搜尋人員</label>
      <div class="flex gap-2 mb-2">
       <input type="text" id="searchPersonInput" placeholder="員工編號或身份證" class="flex-1"> <button onclick="searchPersonForGroup()" class="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-md text-sm font-medium hover:bg-blue-100 transition">搜尋</button>
@@ -258,6 +271,12 @@
   let currentGroupWeekdayShifts = defaultWeekdayShifts();
   let editingGroupIndex = -1;
   let currentGroupMembers = [];
+  let allPunchLocations = ['總公司', '倉儲中心', '北區分部', '中區分部', '南區分部', '外勤'];
+  let currentGroupPunchLocations = [];
+  let branches = ['總公司', '北區分店', '中區分店', '南區分店'];
+  let departments = ['管理部', '營運部', '倉儲部', '物流部', '客服部', '人資部'];
+  let selectedBranch = '總公司';
+  let selectedDepartment = '營運部';
   let allPositions = ['揀貨員', '包裝員', '理貨員', '搬運工', '品檢員', '分類員', '叉車手', '司機'];
   let positions = ['理貨員', '包裝員'];
   let tags = ['可加班', '新人', '夜班優先'];
@@ -629,14 +648,36 @@
     currentGroupMembers = [];
     currentGroupScheduleType = 'auto';
     currentGroupWeekdayShifts = defaultWeekdayShifts();
+    currentGroupPunchLocations = [];
     document.getElementById('groupName').value = '';
     document.getElementById('searchPersonInput').value = '';
     document.getElementById('searchResultsList').innerHTML = '';
     document.getElementById('selectedPersonsInGroup').innerHTML = '';
     document.querySelector('input[name="scheduleType"][value="auto"]').checked = true;
     renderWeekdayShifts();
+    renderPunchLocationOptions();
     updateScheduleTypeUI();
     document.getElementById('attendanceGroupModal').classList.remove('hidden');
+  }
+
+  function renderPunchLocationOptions() {
+    const box = document.getElementById('punchLocationOptions');
+    if (!box) return;
+    if (!allPunchLocations.length) {
+      box.innerHTML = '<span class="text-sm text-slate-500">尚未設定打卡地。</span>';
+      return;
+    }
+    box.innerHTML = allPunchLocations.map(loc => `
+      <label class="flex items-center gap-1 text-sm cursor-pointer">
+        <input type="checkbox" value="${loc}" ${currentGroupPunchLocations.includes(loc) ? 'checked' : ''} onchange="togglePunchLocation('${loc}', this.checked)">
+        <span>${loc}</span>
+      </label>`).join('');
+  }
+
+  function togglePunchLocation(loc, checked) {
+    const idx = currentGroupPunchLocations.indexOf(loc);
+    if (checked && idx === -1) currentGroupPunchLocations.push(loc);
+    if (!checked && idx > -1) currentGroupPunchLocations.splice(idx, 1);
   }
 
   function closeAttendanceGroupModal() {
@@ -704,6 +745,7 @@
     editingGroupIndex = index;
     currentGroupMembers = [...group.members];
     currentGroupScheduleType = group.scheduleType || 'auto';
+    currentGroupPunchLocations = Array.isArray(group.punchLocations) ? [...group.punchLocations] : [];
     const base = defaultWeekdayShifts();
     if (group.weekdayShifts) {
       WEEKDAYS.forEach(w => {
@@ -718,6 +760,7 @@
     document.getElementById('searchResultsList').innerHTML = '';
     document.querySelector(`input[name="scheduleType"][value="${currentGroupScheduleType}"]`).checked = true;
     renderWeekdayShifts();
+    renderPunchLocationOptions();
     updateScheduleTypeUI();
     renderSelectedPersonsInGroup();
     document.getElementById('attendanceGroupModal').classList.remove('hidden');
@@ -784,7 +827,8 @@
       name: groupName,
       members: [...currentGroupMembers],
       scheduleType: currentGroupScheduleType,
-      weekdayShifts: { ...currentGroupWeekdayShifts }
+      weekdayShifts: { ...currentGroupWeekdayShifts },
+      punchLocations: [...currentGroupPunchLocations]
     };
     if (editingGroupIndex >= 0) {
       attendanceGroups[editingGroupIndex] = payload;
@@ -890,7 +934,21 @@
   updatePositionSelect();
   renderPositions();
   renderTags();
+  renderBranchAndDepartment();
   lucide.createIcons();
+
+  function renderBranchAndDepartment() {
+    const b = document.getElementById('branchSelect');
+    const d = document.getElementById('departmentSelect');
+    if (b) {
+      b.innerHTML = branches.map(x => `<option value="${x}" ${x===selectedBranch?'selected':''}>${x}</option>`).join('');
+      b.onchange = e => { selectedBranch = e.target.value; };
+    }
+    if (d) {
+      d.innerHTML = departments.map(x => `<option value="${x}" ${x===selectedDepartment?'selected':''}>${x}</option>`).join('');
+      d.onchange = e => { selectedDepartment = e.target.value; };
+    }
+  }
 
   // 將目前全域資料同步到 localStorage，提供 personal-shift.html 讀取
   function syncGlobalData() {
