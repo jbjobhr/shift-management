@@ -97,9 +97,25 @@
       </div>
      </div>
      <div class="bg-white rounded-xl shadow-sm p-4">
-      <div class="flex items-center gap-2 flex-wrap">
-       <span class="text-sm font-medium text-slate-700 flex items-center gap-1"><i data-lucide="eye" class="w-4 h-4 text-purple-600"></i>檢視人員（主管）：</span>
-       <div id="supervisorChips" class="flex flex-wrap gap-2"></div>
+      <div class="flex items-center justify-between gap-4 flex-wrap">
+       <div class="flex items-center gap-2 flex-wrap">
+        <span class="text-sm font-medium text-slate-700 flex items-center gap-1"><i data-lucide="eye" class="w-4 h-4 text-purple-600"></i>檢視人員（主管）：</span>
+        <div id="supervisorChips" class="flex flex-wrap gap-2"></div>
+       </div>
+      <div id="scheduleSummary" class="flex items-center justify-end gap-2 flex-wrap">
+       <div class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">
+        <div class="text-[11px] text-slate-500">總人數</div>
+        <div class="text-base font-semibold text-slate-800">0 人</div>
+       </div>
+       <div class="bg-blue-50 border border-blue-100 rounded-lg px-3 py-1.5">
+        <div class="text-[11px] text-blue-600">總工時</div>
+        <div class="text-base font-semibold text-blue-700">0 h</div>
+       </div>
+       <div class="bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-1.5">
+        <div class="text-[11px] text-emerald-600">平均工時</div>
+        <div class="text-base font-semibold text-emerald-700">0 h</div>
+       </div>
+      </div>
       </div>
      </div>
      <div class="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -455,6 +471,25 @@
   function getPersonTag(idx) { return tags[idx % tags.length] || ''; }
   function getPersonBranch(idx) { return branches[idx % branches.length] || ''; }
   function getPersonDepartment(idx) { return departments[idx % departments.length] || ''; }
+  function renderScheduleSummary(headCount, totalHours) {
+    const el = document.getElementById('scheduleSummary');
+    if (!el) return;
+    const avg = headCount > 0 ? (totalHours / headCount) : 0;
+    const avgText = Number.isInteger(avg) ? `${avg}` : avg.toFixed(1);
+    el.innerHTML = `
+      <div class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">
+        <div class="text-[11px] text-slate-500">總人數</div>
+        <div class="text-base font-semibold text-slate-800">${headCount} 人</div>
+      </div>
+      <div class="bg-blue-50 border border-blue-100 rounded-lg px-3 py-1.5">
+        <div class="text-[11px] text-blue-600">總工時</div>
+        <div class="text-base font-semibold text-blue-700">${totalHours} h</div>
+      </div>
+      <div class="bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-1.5">
+        <div class="text-[11px] text-emerald-600">平均工時</div>
+        <div class="text-base font-semibold text-emerald-700">${avgText} h</div>
+      </div>`;
+  }
 
   function renderSchedule() {
     const cur = schedules[currentScheduleIndex] || { start: '2024-01-01', end: '2024-01-31' };
@@ -505,9 +540,15 @@
       return matchesTag;
     });
 
-    body.innerHTML = filteredPersons.map(p => {
+    const personRows = filteredPersons.map(p => {
       const assigned = Math.floor(Math.random() * days.length * 0.6);
       const totalHrs = assigned * 4;
+      return { p, totalHrs };
+    });
+    const totalHours = personRows.reduce((sum, row) => sum + row.totalHrs, 0);
+    renderScheduleSummary(personRows.length, totalHours);
+
+    body.innerHTML = personRows.map(({ p, totalHrs }) => {
       return `<tr class="border-t hover:bg-blue-50/30">
         <td class="sticky left-0 bg-white z-10 px-3 py-2 font-medium text-sm whitespace-nowrap">
           <a href="personal-shift.html?empId=${encodeURIComponent(p.id)}" onclick="syncGlobalData()" class="text-blue-700 hover:text-blue-900 hover:underline cursor-pointer">${p.name}</a>
