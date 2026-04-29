@@ -224,12 +224,21 @@
       { name: '午班', shortName: '午', start: '13:00', end: '17:00', hours: 4 },
       { name: '晚班', shortName: '晚', start: '18:00', end: '22:00', hours: 4 }
     ],
-    holidayGroups: { '台灣國定假日': ['2026-01-01'] },
+    holidayGroups: (function(){
+      const out = [];
+      const d = new Date(2026, 0, 1);
+      while (d.getFullYear() === 2026) {
+        const w = d.getDay();
+        if (w === 0 || w === 6) out.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+        d.setDate(d.getDate() + 1);
+      }
+      return { '台灣國定假日': Array.from(new Set([...out, '2026-01-01', '2026-02-28', '2026-04-04', '2026-06-10'])).sort() };
+    })(),
     individualHolidays: [],
     attendanceGroups: [
       { name: 'A組 - 倉儲', members: ['EMP001', 'EMP002'], scheduleType: 'auto',
         weekdayShifts: { mon:['早班'], tue:['早班'], wed:['早班'], thu:['早班'], fri:['早班'], sat:[], sun:[] } },
-      { name: 'B組 - 物流', members: ['EMP003'], scheduleType: 'auto',
+      { name: 'B組 - 物流', members: ['EMP003'], scheduleType: 'auto', workOnHoliday: true,
         weekdayShifts: { mon:['早班'], tue:['早班'], wed:[], thu:['早班'], fri:[], sat:['午班','晚班'], sun:['午班','晚班'] } },
       { name: 'C組 - 客服', members: ['EMP004', 'EMP005'], scheduleType: 'auto',
         weekdayShifts: { mon:['早班'], tue:['午班','晚班'], wed:['早班'], thu:['午班','晚班'], fri:['早班'], sat:[], sun:[] } }
@@ -240,7 +249,7 @@
     schedules: []
   };
   let G = FALLBACK;
-  const DATA_VERSION = 9;
+  const DATA_VERSION = 11;
   try {
     const raw = localStorage.getItem('shiftMgmt:global');
     if (raw) {
@@ -248,6 +257,8 @@
       G = Object.assign({}, FALLBACK, stored);
       if ((stored.__version || 0) < DATA_VERSION) {
         G.attendanceGroups = FALLBACK.attendanceGroups;
+        G.holidayGroups = FALLBACK.holidayGroups;
+        G.shifts = FALLBACK.shifts;
         G.__version = DATA_VERSION;
         try { localStorage.setItem('shiftMgmt:global', JSON.stringify(G)); } catch(e){}
       }

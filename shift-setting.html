@@ -236,8 +236,20 @@
    </div>
   </div>
   <script>
+  function _genWeekendsOfYear(year) {
+    const out = [];
+    const d = new Date(year, 0, 1);
+    while (d.getFullYear() === year) {
+      const w = d.getDay();
+      if (w === 0 || w === 6) {
+        out.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+      }
+      d.setDate(d.getDate() + 1);
+    }
+    return out;
+  }
   let holidayGroups = {
-    '台灣國定假日': ['2026-01-01', '2026-02-28', '2026-04-04', '2026-06-10'],
+    '台灣國定假日': Array.from(new Set([..._genWeekendsOfYear(2026), '2026-01-01', '2026-02-28', '2026-04-04', '2026-06-10'])).sort(),
     '自訂假別A': ['2026-01-15', '2026-02-15'],
     '自訂假別B': ['2026-03-01', '2026-03-15']
   };
@@ -262,7 +274,7 @@
   let attendanceGroups = [
     { name: 'A組 - 倉儲', members: ['EMP001', 'EMP002'], scheduleType: 'auto',
       weekdayShifts: { mon:['早班'], tue:['早班'], wed:['早班'], thu:['早班'], fri:['早班'], sat:[], sun:[] } },
-    { name: 'B組 - 物流', members: ['EMP003'], scheduleType: 'auto',
+    { name: 'B組 - 物流', members: ['EMP003'], scheduleType: 'auto', workOnHoliday: true,
       weekdayShifts: { mon:['早班'], tue:['早班'], wed:[], thu:['早班'], fri:[], sat:['午班','晚班'], sun:['午班','晚班'] } },
     { name: 'C組 - 客服', members: ['EMP004', 'EMP005'], scheduleType: 'auto',
       weekdayShifts: { mon:['早班'], tue:['午班','晚班'], wed:['早班'], thu:['午班','晚班'], fri:['早班'], sat:[], sun:[] } }

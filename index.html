@@ -145,9 +145,21 @@
   </div>
   <script>
   // ===== 從 localStorage 載入全域資料（由 shift-setting.html 寫入） =====
+  function _genWeekendsOfYear(year) {
+    const out = [];
+    const d = new Date(year, 0, 1);
+    while (d.getFullYear() === year) {
+      const w = d.getDay();
+      if (w === 0 || w === 6) {
+        out.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+      }
+      d.setDate(d.getDate() + 1);
+    }
+    return out;
+  }
   const FALLBACK = {
     holidayGroups: {
-      '台灣國定假日': ['2026-01-01', '2026-02-28', '2026-04-04', '2026-06-10'],
+      '台灣國定假日': Array.from(new Set([..._genWeekendsOfYear(2026), '2026-01-01', '2026-02-28', '2026-04-04', '2026-06-10'])).sort(),
       '自訂假別A': ['2026-01-15', '2026-02-15'],
       '自訂假別B': ['2026-03-01', '2026-03-15']
     },
@@ -168,7 +180,7 @@
     attendanceGroups: [
       { name: 'A組 - 倉儲', members: ['EMP001', 'EMP002'], scheduleType: 'auto',
         weekdayShifts: { mon:['早班'], tue:['早班'], wed:['早班'], thu:['早班'], fri:['早班'], sat:[], sun:[] } },
-      { name: 'B組 - 物流', members: ['EMP003'], scheduleType: 'auto',
+      { name: 'B組 - 物流', members: ['EMP003'], scheduleType: 'auto', workOnHoliday: true,
         weekdayShifts: { mon:['早班'], tue:['早班'], wed:[], thu:['早班'], fri:[], sat:['午班','晚班'], sun:['午班','晚班'] } },
       { name: 'C組 - 客服', members: ['EMP004', 'EMP005'], scheduleType: 'auto',
         weekdayShifts: { mon:['早班'], tue:['午班','晚班'], wed:['早班'], thu:['午班','晚班'], fri:['早班'], sat:[], sun:[] } }
@@ -187,7 +199,7 @@
     ]
   };
   let G = FALLBACK;
-  const DATA_VERSION = 9;
+  const DATA_VERSION = 11;
   try {
     const raw = localStorage.getItem('shiftMgmt:global');
     if (raw) {
@@ -198,6 +210,8 @@
       G.selectedDepartment = '';
       if ((stored.__version || 0) < DATA_VERSION) {
         G.attendanceGroups = FALLBACK.attendanceGroups;
+        G.holidayGroups = FALLBACK.holidayGroups;
+        G.shifts = FALLBACK.shifts;
         G.__version = DATA_VERSION;
         try { localStorage.setItem('shiftMgmt:global', JSON.stringify(G)); } catch(e){}
       }
@@ -518,10 +532,16 @@
     } else {
       allHolidaysForDisplay = [...holidays, ...individualHolidays];
     }
-    // 假日優先策略：將所有已啟用之假別組與彈性假期視為「不可排班」日
-    // selectedHolidays 為 UI 篩選；衝突計算採用所有實際假日避免漏算
-    const conflictHolidaySet = new Set(individualHolidays || []);
-    Object.values(holidayGroups || {}).forEach(arr => (arr || []).forEach(d => conflictHolidaySet.add(d)));
+    // 假日優先策略：將「目前顯示中」的假別組與彈性假期視為「不可排班」日
+    // 若使用者於 UI 勾選了特定假別組/日期，conflictHolidaySet 即僅含該選擇；
+    // 未勾選則 fallback 至所有假別組 + individualHolidays，避免漏算
+    const conflictHolidaySet = new Set();
+    if (selectedHolidays.length > 0) {
+      allHolidaysForDisplay.forEach(d => conflictHolidaySet.add(d));
+    } else {
+      (individualHolidays || []).forEach(d => conflictHolidaySet.add(d));
+      Object.values(holidayGroups || {}).forEach(arr => (arr || []).forEach(d => conflictHolidaySet.add(d)));
+    }
     const DOW_KEYS = ['sun','mon','tue','wed','thu','fri','sat'];
     const shiftHoursMap = {};
     (shifts || []).forEach(s => { shiftHoursMap[s.name] = Number(s.hours) || 0; });
@@ -581,15 +601,21 @@
         const isHolidayDisplay = allHolidaysForDisplay.includes(dateStr);
         const isHolidayActual = conflictHolidaySet.has(dateStr);
         const result = getShiftsForPersonOnDate(p.id, dateStr, d.getDay());
-        result.list.forEach(n => { totalHrs += shiftHoursMap[n] || 0; });
-        return { dateStr, isHolidayDisplay, isHolidayActual, assignedShifts: result.list, isHolidayOt: result.isHolidayOt };
+        // \u73ed\u5225\u7be9\u9078\uff1a\u50c5\u4fdd\u7559\u88ab\u52fe\u9078\u4e4b\u73ed\u5225\uff08\u672a\u52fe\u9078\u5247\u5168\u986f\u793a\uff09\n
+        const filteredList = selectedShifts.length === 0 ? result.list : result.list.filter(n => selectedShifts.includes(n));
+        filteredList.forEach(n => { totalHrs += shiftHoursMap[n] || 0; });
+        return { dateStr, isHolidayDisplay, isHolidayActual, assignedShifts: filteredList, isHolidayOt: result.isHolidayOt && filteredList.length > 0 };
       });
       return { p, totalHrs, dayShifts };
     });
-    const totalHours = personRows.reduce((sum, row) => sum + row.totalHrs, 0);
-    renderScheduleSummary(personRows.length, totalHours);
+    // \u82e5\u6709\u73ed\u5225\u7be9\u9078\uff0c\u96b1\u85cf\u672c\u9031\u5b8c\u5168\u7121\u7b26\u5408\u73ed\u6b21\u4e4b\u4eba\u54e1\n
+    const visibleRows = selectedShifts.length === 0
+      ? personRows
+      : personRows.filter(row => row.dayShifts.some(ds => ds.assignedShifts.length > 0));
+    const totalHours = visibleRows.reduce((sum, row) => sum + row.totalHrs, 0);
+    renderScheduleSummary(visibleRows.length, totalHours);
 
-    body.innerHTML = personRows.map(({ p, totalHrs, dayShifts }) => {
+    body.innerHTML = visibleRows.map(({ p, totalHrs, dayShifts }) => {
       const grp = getPersonGroup(p.id);
       const groupName = grp ? grp.name : '';
       const groupCell = groupName
