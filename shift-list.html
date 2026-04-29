@@ -80,6 +80,8 @@
     } catch (e) { console.warn('load global failed', e); }
 
     let schedules = Array.isArray(G.schedules) ? G.schedules : [];
+    // 補上沒有 branch 的舊資料預設值
+    schedules.forEach(s => { if (!s.branch) s.branch = '總公司'; });
 
     function persist() {
       try {
