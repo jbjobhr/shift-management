@@ -42,6 +42,9 @@
      <button onclick="savePersonal()" class="px-4 py-1.5 rounded-md text-sm font-medium transition bg-blue-600 hover:bg-blue-700 flex items-center gap-2">
       <i data-lucide="save" class="w-4 h-4"></i>儲存
      </button>
+      <button onclick="cancelPersonalChanges()" class="px-4 py-1.5 rounded-md text-sm font-medium transition bg-slate-200 hover:bg-slate-300 text-slate-700 flex items-center gap-2" title="回到未改動前（上次儲存）狀態">
+       <i data-lucide="x-circle" class="w-4 h-4"></i>取消
+      </button>
      <a href="index.html" class="px-4 py-1.5 rounded-md text-sm font-medium transition bg-transparent hover:bg-white/10 text-white flex items-center gap-2">
       <i data-lucide="arrow-left" class="w-4 h-4"></i>返回
      </a>
@@ -118,7 +121,7 @@
       </h2>
       <div class="flex items-center gap-3">
        <span id="applyDirtyHint" class="text-xs text-amber-600 hidden">有未套用的變更</span>
-       <button onclick="applyPersonalSettings('keep')" class="px-4 py-2 bg-white border border-[#1e3a5f] text-[#1e3a5f] rounded-lg text-sm font-medium hover:bg-slate-100 transition flex items-center gap-1" title="保留原本已指派的日期，只填入未指派的日期">
+      <button onclick="applyPersonalSettings('keep')" class="px-4 py-2 bg-white border border-[#1e3a5f] text-[#1e3a5f] rounded-lg text-sm font-medium hover:bg-slate-100 transition flex items-center gap-1" title="保留原本班表，並將新班別 append 到既有班別（不重複）">
         <i data-lucide="plus" class="w-4 h-4"></i>保留並套用
        </button>
        <button onclick="applyPersonalSettings('clear')" class="px-4 py-2 bg-[#1e3a5f] text-white rounded-lg text-sm font-medium hover:bg-[#2a4f7f] transition flex items-center gap-1" title="清除區間內原有的指派並重新套用">
@@ -276,6 +279,7 @@
     shifts: [...personal.shifts],
     positions: [...personal.positions]
   };
+  let savedSnapshot = null;
   function setDirty(flag){
     const el = document.getElementById('applyDirtyHint');
     if (el) el.classList.toggle('hidden', !flag);
@@ -293,6 +297,20 @@
   function pad(n){ return String(n).padStart(2,'0'); }
   function fmt(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
   function parseDate(s){ const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); }
+  function deepClone(v){ return JSON.parse(JSON.stringify(v)); }
+  function commitSnapshot(){
+    savedSnapshot = {
+      personal: deepClone(personal),
+      draft: deepClone(draft),
+      viewMonth: fmt(viewMonth)
+    };
+  }
+  function hasSnapshotChanges(){
+    if (!savedSnapshot) return false;
+    return JSON.stringify(personal) !== JSON.stringify(savedSnapshot.personal)
+      || JSON.stringify(draft) !== JSON.stringify(savedSnapshot.draft)
+      || fmt(viewMonth) !== savedSnapshot.viewMonth;
+  }
   function isHolidayDate(dateStr, dow){
     if (dow === 0 || dow === 6) return true;
     if ((G.individualHolidays||[]).includes(dateStr)) return true;
@@ -606,7 +624,7 @@
   }
 
   function applyPersonalSettings(mode){
-    // mode: 'clear' = 清除原資料後重新套用；'keep' = 保留已指派，僅補未指派日期
+    // mode: 'clear' = 清除原資料後重新套用；'keep' = 保留原本班表並 append 新班別
     if (mode !== 'keep' && mode !== 'clear') mode = 'clear';
     if (mode === 'clear') {
       if (!confirm('將清除區間內原有的指派並重新套用，確定繼續？')) return;
@@ -622,7 +640,7 @@
   }
 
   // 依目前設定，將區間內每一天填入班別或休假
-  // mode: 'clear' 覆寫所有日期；'keep' 僅填入尚未指派的日期
+  // mode: 'clear' 覆寫所有日期；'keep' 保留既有資料並 append 新班別
   function autoFillAssignments(mode){
     if (mode !== 'keep') mode = 'clear';
     const rs = personal.rangeStart, re = personal.rangeEnd;
@@ -664,10 +682,10 @@
     for (let d = new Date(start); d <= end; d.setDate(d.getDate()+1)){
       const ds = fmt(d);
       const dow = d.getDay();
-      // 保留模式：若該日已有指派就跳過
-      if (mode === 'keep' && personal.assignments[ds]) continue;
+      const existing = personal.assignments[ds];
       // 假別組明確列出的日期 → 一定休
       if (isExplicitHoliday(ds)) {
+        if (mode === 'keep' && existing) continue;
         personal.assignments[ds] = { type: 'off' };
         continue;
       }
@@ -680,6 +698,15 @@
         if (dow === 0 || dow === 6) { personal.assignments[ds] = { type: 'off' }; continue; }
         dayShifts = shiftNames;
       }
+      if (mode === 'keep' && existing) {
+        if (existing.type === 'work' && dayShifts.length) {
+          const merged = [...(existing.shiftNames || [])];
+          dayShifts.forEach(s => { if (!merged.includes(s)) merged.push(s); });
+          personal.assignments[ds] = { type: 'work', shiftNames: merged };
+        }
+        continue;
+      }
+
       if (dayShifts.length) {
         personal.assignments[ds] = { type: 'work', shiftNames: [...dayShifts] };
       } else {
@@ -694,7 +721,33 @@
   }
   function savePersonal(){
     persistPersonal();
+    commitSnapshot();
+    setDirty(false);
     alert('已儲存個人排班設定');
+  }
+
+  function cancelPersonalChanges(){
+    if (!savedSnapshot) return;
+    if (!hasSnapshotChanges()) {
+      alert('目前沒有可取消的改動');
+      return;
+    }
+    if (!confirm('確定要取消目前改動，回到未改動前的狀態嗎？')) return;
+
+    personal = deepClone(savedSnapshot.personal);
+    draft = deepClone(savedSnapshot.draft);
+    viewMonth = parseDate(savedSnapshot.viewMonth);
+    viewMonth.setDate(1);
+
+    persistPersonal();
+    renderHeader();
+    renderCalendar();
+    renderHolidayGroupsPanel();
+    renderAttendanceGroupsPanel();
+    renderShiftsPanel();
+    renderPositionsPanel();
+    renderTagsPanel();
+    setDirty(false);
   }
 
   // ===== 事件繫結 =====
@@ -717,6 +770,7 @@
     renderShiftsPanel();
     renderPositionsPanel();
     renderTagsPanel();
+    commitSnapshot();
     lucide.createIcons();
   });
 
@@ -735,6 +789,7 @@
   window.addPersonalTag = addPersonalTag;
   window.removePersonalTag = removePersonalTag;
   window.savePersonal = savePersonal;
+  window.cancelPersonalChanges = cancelPersonalChanges;
   </script>
  </body>
 </html>
