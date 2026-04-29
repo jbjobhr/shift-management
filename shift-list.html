@@ -22,7 +22,6 @@
    <header class="bg-[#1e3a5f] text-white px-6 py-4 flex items-center justify-between shrink-0">
     <h1 class="text-xl font-bold tracking-wide">班表列表</h1>
     <div class="flex gap-2">
-     <a href="shift-setting.html" class="px-4 py-1.5 rounded-md text-sm font-medium transition tab-inactive">排班設定</a>
      <a href="index.html" class="px-4 py-1.5 rounded-md text-sm font-medium transition tab-inactive">排班班表</a>
      <a href="shift-list.html" class="px-4 py-1.5 rounded-md text-sm font-medium transition tab-active">班表列表</a>
     </div>
@@ -152,7 +151,7 @@
           <tr class="border-t hover:bg-blue-50/30">
             <td class="px-4 py-3 text-slate-500">${i + 1}</td>
             <td class="px-4 py-3">
-              <a href="index.html?index=${i}" class="text-blue-700 hover:text-blue-900 hover:underline font-medium">${name}</a>
+              <a href="shift-setting.html?index=${i}" class="text-blue-700 hover:text-blue-900 hover:underline font-medium">${name}</a>
             </td>
             <td class="px-4 py-3 text-slate-700">${s.start || '-'}</td>
             <td class="px-4 py-3 text-slate-700">${s.end || '-'}</td>
