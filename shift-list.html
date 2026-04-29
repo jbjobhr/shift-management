@@ -186,10 +186,9 @@
     }
 
     function showNewScheduleModal() {
-      const today = new Date().toISOString().split('T')[0];
       document.getElementById('newScheduleName').value = '';
-      document.getElementById('newScheduleStart').value = today;
-      document.getElementById('newScheduleEnd').value = today;
+      document.getElementById('newScheduleStart').value = '';
+      document.getElementById('newScheduleEnd').value = '';
       document.getElementById('newScheduleModal').classList.remove('hidden');
     }
     function closeNewScheduleModal() {
