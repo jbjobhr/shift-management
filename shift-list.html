@@ -23,7 +23,7 @@
     <h1 class="text-xl font-bold tracking-wide">班表列表</h1>
     <div class="flex gap-2">
      <a href="index.html" class="px-4 py-1.5 rounded-md text-sm font-medium transition tab-inactive">排班班表</a>
-     <a href="shift-list.html" class="px-4 py-1.5 rounded-md text-sm font-medium transition tab-active">班表列表</a>
+     <a href="shift-list.html" class="px-4 py-1.5 rounded-md text-sm font-medium transition tab-active">班表設定</a>
     </div>
    </header>
 
@@ -142,10 +142,10 @@
             </td>
             <td class="px-4 py-3 text-right whitespace-nowrap">
               <a href="index.html?index=${i}" class="inline-flex items-center gap-1 text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-700 transition">
-                <i data-lucide="external-link" class="w-3.5 h-3.5"></i>開啟
+                <i data-lucide="external-link" class="w-3.5 h-3.5"></i>查看
               </a>
               <a href="shift-setting.html?index=${i}" class="inline-flex items-center gap-1 text-xs px-2 py-1 bg-blue-50 hover:bg-blue-100 rounded text-blue-700 transition ml-1">
-                <i data-lucide="settings" class="w-3.5 h-3.5"></i>編輯
+                <i data-lucide="settings" class="w-3.5 h-3.5"></i>設定
               </a>
               <button onclick="deleteSchedule(${i})" class="inline-flex items-center gap-1 text-xs px-2 py-1 bg-red-50 hover:bg-red-100 rounded text-red-600 transition ml-1">
                 <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>刪除
