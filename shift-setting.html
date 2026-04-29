@@ -28,12 +28,12 @@
  <body class="h-full bg-slate-50 w-full">
   <div id="app" class="h-full w-full flex flex-col overflow-auto">
    <header class="bg-[#1e3a5f] text-white px-6 py-4 flex items-center justify-between shrink-0">
-    <h1 id="appTitle" class="text-xl font-bold tracking-wide">排班設定</h1>
+    <h1 id="appTitle" class="text-xl font-bold tracking-wide">班表設定</h1>
     <div class="flex gap-2">
      <button onclick="showNewScheduleModal()" class="px-4 py-1.5 rounded-md text-sm font-medium transition bg-blue-600 hover:bg-blue-700 flex items-center gap-2"><i data-lucide="plus" class="w-4 h-4"></i>複製班表</button>
     <div class="flex gap-2">
      <a href="index.html" class="px-4 py-1.5 rounded-md text-sm font-medium transition tab-inactive">排班班表</a>
-     <a href="shift-list.html" class="px-4 py-1.5 rounded-md text-sm font-medium transition tab-inactive">班表列表</a>
+     <a href="shift-list.html" class="px-4 py-1.5 rounded-md text-sm font-medium transition tab-active">返回</a>
     </div>
    </header>
    <div id="pageSettings" class="flex-1 overflow-auto p-6">
@@ -323,7 +323,7 @@
   let currentScheduleIndex = 0;
 
   const defaultConfig = {
-    app_title: '派遣排班系統',
+    app_title: '班表設定',
     background_color: '#f8fafc',
     header_color: '#1e3a5f',
     text_color: '#1e293b',
