@@ -36,9 +36,9 @@
       </div>
       <div class="flex items-center gap-2">
        <input type="text" id="searchInput" placeholder="搜尋班表名稱" class="text-sm" oninput="renderList()">
-       <button onclick="showNewScheduleModal()" class="px-4 py-2 rounded-md text-sm font-medium transition bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2">
+       <a href="shift-setting-new.html" class="px-4 py-2 rounded-md text-sm font-medium transition bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2">
         <i data-lucide="plus" class="w-4 h-4"></i>新增班表
-       </button>
+       </a>
       </div>
      </div>
 
@@ -48,6 +48,7 @@
         <tr>
          <th class="px-4 py-3 text-left">#</th>
          <th class="px-4 py-3 text-left">班表名稱</th>
+         <th class="px-4 py-3 text-left">分公司/分店/案場</th>
          <th class="px-4 py-3 text-left">起始日期</th>
          <th class="px-4 py-3 text-left">結束日期</th>
          <th class="px-4 py-3 text-center">天數</th>
@@ -62,34 +63,13 @@
    </main>
   </div>
 
-  <!-- 新增班表 modal -->
-  <div id="newScheduleModal" class="modal-overlay hidden">
-   <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-md space-y-4">
-    <h3 class="font-bold text-lg">新增班表</h3>
-    <div>
-     <label class="block text-sm font-medium text-slate-600 mb-1">班表名稱</label>
-     <input type="text" id="newScheduleName" placeholder="如：2026年2月排班" class="w-full">
-    </div>
-    <div>
-     <label class="block text-sm font-medium text-slate-600 mb-1">起始日期</label>
-     <input type="date" id="newScheduleStart" class="w-full">
-    </div>
-    <div>
-     <label class="block text-sm font-medium text-slate-600 mb-1">結束日期</label>
-     <input type="date" id="newScheduleEnd" class="w-full">
-    </div>
-    <div class="flex justify-end gap-2 pt-2">
-     <button onclick="closeNewScheduleModal()" class="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-md">取消</button>
-     <button onclick="confirmNewSchedule()" class="px-4 py-2 text-sm bg-[#1e3a5f] text-white rounded-md hover:bg-[#2a4f7f]">確認</button>
-    </div>
-   </div>
-  </div>
 
   <script>
     const FALLBACK = {
       schedules: [
-        { name: '2026年1月排班', start: '2026-01-01', end: '2026-01-31' },
-        { name: '2026年2月排班', start: '2026-02-01', end: '2026-02-28' }
+        { name: '2026年1月排班', start: '2026-01-01', end: '2026-01-31', branch: '總公司' },
+        { name: '2026年2月排班', start: '2026-02-01', end: '2026-02-28', branch: '總公司' },
+        { name: '2026年3月排班', start: '2026-03-01', end: '2026-03-31', branch: '總公司' }
       ]
     };
 
@@ -139,7 +119,7 @@
         `共 ${schedules.length} 個班表${q ? `，符合「${q}」${filtered.length} 筆` : ''}`;
 
       if (!filtered.length) {
-        tbody.innerHTML = `<tr><td colspan="7" class="px-4 py-8 text-center text-slate-500">${schedules.length ? '沒有符合條件的班表' : '目前沒有班表，點右上方「新增班表」開始'}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="px-4 py-8 text-center text-slate-500">${schedules.length ? '沒有符合條件的班表' : '目前沒有班表，點右上方「新增班表」開始'}</td></tr>`;
         return;
       }
 
@@ -153,6 +133,7 @@
             <td class="px-4 py-3">
               <a href="shift-setting.html?index=${i}" class="text-blue-700 hover:text-blue-900 hover:underline font-medium">${name}</a>
             </td>
+            <td class="px-4 py-3 text-slate-500 text-xs">${s.branch || '-'}</td>
             <td class="px-4 py-3 text-slate-700">${s.start || '-'}</td>
             <td class="px-4 py-3 text-slate-700">${s.end || '-'}</td>
             <td class="px-4 py-3 text-center text-slate-700">${days || '-'}</td>
@@ -185,32 +166,7 @@
       renderList();
     }
 
-    function showNewScheduleModal() {
-      document.getElementById('newScheduleName').value = '';
-      document.getElementById('newScheduleStart').value = '';
-      document.getElementById('newScheduleEnd').value = '';
-      document.getElementById('newScheduleModal').classList.remove('hidden');
-    }
-    function closeNewScheduleModal() {
-      document.getElementById('newScheduleModal').classList.add('hidden');
-    }
-    function confirmNewSchedule() {
-      const name = document.getElementById('newScheduleName').value.trim();
-      const start = document.getElementById('newScheduleStart').value;
-      const end = document.getElementById('newScheduleEnd').value;
-      if (!name) { alert('請輸入班表名稱'); return; }
-      if (!start || !end) { alert('請選擇起始和結束日期'); return; }
-      if (start > end) { alert('起始日期不能晚於結束日期'); return; }
-      schedules.push({ name, start, end });
-      persist();
-      closeNewScheduleModal();
-      renderList();
-    }
-
     window.deleteSchedule = deleteSchedule;
-    window.showNewScheduleModal = showNewScheduleModal;
-    window.closeNewScheduleModal = closeNewScheduleModal;
-    window.confirmNewSchedule = confirmNewSchedule;
 
     renderList();
     if (window.lucide) lucide.createIcons();
