@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="zh-TW" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>班表列表</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&amp;display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Noto Sans TC', sans-serif; }
+    html, body { height: 100%; width: 100%; }
+    .tab-active { background: #e2e8f0; color: #1e3a5f; }
+    .tab-inactive { background: transparent; color: #ffffff; }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 50; }
+    input[type="date"], input[type="text"] { border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 10px; font-size: 14px; }
+    input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.1); }
+  </style>
+ </head>
+ <body class="h-full bg-slate-50 w-full">
+  <div class="h-full w-full flex flex-col overflow-auto">
+   <header class="bg-[#1e3a5f] text-white px-6 py-4 flex items-center justify-between shrink-0">
+    <h1 class="text-xl font-bold tracking-wide">班表列表</h1>
+    <div class="flex gap-2">
+     <a href="shift-setting.html" class="px-4 py-1.5 rounded-md text-sm font-medium transition tab-inactive">排班設定</a>
+     <a href="index.html" class="px-4 py-1.5 rounded-md text-sm font-medium transition tab-inactive">排班班表</a>
+     <a href="shift-list.html" class="px-4 py-1.5 rounded-md text-sm font-medium transition tab-active">班表列表</a>
+    </div>
+   </header>
+
+   <main class="flex-1 overflow-auto p-6">
+    <div class="max-w-6xl mx-auto space-y-4">
+     <div class="bg-white rounded-xl shadow-sm p-5 flex items-center justify-between flex-wrap gap-3">
+      <div>
+       <h2 class="text-lg font-bold text-slate-800">所有班表</h2>
+       <div class="text-xs text-slate-500 mt-1" id="summaryText">共 0 個班表</div>
+      </div>
+      <div class="flex items-center gap-2">
+       <input type="text" id="searchInput" placeholder="搜尋班表名稱" class="text-sm" oninput="renderList()">
+       <button onclick="showNewScheduleModal()" class="px-4 py-2 rounded-md text-sm font-medium transition bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2">
+        <i data-lucide="plus" class="w-4 h-4"></i>新增班表
+       </button>
+      </div>
+     </div>
+
+     <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+      <table class="w-full text-sm">
+       <thead class="bg-slate-100 text-slate-600">
+        <tr>
+         <th class="px-4 py-3 text-left">#</th>
+         <th class="px-4 py-3 text-left">班表名稱</th>
+         <th class="px-4 py-3 text-left">起始日期</th>
+         <th class="px-4 py-3 text-left">結束日期</th>
+         <th class="px-4 py-3 text-center">天數</th>
+         <th class="px-4 py-3 text-center">狀態</th>
+         <th class="px-4 py-3 text-right">操作</th>
+        </tr>
+       </thead>
+       <tbody id="scheduleTableBody"></tbody>
+      </table>
+     </div>
+    </div>
+   </main>
+  </div>
+
+  <!-- 新增班表 modal -->
+  <div id="newScheduleModal" class="modal-overlay hidden">
+   <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-md space-y-4">
+    <h3 class="font-bold text-lg">新增班表</h3>
+    <div>
+     <label class="block text-sm font-medium text-slate-600 mb-1">班表名稱</label>
+     <input type="text" id="newScheduleName" placeholder="如：2024年2月排班" class="w-full">
+    </div>
+    <div>
+     <label class="block text-sm font-medium text-slate-600 mb-1">起始日期</label>
+     <input type="date" id="newScheduleStart" class="w-full">
+    </div>
+    <div>
+     <label class="block text-sm font-medium text-slate-600 mb-1">結束日期</label>
+     <input type="date" id="newScheduleEnd" class="w-full">
+    </div>
+    <div class="flex justify-end gap-2 pt-2">
+     <button onclick="closeNewScheduleModal()" class="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-md">取消</button>
+     <button onclick="confirmNewSchedule()" class="px-4 py-2 text-sm bg-[#1e3a5f] text-white rounded-md hover:bg-[#2a4f7f]">確認</button>
+    </div>
+   </div>
+  </div>
+
+  <script>
+    const FALLBACK = {
+      schedules: [
+        { name: '2024年1月排班', start: '2024-01-01', end: '2024-01-31' },
+        { name: '2024年2月排班', start: '2024-02-01', end: '2024-02-29' }
+      ]
+    };
+
+    let G = FALLBACK;
+    try {
+      const raw = localStorage.getItem('shiftMgmt:global');
+      if (raw) G = Object.assign({}, FALLBACK, JSON.parse(raw));
+    } catch (e) { console.warn('load global failed', e); }
+
+    let schedules = Array.isArray(G.schedules) ? G.schedules : [];
+
+    function persist() {
+      try {
+        G.schedules = schedules;
+        localStorage.setItem('shiftMgmt:global', JSON.stringify(G));
+      } catch (e) {}
+    }
+
+    function daysBetween(start, end) {
+      if (!start || !end) return 0;
+      const s = new Date(start), e = new Date(end);
+      if (isNaN(s) || isNaN(e)) return 0;
+      return Math.floor((e - s) / 86400000) + 1;
+    }
+
+    function statusOf(start, end) {
+      const today = new Date(); today.setHours(0,0,0,0);
+      const s = start ? new Date(start) : null;
+      const e = end ? new Date(end) : null;
+      if (!s || !e || isNaN(s) || isNaN(e)) {
+        return { label: '未設定', cls: 'bg-slate-100 text-slate-600' };
+      }
+      if (today < s) return { label: '即將開始', cls: 'bg-amber-100 text-amber-700' };
+      if (today > e) return { label: '已結束', cls: 'bg-slate-200 text-slate-600' };
+      return { label: '進行中', cls: 'bg-emerald-100 text-emerald-700' };
+    }
+
+    function renderList() {
+      const q = (document.getElementById('searchInput').value || '').toLowerCase().trim();
+      const tbody = document.getElementById('scheduleTableBody');
+
+      const filtered = schedules
+        .map((s, i) => ({ s, i }))
+        .filter(({ s }) => !q || (s.name || '').toLowerCase().includes(q));
+
+      document.getElementById('summaryText').textContent =
+        `共 ${schedules.length} 個班表${q ? `，符合「${q}」${filtered.length} 筆` : ''}`;
+
+      if (!filtered.length) {
+        tbody.innerHTML = `<tr><td colspan="7" class="px-4 py-8 text-center text-slate-500">${schedules.length ? '沒有符合條件的班表' : '目前沒有班表，點右上方「新增班表」開始'}</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(({ s, i }) => {
+        const days = daysBetween(s.start, s.end);
+        const st = statusOf(s.start, s.end);
+        const name = s.name || '未命名班表';
+        return `
+          <tr class="border-t hover:bg-blue-50/30">
+            <td class="px-4 py-3 text-slate-500">${i + 1}</td>
+            <td class="px-4 py-3">
+              <a href="index.html?index=${i}" class="text-blue-700 hover:text-blue-900 hover:underline font-medium">${name}</a>
+            </td>
+            <td class="px-4 py-3 text-slate-700">${s.start || '-'}</td>
+            <td class="px-4 py-3 text-slate-700">${s.end || '-'}</td>
+            <td class="px-4 py-3 text-center text-slate-700">${days || '-'}</td>
+            <td class="px-4 py-3 text-center">
+              <span class="inline-block px-2 py-0.5 rounded-full text-xs ${st.cls}">${st.label}</span>
+            </td>
+            <td class="px-4 py-3 text-right whitespace-nowrap">
+              <a href="index.html?index=${i}" class="inline-flex items-center gap-1 text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-700 transition">
+                <i data-lucide="external-link" class="w-3.5 h-3.5"></i>開啟
+              </a>
+              <a href="shift-setting.html?index=${i}" class="inline-flex items-center gap-1 text-xs px-2 py-1 bg-blue-50 hover:bg-blue-100 rounded text-blue-700 transition ml-1">
+                <i data-lucide="settings" class="w-3.5 h-3.5"></i>編輯
+              </a>
+              <button onclick="deleteSchedule(${i})" class="inline-flex items-center gap-1 text-xs px-2 py-1 bg-red-50 hover:bg-red-100 rounded text-red-600 transition ml-1">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>刪除
+              </button>
+            </td>
+          </tr>`;
+      }).join('');
+
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function deleteSchedule(i) {
+      const s = schedules[i];
+      if (!s) return;
+      if (!confirm(`確定要刪除「${s.name || '未命名班表'}」？`)) return;
+      schedules.splice(i, 1);
+      persist();
+      renderList();
+    }
+
+    function showNewScheduleModal() {
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('newScheduleName').value = '';
+      document.getElementById('newScheduleStart').value = today;
+      document.getElementById('newScheduleEnd').value = today;
+      document.getElementById('newScheduleModal').classList.remove('hidden');
+    }
+    function closeNewScheduleModal() {
+      document.getElementById('newScheduleModal').classList.add('hidden');
+    }
+    function confirmNewSchedule() {
+      const name = document.getElementById('newScheduleName').value.trim();
+      const start = document.getElementById('newScheduleStart').value;
+      const end = document.getElementById('newScheduleEnd').value;
+      if (!name) { alert('請輸入班表名稱'); return; }
+      if (!start || !end) { alert('請選擇起始和結束日期'); return; }
+      if (start > end) { alert('起始日期不能晚於結束日期'); return; }
+      schedules.push({ name, start, end });
+      persist();
+      closeNewScheduleModal();
+      renderList();
+    }
+
+    window.deleteSchedule = deleteSchedule;
+    window.showNewScheduleModal = showNewScheduleModal;
+    window.closeNewScheduleModal = closeNewScheduleModal;
+    window.confirmNewSchedule = confirmNewSchedule;
+
+    renderList();
+    if (window.lucide) lucide.createIcons();
+  </script>
+ </body>
+</html>

@@ -30,9 +30,10 @@
    <header class="bg-[#1e3a5f] text-white px-6 py-4 flex items-center justify-between shrink-0">
     <h1 id="appTitle" class="text-xl font-bold tracking-wide">排班班表</h1>
     <div class="flex gap-2">
-     <button onclick="showNewScheduleModal()" class="px-4 py-1.5 rounded-md text-sm font-medium transition bg-blue-600 hover:bg-blue-700 flex items-center gap-2"><i data-lucide="plus" class="w-4 h-4"></i>新增班表</button>
+
      <a href="shift-setting.html" class="px-4 py-1.5 rounded-md text-sm font-medium transition tab-inactive">排班設定</a>
      <a href="index.html" class="px-4 py-1.5 rounded-md text-sm font-medium transition tab-active">排班班表</a>
+    <a href="shift-list.html" class="px-4 py-1.5 rounded-md text-sm font-medium transition tab-inactive">班表列表</a>
     </div>
    </header>
    <div id="pageSchedule" class="flex-1 overflow-auto p-6">
@@ -219,6 +220,14 @@
   let tags = G.tags;
   let schedules = G.schedules;
   let currentScheduleIndex = 0;
+  // Allow deep-linking from shift-list.html via ?index=N
+  try {
+    const _qs = new URLSearchParams(location.search);
+    const _idx = parseInt(_qs.get('index'), 10);
+    if (!Number.isNaN(_idx) && _idx >= 0 && _idx < schedules.length) {
+      currentScheduleIndex = _idx;
+    }
+  } catch (e) {}
 
   let selectedPositions = [];
   let selectedShifts = [];
