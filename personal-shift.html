@@ -25,7 +25,10 @@
     .calendar-cell.holiday .date-num { color: #dc2626; font-weight: 600; }
     .shift-tag { display: block; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-top: 3px; text-align: center; }
     .shift-tag.work { background: #fef3c7; color: #b45309; }
+    .shift-tag.work.ot { background: #ffedd5; color: #c2410c; border: 1px solid #fdba74; }
     .shift-tag.off { background: #fee2e2; color: #b91c1c; }
+    .week-summary { font-size: 11px; color: #475569; padding: 4px 6px; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 4px; text-align: center; }
+    .week-summary.warn { background: #fff7ed; color: #c2410c; border-color: #fed7aa; font-weight: 600; }
     .tag-item { display: inline-flex; align-items: center; gap: 6px; background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 4px; font-size: 13px; margin: 3px; }
     .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 50; }
     input[type="date"], input[type="time"], input[type="text"], select { border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 10px; font-size: 14px; }
@@ -104,6 +107,7 @@
          <th class="p-2 border border-slate-200">四</th>
          <th class="p-2 border border-slate-200">五</th>
          <th class="p-2 border border-slate-200">六</th>
+         <th class="p-2 border border-slate-200 w-20">週合計</th>
         </tr>
        </thead>
        <tbody id="calendarBody"></tbody>
@@ -332,6 +336,47 @@
   }
 
   // ===== 渲染：月曆 =====
+  const MAX_WEEKLY_HOURS_PERSONAL = 40;
+  function getShiftHoursByName(name) {
+    const s = (G.shifts || []).find(x => x.name === name);
+    return s ? (Number(s.hours) || 0) : 0;
+  }
+  // 以 ISO 週為單位（週一為週首）計算累計工時，依排序順序逐班標記是否已超過 40h
+  function buildWeeklyOtMap() {
+    // key: ISO weekKey "YYYY-Www" -> { totalSoFar, otByDate: { date: [boolFlags per shift] } }
+    const dates = Object.keys(personal.assignments || {}).sort();
+    const weekTotal = {}; // weekKey -> hours so far
+    const otFlags = {};   // dateStr -> array<bool> aligning shiftNames order
+    const dateWeekly = {};// dateStr -> { weekKey, weeklyAfter }
+    function isoWeekKey(d) {
+      const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+      const dayNum = date.getUTCDay() || 7;
+      date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+      const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+      const weekNo = Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+      return `${date.getUTCFullYear()}-W${String(weekNo).padStart(2,'0')}`;
+    }
+    dates.forEach(ds => {
+      const a = personal.assignments[ds];
+      if (!a || a.type !== 'work') return;
+      const names = a.shiftNames || (a.shiftName ? [a.shiftName] : []);
+      const [y,m,d] = ds.split('-').map(Number);
+      const wk = isoWeekKey(new Date(y, m-1, d));
+      if (!(wk in weekTotal)) weekTotal[wk] = 0;
+      const flags = [];
+      names.forEach(n => {
+        const h = getShiftHoursByName(n);
+        const before = weekTotal[wk];
+        const after = before + h;
+        flags.push(after > MAX_WEEKLY_HOURS_PERSONAL); // 整班是否超過上限
+        weekTotal[wk] = after;
+      });
+      otFlags[ds] = flags;
+      dateWeekly[ds] = { weekKey: wk, weeklyAfter: weekTotal[wk] };
+    });
+    return { weekTotal, otFlags, dateWeekly, isoWeekKey };
+  }
+
   function renderCalendar(){
     const year = viewMonth.getFullYear();
     const month = viewMonth.getMonth();
@@ -352,8 +397,12 @@
     const tbody = document.getElementById('calendarBody');
     tbody.innerHTML = '';
 
+    const otMap = buildWeeklyOtMap();
+
     for (let r = 0; r < cells.length/7; r++){
       const tr = document.createElement('tr');
+      let weekHours = 0;
+      let weekHasOt = false;
       for (let c = 0; c < 7; c++){
         const cell = cells[r*7+c];
         const td = document.createElement('td');
@@ -374,8 +423,16 @@
           if (a.type === 'off') body = `<div class="shift-tag off">休</div>`;
           else if (a.type === 'work') {
             const names = a.shiftNames || (a.shiftName ? [a.shiftName] : []);
+            const flags = otMap.otFlags[ds] || [];
             body = names.length
-              ? names.map(n => `<div class="shift-tag work">${n}</div>`).join('')
+              ? names.map((n, i) => {
+                  const isOt = flags[i];
+                  if (!cell.other) {
+                    weekHours += getShiftHoursByName(n);
+                    if (isOt) weekHasOt = true;
+                  }
+                  return `<div class="shift-tag work${isOt ? ' ot' : ''}" title="${isOt ? '\u5df2\u8d85\u904e\u6bcf\u9031 40h\uff0c\u8a72\u73ed\u6b21\u8a08\u52a0\u73ed' : ''}">${n}${isOt ? ' \u52a0' : ''}</div>`;
+                }).join('')
               : `<div class="shift-tag work">已排</div>`;
           }
         }
@@ -386,6 +443,14 @@
         }
         tr.appendChild(td);
       }
+      // 週合計欄
+      const sumTd = document.createElement('td');
+      sumTd.className = 'calendar-cell';
+      sumTd.style.cursor = 'default';
+      const cls = (weekHours > MAX_WEEKLY_HOURS_PERSONAL || weekHasOt) ? 'week-summary warn' : 'week-summary';
+      const otText = weekHours > MAX_WEEKLY_HOURS_PERSONAL ? `<div class="text-[10px]">含加班 ${(weekHours - MAX_WEEKLY_HOURS_PERSONAL)}h</div>` : '';
+      sumTd.innerHTML = `<div class="${cls}">${weekHours}h${otText}</div>`;
+      tr.appendChild(sumTd);
       tbody.appendChild(tr);
     }
     lucide.createIcons();
@@ -441,11 +506,44 @@
     const shiftList = G.shifts.filter(s => enabledShiftNames.includes(s.name));
     renderAssignOptions(shiftList, personal.assignments[assigningDate]);
   }
+  function checkWeeklyOverLimit(dateStr, newShiftNames) {
+    if (!newShiftNames || !newShiftNames.length) return null;
+    function isoWeekKey(d) {
+      const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+      const dayNum = date.getUTCDay() || 7;
+      date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+      const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+      const weekNo = Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+      return `${date.getUTCFullYear()}-W${String(weekNo).padStart(2,'0')}`;
+    }
+    const [y,m,d] = dateStr.split('-').map(Number);
+    const targetWk = isoWeekKey(new Date(y, m-1, d));
+    let total = 0;
+    Object.keys(personal.assignments || {}).forEach(ds => {
+      if (ds === dateStr) return; // 本日以新設為準
+      const a = personal.assignments[ds];
+      if (!a || a.type !== 'work') return;
+      const [yy,mm,dd] = ds.split('-').map(Number);
+      if (isoWeekKey(new Date(yy, mm-1, dd)) !== targetWk) return;
+      const names = a.shiftNames || (a.shiftName ? [a.shiftName] : []);
+      names.forEach(n => { total += getShiftHoursByName(n); });
+    });
+    newShiftNames.forEach(n => { total += getShiftHoursByName(n); });
+    return total > MAX_WEEKLY_HOURS_PERSONAL ? total : null;
+  }
+
   function confirmAssignShifts(){
     if (!assigningDate) return;
     if (assigningSelected.length === 0) {
       delete personal.assignments[assigningDate];
     } else {
+      const overTotal = checkWeeklyOverLimit(assigningDate, assigningSelected);
+      if (overTotal != null) {
+        const ot = overTotal - MAX_WEEKLY_HOURS_PERSONAL;
+        if (!confirm(`本週累計將達 ${overTotal}h，超過 ${MAX_WEEKLY_HOURS_PERSONAL}h 上限 ${ot}h，將視為「加班」。\n是否繼續儲存？`)) {
+          return;
+        }
+      }
       personal.assignments[assigningDate] = { type: 'work', shiftNames: [...assigningSelected] };
     }
     persistPersonal();
