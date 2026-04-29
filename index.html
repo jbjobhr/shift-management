@@ -565,6 +565,10 @@
       const matchesBranch = !selectedBranchFilter || selectedBranchFilter === personBranch;
       const matchesDepartment = !selectedDepartmentFilter || selectedDepartmentFilter === personDepartment;
       if (!matchesBranch || !matchesDepartment) return false;
+      if (selectedGroups.length > 0) {
+        const grp = getPersonGroup(p.id);
+        if (!grp || !selectedGroups.includes(grp.name)) return false;
+      }
       if (selectedPositions.length === 0 && selectedTags.length === 0) return true;
       const matchesTag = selectedTags.length === 0 || selectedTags.includes(personTag);
       return matchesTag;
