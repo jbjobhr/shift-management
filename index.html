@@ -17,6 +17,7 @@
     .calendar-cell { min-width: 50px; min-height: 40px; border: 1px solid #e2e8f0; text-align: center; font-size: 12px; padding: 4px; }
     .calendar-cell.holiday { background: #fef2f2; color: #dc2626; }
     .calendar-cell.assigned { background: #dbeafe; color: #1e40af; font-weight: 500; }
+    .calendar-cell.holiday-ot { background: #fff7ed; color: #c2410c; font-weight: 600; border-color: #fed7aa; }
     .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 50; }
     .tag-item { display: inline-flex; align-items: center; gap: 6px; background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 4px; font-size: 13px; margin: 3px; }
     input[type="date"], input[type="time"], input[type="text"], select { border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 10px; font-size: 14px; }
@@ -170,7 +171,7 @@
       { name: 'B組 - 物流', members: ['EMP003'], scheduleType: 'auto',
         weekdayShifts: { mon:['早班','午班'], tue:['早班','午班'], wed:['早班','午班'], thu:['早班','午班'], fri:['早班','午班'], sat:[], sun:[] } },
       { name: 'C組 - 客服', members: ['EMP004', 'EMP005'], scheduleType: 'auto',
-        weekdayShifts: { mon:['早班','午班','晚班'], tue:['早班','午班','晚班'], wed:['早班','午班','晚班'], thu:['早班','午班','晚班'], fri:['早班','午班','晚班'], sat:[], sun:[] } }
+        weekdayShifts: { mon:['早班','午班'], tue:['午班','晚班'], wed:['早班','晚班'], thu:['早班','午班'], fri:['午班','晚班'], sat:[], sun:[] } }
     ],
     allPositions: ['揀貨員','包裝員','理貨員','搬運工','品檢員','分類員','叉車手','司機'],
     positions: ['理貨員', '包裝員'],
@@ -186,7 +187,7 @@
     ]
   };
   let G = FALLBACK;
-  const DATA_VERSION = 2;
+  const DATA_VERSION = 4;
   try {
     const raw = localStorage.getItem('shiftMgmt:global');
     if (raw) {
@@ -517,11 +518,33 @@
     } else {
       allHolidaysForDisplay = [...holidays, ...individualHolidays];
     }
+    // 假日優先策略：將所有已啟用之假別組與彈性假期視為「不可排班」日
+    // selectedHolidays 為 UI 篩選；衝突計算採用所有實際假日避免漏算
+    const conflictHolidaySet = new Set(individualHolidays || []);
+    Object.values(holidayGroups || {}).forEach(arr => (arr || []).forEach(d => conflictHolidaySet.add(d)));
+    const DOW_KEYS = ['sun','mon','tue','wed','thu','fri','sat'];
+    const shiftHoursMap = {};
+    (shifts || []).forEach(s => { shiftHoursMap[s.name] = Number(s.hours) || 0; });
+    function getPersonGroup(empId) {
+      return (attendanceGroups || []).find(g => Array.isArray(g.members) && g.members.includes(empId));
+    }
+    function getShiftsForPersonOnDate(empId, dateStr, dow) {
+      const g = getPersonGroup(empId);
+      if (!g || (g.scheduleType && g.scheduleType !== 'auto')) return { list: [], isHolidayOt: false };
+      const isHoliday = conflictHolidaySet.has(dateStr);
+      // 假日優先：默設不排班；除非考勤組勾選「假日仍排班」
+      if (isHoliday && !g.workOnHoliday) return { list: [], isHolidayOt: false };
+      const ws = g.weekdayShifts || {};
+      const arr = ws[DOW_KEYS[dow]];
+      const list = Array.isArray(arr) ? arr.filter(n => n) : [];
+      return { list, isHolidayOt: isHoliday && list.length > 0 };
+    }
 
     const head = document.getElementById('scheduleHead');
     const weekdays = ['日','一','二','三','四','五','六'];
     head.innerHTML = `<tr class="bg-slate-100">
       <th class="sticky left-0 bg-slate-100 z-10 px-3 py-2 text-left min-w-[140px]">姓名</th>
+      <th class="px-2 py-2 min-w-[100px] whitespace-nowrap">考勤組</th>
       <th class="px-2 py-2 min-w-[72px] whitespace-nowrap">總工時</th>
       ${days.map(d => {
         const dateStr = d.toISOString().split('T')[0];
@@ -548,26 +571,57 @@
     });
 
     const personRows = filteredPersons.map(p => {
-      const assigned = Math.floor(Math.random() * days.length * 0.6);
-      const totalHrs = assigned * 4;
-      return { p, totalHrs };
+      let totalHrs = 0;
+      const dayShifts = days.map(d => {
+        const dateStr = d.toISOString().split('T')[0];
+        const isHolidayDisplay = allHolidaysForDisplay.includes(dateStr);
+        const isHolidayActual = conflictHolidaySet.has(dateStr);
+        const result = getShiftsForPersonOnDate(p.id, dateStr, d.getDay());
+        result.list.forEach(n => { totalHrs += shiftHoursMap[n] || 0; });
+        return { dateStr, isHolidayDisplay, isHolidayActual, assignedShifts: result.list, isHolidayOt: result.isHolidayOt };
+      });
+      return { p, totalHrs, dayShifts };
     });
     const totalHours = personRows.reduce((sum, row) => sum + row.totalHrs, 0);
     renderScheduleSummary(personRows.length, totalHours);
 
-    body.innerHTML = personRows.map(({ p, totalHrs }) => {
+    body.innerHTML = personRows.map(({ p, totalHrs, dayShifts }) => {
+      const grp = getPersonGroup(p.id);
+      const groupName = grp ? grp.name : '';
+      const groupCell = groupName
+        ? `<span class="chip bg-green-50 text-green-700 text-[11px]">${groupName}</span>`
+        : '<span class="text-xs text-slate-400">未分組</span>';
       return `<tr class="border-t hover:bg-blue-50/30">
         <td class="sticky left-0 bg-white z-10 px-3 py-2 font-medium text-sm whitespace-nowrap">
           <a href="personal-shift.html?empId=${encodeURIComponent(p.id)}" onclick="syncGlobalData()" class="text-blue-700 hover:text-blue-900 hover:underline cursor-pointer">${p.name}</a>
           <div class="text-xs text-slate-500">${p.id}</div>
         </td>
+        <td class="px-2 py-2 text-center text-xs whitespace-nowrap">${groupCell}</td>
         <td class="px-2 py-2 text-center text-xs font-medium text-blue-700">${totalHrs}h</td>
-        ${days.map(d => {
-          const dateStr = d.toISOString().split('T')[0];
-          const isHoliday = allHolidaysForDisplay.includes(dateStr) || d.getDay() === 0 || d.getDay() === 6;
-          const hasShift = !isHoliday && Math.random() > 0.4;
-          const shiftLabel = hasShift ? shifts[Math.floor(Math.random() * shifts.length)]?.name || '' : '';
-          return `<td class="calendar-cell ${isHoliday ? 'holiday' : ''} ${hasShift ? 'assigned' : ''} text-xs">${isHoliday ? '休' : shiftLabel}</td>`;
+        ${dayShifts.map(ds => {
+          const hasShift = ds.assignedShifts.length > 0;
+          const shiftLabel = hasShift
+            ? ds.assignedShifts.map(n => {
+                const sh = (shifts || []).find(s => s.name === n);
+                return sh && sh.shortName ? sh.shortName : n;
+              }).join('/')
+            : '';
+          let label, cls;
+          if (ds.isHolidayOt) {
+            label = shiftLabel;
+            cls = 'holiday-ot';
+          } else if (ds.isHolidayDisplay) {
+            label = '休';
+            cls = 'holiday';
+          } else if (hasShift) {
+            label = shiftLabel;
+            cls = 'assigned';
+          } else {
+            label = '';
+            cls = '';
+          }
+          const title = ds.isHolidayOt ? `假日加班：${ds.assignedShifts.join('、')}` : '';
+          return `<td class="calendar-cell ${cls} text-xs" title="${title}">${label}</td>`;
         }).join('')}
       </tr>`;
     }).join('');

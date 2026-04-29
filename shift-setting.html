@@ -72,7 +72,7 @@
         <div id="holidayGroupList" class="space-y-2"></div><button onclick="showAddHolidayGroup()" class="mt-3 px-3 py-1.5 bg-red-50 text-red-600 rounded-md text-sm font-medium hover:bg-red-100 transition flex items-center gap-1"><i data-lucide="plus" class="w-4 h-4"></i>新增假別組</button>
        </div>
        <div>
-        <label class="block text-sm font-medium text-slate-600 mb-2">臨時假期</label>
+        <label class="block text-sm font-medium text-slate-600 mb-2">彈性假期</label>
         <div class="flex gap-2 mb-3">
          <input type="date" id="addIndividualHolidayDate" class="flex-1 max-w-xs"> <button onclick="addIndividualHolidayDate()" class="px-3 py-1.5 bg-red-50 text-red-600 rounded-md text-sm font-medium hover:bg-red-100 transition flex items-center gap-1"><i data-lucide="plus" class="w-4 h-4"></i>新增</button>
         </div>
@@ -125,7 +125,7 @@
   </div>
   <div id="shiftModal" class="modal-overlay hidden">
    <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm space-y-4">
-    <h3 class="font-bold text-lg">新增班別</h3>
+    <h3 id="shiftModalTitle" class="font-bold text-lg">新增班別</h3>
     <div><label class="block text-sm font-medium text-slate-600 mb-1">班別名稱</label><input type="text" id="shiftName" placeholder="如：早班" class="w-full">
     </div>
     <div><label class="block text-sm font-medium text-slate-600 mb-1">班別簡稱</label><input type="text" id="shiftShortName" placeholder="如：早" class="w-full" maxlength="4">
@@ -148,7 +148,7 @@
      </div>
     </div>
     <div class="flex justify-end gap-2 pt-2">
-     <button onclick="closeShiftModal()" class="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-md">取消</button> <button onclick="confirmAddShift()" class="px-4 py-2 text-sm bg-[#1e3a5f] text-white rounded-md hover:bg-[#2a4f7f]">確認</button>
+     <button onclick="closeShiftModal()" class="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-md">取消</button> <button id="shiftModalConfirmBtn" onclick="confirmAddShift()" class="px-4 py-2 text-sm bg-[#1e3a5f] text-white rounded-md hover:bg-[#2a4f7f]">確認</button>
     </div>
    </div>
   </div>
@@ -179,7 +179,18 @@
      </div>
      <p class="text-xs text-slate-500 mb-2" id="scheduleTypeHint">自動排班適用於週間固定上班日之行業</p>
      <div id="weekdayShiftsBlock" class="border border-slate-200 rounded-md overflow-hidden"></div>
+     <div id="weeklyHoursIndicator" class="mt-2 flex items-center justify-between text-xs px-3 py-2 rounded-md bg-slate-50 border border-slate-200">
+      <span class="text-slate-600">每週總工時（上限 40h）</span>
+      <span id="weeklyHoursValue" class="font-semibold">0 h</span>
+     </div>
      <p class="text-xs text-slate-500 mt-1" id="weekdayShiftsFooter">請設定固定上班日之班別。</p>
+     <label id="workOnHolidayWrap" class="mt-2 flex items-start gap-2 text-sm cursor-pointer bg-orange-50 border border-orange-200 rounded-md px-3 py-2">
+      <input type="checkbox" id="workOnHoliday" class="mt-0.5" onchange="currentGroupWorkOnHoliday = this.checked">
+      <span>
+       <span class="font-medium text-orange-700">假日仍排班（視為加班）</span>
+       <span class="block text-xs text-slate-500">勾選後，同仍依週間設定排班，並以「假日加班」樣式顯示；未勾選則施行「假日優先」，假日不排班。</span>
+      </span>
+     </label>
     </div>
     <div>
      <label class="block text-sm font-medium text-slate-600 mb-2">打卡地</label>
@@ -252,7 +263,7 @@
     { name: 'B組 - 物流', members: ['EMP003'], scheduleType: 'auto',
       weekdayShifts: { mon:['早班','午班'], tue:['早班','午班'], wed:['早班','午班'], thu:['早班','午班'], fri:['早班','午班'], sat:[], sun:[] } },
     { name: 'C組 - 客服', members: ['EMP004', 'EMP005'], scheduleType: 'auto',
-      weekdayShifts: { mon:['早班','午班','晚班'], tue:['早班','午班','晚班'], wed:['早班','午班','晚班'], thu:['早班','午班','晚班'], fri:['早班','午班','晚班'], sat:[], sun:[] } }
+      weekdayShifts: { mon:['早班','午班'], tue:['午班','晚班'], wed:['早班','晚班'], thu:['早班','午班'], fri:['午班','晚班'], sat:[], sun:[] } }
   ];
   const WEEKDAYS = [
     { key: 'mon', label: '每週一' },
@@ -270,6 +281,7 @@
   }
   let currentGroupScheduleType = 'auto';
   let currentGroupWeekdayShifts = defaultWeekdayShifts();
+  let currentGroupWorkOnHoliday = false;
   let editingGroupIndex = -1;
   let currentGroupMembers = [];
   let allPunchLocations = ['總公司', '倉儲中心', '北區分部', '中區分部', '南區分部', '外勤'];
@@ -492,7 +504,7 @@
   function renderIndividualHolidays() {
     const container = document.getElementById('individualHolidayList');
     if (individualHolidays.length === 0) {
-      container.innerHTML = '<div class="text-sm text-slate-500">尚未新增臨時假期</div>';
+      container.innerHTML = '<div class="text-sm text-slate-500">尚未新增彈性假期</div>';
       return;
     }
     container.innerHTML = individualHolidays.map(date => 
@@ -598,10 +610,38 @@
         <span class="text-xs text-slate-500">${s.start} - ${s.end}</span>
         <span class="chip bg-amber-100 text-amber-800">工時 ${s.hours}h</span>
         <span class="chip bg-orange-100 text-orange-800">休息 ${restHours.toFixed(1)}h</span>
-        <button onclick="shifts.splice(${i},1);renderShifts()" class="ml-auto text-red-400 hover:text-red-600 text-sm">刪除</button>
+        <button onclick="editShift(${i})" class="ml-auto text-blue-400 hover:text-blue-600 text-sm">編輯</button>
+        <button onclick="deleteShift(${i})" class="text-red-400 hover:text-red-600 text-sm">刪除</button>
       </div>`;
     }).join('');
     lucide.createIcons();
+  }
+
+  let editingShiftIndex = -1;
+
+  function deleteShift(i) {
+    const s = shifts[i];
+    if (!s) return;
+    if (confirm(`確定要刪除「${s.name}」嗎？`)) {
+      shifts.splice(i, 1);
+      renderShifts();
+    }
+  }
+
+  function editShift(i) {
+    const s = shifts[i];
+    if (!s) return;
+    editingShiftIndex = i;
+    document.getElementById('shiftModalTitle').textContent = `編輯班別：${s.name}`;
+    document.getElementById('shiftModalConfirmBtn').textContent = '更新';
+    document.getElementById('shiftName').value = s.name || '';
+    document.getElementById('shiftShortName').value = s.shortName || '';
+    document.getElementById('shiftStart').value = s.start || '08:00';
+    document.getElementById('shiftEnd').value = s.end || '12:00';
+    document.getElementById('shiftHours').value = s.hours || '';
+    document.getElementById('shiftOtStart').value = s.otStart || '';
+    document.getElementById('shiftOtEnd').value = s.otEnd || '';
+    document.getElementById('shiftModal').classList.remove('hidden');
   }
 
   function renderAttendanceGroups() {
@@ -634,7 +674,10 @@
       return `<div class="flex items-start gap-2 p-2 bg-green-50 rounded-lg">
       <input type="radio" name="attendanceGroupSelect" class="rounded mt-1">
       <div class="flex-1 min-w-0">
-        <div class="font-medium text-sm">${g.name}</div>
+        <div class="font-medium text-sm flex items-center gap-2">
+          <span>${g.name}</span>
+          ${g.workOnHoliday ? '<span class="chip bg-orange-100 text-orange-700 text-[10px]">假日加班</span>' : ''}
+        </div>
         <div class="text-xs text-slate-500">${g.members.length} 人</div>
         ${weekdayHtml}
       </div>
@@ -650,14 +693,17 @@
     currentGroupScheduleType = 'auto';
     currentGroupWeekdayShifts = defaultWeekdayShifts();
     currentGroupPunchLocations = [];
+    currentGroupWorkOnHoliday = false;
     document.getElementById('groupName').value = '';
     document.getElementById('searchPersonInput').value = '';
     document.getElementById('searchResultsList').innerHTML = '';
     document.getElementById('selectedPersonsInGroup').innerHTML = '';
     document.querySelector('input[name="scheduleType"][value="auto"]').checked = true;
+    document.getElementById('workOnHoliday').checked = false;
     renderWeekdayShifts();
     renderPunchLocationOptions();
     updateScheduleTypeUI();
+    updateWeeklyHoursIndicator();
     document.getElementById('attendanceGroupModal').classList.remove('hidden');
   }
 
@@ -756,13 +802,16 @@
       });
     }
     currentGroupWeekdayShifts = base;
+    currentGroupWorkOnHoliday = !!group.workOnHoliday;
     document.getElementById('groupName').value = group.name;
     document.getElementById('searchPersonInput').value = '';
     document.getElementById('searchResultsList').innerHTML = '';
     document.querySelector(`input[name="scheduleType"][value="${currentGroupScheduleType}"]`).checked = true;
+    document.getElementById('workOnHoliday').checked = currentGroupWorkOnHoliday;
     renderWeekdayShifts();
     renderPunchLocationOptions();
     updateScheduleTypeUI();
+    updateWeeklyHoursIndicator();
     renderSelectedPersonsInGroup();
     document.getElementById('attendanceGroupModal').classList.remove('hidden');
   }
@@ -773,13 +822,16 @@
     const block = document.getElementById('weekdayShiftsBlock');
     const footer = document.getElementById('weekdayShiftsFooter');
     const hint = document.getElementById('scheduleTypeHint');
+    const indicator = document.getElementById('weeklyHoursIndicator');
     if (currentGroupScheduleType === 'auto') {
       block.classList.remove('hidden');
       footer.classList.remove('hidden');
+      if (indicator) indicator.classList.remove('hidden');
       hint.textContent = '自動排班適用於週間固定上班日之行業';
     } else {
       block.classList.add('hidden');
       footer.classList.add('hidden');
+      if (indicator) indicator.classList.add('hidden');
       hint.textContent = '手動排班可於排班表中逐日指定班別';
     }
   }
@@ -812,6 +864,38 @@
     const idx = arr.indexOf(shiftName);
     if (checked && idx === -1) arr.push(shiftName);
     if (!checked && idx > -1) arr.splice(idx, 1);
+    updateWeeklyHoursIndicator();
+  }
+
+  const MAX_WEEKLY_HOURS = 40;
+  function calcWeeklyHours(weekdayShifts) {
+    const shiftMap = {};
+    (shifts || []).forEach(s => { shiftMap[s.name] = Number(s.hours) || 0; });
+    let total = 0;
+    Object.values(weekdayShifts || {}).forEach(arr => {
+      if (!Array.isArray(arr)) return;
+      arr.forEach(n => { total += shiftMap[n] || 0; });
+    });
+    return total;
+  }
+  function updateWeeklyHoursIndicator() {
+    const el = document.getElementById('weeklyHoursValue');
+    const wrap = document.getElementById('weeklyHoursIndicator');
+    if (!el || !wrap) return;
+    const total = calcWeeklyHours(currentGroupWeekdayShifts);
+    el.textContent = `${total} h`;
+    wrap.classList.remove('bg-slate-50','border-slate-200','bg-red-50','border-red-200','bg-amber-50','border-amber-200');
+    el.classList.remove('text-slate-700','text-red-600','text-amber-600');
+    if (total > MAX_WEEKLY_HOURS) {
+      wrap.classList.add('bg-red-50','border-red-200');
+      el.classList.add('text-red-600');
+    } else if (total === MAX_WEEKLY_HOURS) {
+      wrap.classList.add('bg-amber-50','border-amber-200');
+      el.classList.add('text-amber-600');
+    } else {
+      wrap.classList.add('bg-slate-50','border-slate-200');
+      el.classList.add('text-slate-700');
+    }
   }
 
   function confirmAddAttendanceGroup() {
@@ -824,12 +908,20 @@
       alert('請至少添加一位人員');
       return;
     }
+    if (currentGroupScheduleType === 'auto') {
+      const weekly = calcWeeklyHours(currentGroupWeekdayShifts);
+      if (weekly > MAX_WEEKLY_HOURS) {
+        alert(`每週總工時 ${weekly}h 已超過上限 ${MAX_WEEKLY_HOURS}h，請調整班別設定。`);
+        return;
+      }
+    }
     const payload = {
       name: groupName,
       members: [...currentGroupMembers],
       scheduleType: currentGroupScheduleType,
       weekdayShifts: { ...currentGroupWeekdayShifts },
-      punchLocations: [...currentGroupPunchLocations]
+      punchLocations: [...currentGroupPunchLocations],
+      workOnHoliday: !!currentGroupWorkOnHoliday
     };
     if (editingGroupIndex >= 0) {
       attendanceGroups[editingGroupIndex] = payload;
@@ -847,8 +939,23 @@
     return ((eh * 60 + em) - (sh * 60 + sm)) / 60;
   }
 
-  function showAddShift() { document.getElementById('shiftModal').classList.remove('hidden'); }
-  function closeShiftModal() { document.getElementById('shiftModal').classList.add('hidden'); }
+  function showAddShift() {
+    editingShiftIndex = -1;
+    document.getElementById('shiftModalTitle').textContent = '新增班別';
+    document.getElementById('shiftModalConfirmBtn').textContent = '確認';
+    document.getElementById('shiftName').value = '';
+    document.getElementById('shiftShortName').value = '';
+    document.getElementById('shiftStart').value = '08:00';
+    document.getElementById('shiftEnd').value = '12:00';
+    document.getElementById('shiftHours').value = '';
+    document.getElementById('shiftOtStart').value = '';
+    document.getElementById('shiftOtEnd').value = '';
+    document.getElementById('shiftModal').classList.remove('hidden');
+  }
+  function closeShiftModal() {
+    document.getElementById('shiftModal').classList.add('hidden');
+    editingShiftIndex = -1;
+  }
 
   function showNewScheduleModal() {
     document.getElementById('newScheduleName').value = '';
@@ -913,16 +1020,27 @@
       return;
     }
     
-    shifts.push({ name, shortName, start, end, hours, otStart, otEnd });
+    if (editingShiftIndex >= 0 && shifts[editingShiftIndex]) {
+      const oldName = shifts[editingShiftIndex].name;
+      shifts[editingShiftIndex] = { name, shortName, start, end, hours, otStart, otEnd };
+      // 同步更新考勤組中引用此班別名稱
+      if (oldName !== name) {
+        attendanceGroups.forEach(g => {
+          if (!g.weekdayShifts) return;
+          Object.keys(g.weekdayShifts).forEach(k => {
+            const arr = g.weekdayShifts[k];
+            if (Array.isArray(arr)) {
+              g.weekdayShifts[k] = arr.map(n => n === oldName ? name : n);
+            }
+          });
+        });
+        renderAttendanceGroups();
+      }
+    } else {
+      shifts.push({ name, shortName, start, end, hours, otStart, otEnd });
+    }
     renderShifts();
     closeShiftModal();
-    document.getElementById('shiftName').value = '';
-    document.getElementById('shiftShortName').value = '';
-    document.getElementById('shiftStart').value = '08:00';
-    document.getElementById('shiftEnd').value = '12:00';
-    document.getElementById('shiftHours').value = '';
-    document.getElementById('shiftOtStart').value = '';
-    document.getElementById('shiftOtEnd').value = '';
   }
 
   renderHolidays();
