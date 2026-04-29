@@ -159,6 +159,8 @@
     <h3 class="font-bold text-lg">複製班表</h3>
     <div><label class="block text-sm font-medium text-slate-600 mb-1">班表名稱</label><input type="text" id="newScheduleName" placeholder="如：2026年2月排班" class="w-full">
     </div>
+    <div><label class="block text-sm font-medium text-slate-600 mb-1">分公司/分店/案場 <span class="text-red-500">*</span></label><select id="newScheduleBranch" class="w-full"></select>
+    </div>
     <div><label class="block text-sm font-medium text-slate-600 mb-1">起始日期</label><input type="date" id="newScheduleStart" class="w-full">
     </div>
     <div><label class="block text-sm font-medium text-slate-600 mb-1">結束日期</label><input type="date" id="newScheduleEnd" class="w-full">
@@ -1010,6 +1012,8 @@
     document.getElementById('newScheduleName').value = '';
     document.getElementById('newScheduleStart').value = '';
     document.getElementById('newScheduleEnd').value = '';
+    const branchSel = document.getElementById('newScheduleBranch');
+    branchSel.innerHTML = '<option value="">請選擇</option>' + branches.map(x => `<option value="${x}">${x}</option>`).join('');
     document.getElementById('newScheduleModal').classList.remove('hidden');
   }
 
@@ -1019,11 +1023,16 @@
 
   function confirmNewSchedule() {
     const name = document.getElementById('newScheduleName').value.trim();
+    const branch = document.getElementById('newScheduleBranch').value;
     const start = document.getElementById('newScheduleStart').value;
     const end = document.getElementById('newScheduleEnd').value;
     
     if (!name) {
       alert('請輸入班表名稱');
+      return;
+    }
+    if (!branch) {
+      alert('請選擇分公司/分店/案場');
       return;
     }
     if (!start || !end) {
@@ -1036,13 +1045,15 @@
     }
     
     // 新增班表到列表
-    schedules.push({ name, start, end });
+    schedules.push({ name, branch, start, end });
     currentScheduleIndex = schedules.length - 1;
     
     // 更新班表資訊
     document.getElementById('scheduleName').value = name;
     document.getElementById('startDate').value = start;
     document.getElementById('endDate').value = end;
+    selectedBranch = branch;
+    renderBranchAndDepartment();
     
     closeNewScheduleModal();
   }
