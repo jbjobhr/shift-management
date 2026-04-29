@@ -530,7 +530,10 @@
         }
       });
     } else {
-      allHolidaysForDisplay = [...holidays, ...individualHolidays];
+      // 預設顯示：所有假別組 + 彈性假期（與 conflictHolidaySet 對齊）
+      const set = new Set(individualHolidays || []);
+      Object.values(holidayGroups || {}).forEach(arr => (arr || []).forEach(d => set.add(d)));
+      allHolidaysForDisplay = Array.from(set);
     }
     // 假日優先策略：將「目前顯示中」的假別組與彈性假期視為「不可排班」日
     // 若使用者於 UI 勾選了特定假別組/日期，conflictHolidaySet 即僅含該選擇；
