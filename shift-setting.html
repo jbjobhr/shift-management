@@ -50,11 +50,11 @@
         <label class="block text-sm font-medium text-slate-600 mb-1">結束日期</label> <input type="date" id="endDate" value="2024-01-31" class="w-full">
        </div>
        <div>
-        <label class="block text-sm font-medium text-slate-600 mb-1">分公司（分店）</label>
+        <label class="block text-sm font-medium text-slate-600 mb-1">分公司/分店/案場</label>
         <select id="branchSelect" class="w-full"></select>
        </div>
        <div>
-        <label class="block text-sm font-medium text-slate-600 mb-1">部門</label>
+        <label class="block text-sm font-medium text-slate-600 mb-1">部門/工作地</label>
         <select id="departmentSelect" class="w-full"></select>
        </div>
       </div>
@@ -960,6 +960,10 @@
         holidayGroups,
         individualHolidays,
         attendanceGroups,
+        branches,
+        departments,
+        selectedBranch,
+        selectedDepartment,
         allPositions,
         positions,
         tags,

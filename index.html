@@ -39,8 +39,18 @@
     <div class="w-full space-y-4">
      <div class="bg-white rounded-xl shadow-sm p-4 space-y-3">
       <div class="flex items-center justify-between border-b border-slate-200 pb-3 mb-3">
-       <div class="flex items-center gap-3">
+       <div class="flex flex-wrap items-center gap-3">
         <h2 class="text-lg font-bold text-slate-800" id="schedulePageTitle">2024年1月排班</h2><span id="scheduleDateRange" class="text-xs text-slate-500"></span><button onclick="toggleScheduleList()" class="text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-600 transition">切換班表</button>
+        <div class="relative"><button onclick="toggleFilterDropdown('branchFilter')" class="text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-600 transition">分公司/分店/案場</button>
+         <div id="branchFilter" class="hidden absolute top-full left-0 bg-white border border-slate-300 rounded-md shadow-lg mt-1 min-w-[220px] z-30">
+          <div id="branchFilterList" class="p-2 space-y-1"></div>
+         </div>
+        </div>
+        <div class="relative"><button onclick="toggleFilterDropdown('departmentFilter')" class="text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-600 transition">部門/工作地</button>
+         <div id="departmentFilter" class="hidden absolute top-full left-0 bg-white border border-slate-300 rounded-md shadow-lg mt-1 min-w-[220px] z-30">
+          <div id="departmentFilterList" class="p-2 space-y-1"></div>
+         </div>
+        </div>
        </div>
        <div id="scheduleListDropdown" class="hidden absolute top-20 left-6 bg-white border border-slate-300 rounded-lg shadow-lg z-30 min-w-[200px]">
         <div class="p-2 space-y-1" id="scheduleListContainer"></div>
@@ -149,6 +159,10 @@
     ],
     allPositions: ['揀貨員','包裝員','理貨員','搬運工','品檢員','分類員','叉車手','司機'],
     positions: ['理貨員', '包裝員'],
+    branches: ['總公司', '北區分店', '中區分店', '南區分店'],
+    departments: ['管理部', '營運部', '倉儲部', '物流部', '客服部', '人資部'],
+    selectedBranch: '總公司',
+    selectedDepartment: '營運部',
     tags: ['可加班', '新人', '夜班優先'],
     schedules: [
       { name: '2024年1月排班', start: '2024-01-01', end: '2024-01-31' },
@@ -181,6 +195,8 @@
   let shifts = G.shifts;
   let attendanceGroups = G.attendanceGroups;
   let positions = G.positions;
+  let branches = G.branches || FALLBACK.branches;
+  let departments = G.departments || FALLBACK.departments;
   let tags = G.tags;
   let schedules = G.schedules;
   let currentScheduleIndex = 0;
@@ -190,6 +206,8 @@
   let selectedHolidays = [];
   let selectedGroups = [];
   let selectedTags = [];
+  let selectedBranchFilter = G.selectedBranch || '';
+  let selectedDepartmentFilter = G.selectedDepartment || '';
 
   // ===== 主題設定 =====
   const defaultConfig = {
@@ -215,6 +233,10 @@
     try {
       G.schedules = schedules;
       G.tags = tags;
+      G.branches = branches;
+      G.departments = departments;
+      G.selectedBranch = selectedBranchFilter;
+      G.selectedDepartment = selectedDepartmentFilter;
       localStorage.setItem('shiftMgmt:global', JSON.stringify(G));
     } catch(e){}
   }
@@ -327,6 +349,32 @@
           <span>${t}</span>
         </label>`).join('');
     }
+    const branchFilterList = document.getElementById('branchFilterList');
+    if (branchFilterList) {
+      branchFilterList.innerHTML = `
+        <label class="flex items-center gap-2 text-sm cursor-pointer px-2 py-1 hover:bg-slate-100 rounded">
+          <input type="radio" name="branchFilterOption" ${selectedBranchFilter === '' ? 'checked' : ''} onclick="selectBranchFilter(''); applyScheduleFilters()">
+          <span>全部</span>
+        </label>
+      ` + branches.map(b => `
+        <label class="flex items-center gap-2 text-sm cursor-pointer px-2 py-1 hover:bg-slate-100 rounded">
+          <input type="radio" name="branchFilterOption" ${selectedBranchFilter === b ? 'checked' : ''} onclick="selectBranchFilter('${b}'); applyScheduleFilters()">
+          <span>${b}</span>
+        </label>`).join('');
+    }
+    const departmentFilterList = document.getElementById('departmentFilterList');
+    if (departmentFilterList) {
+      departmentFilterList.innerHTML = `
+        <label class="flex items-center gap-2 text-sm cursor-pointer px-2 py-1 hover:bg-slate-100 rounded">
+          <input type="radio" name="departmentFilterOption" ${selectedDepartmentFilter === '' ? 'checked' : ''} onclick="selectDepartmentFilter(''); applyScheduleFilters()">
+          <span>全部</span>
+        </label>
+      ` + departments.map(d => `
+        <label class="flex items-center gap-2 text-sm cursor-pointer px-2 py-1 hover:bg-slate-100 rounded">
+          <input type="radio" name="departmentFilterOption" ${selectedDepartmentFilter === d ? 'checked' : ''} onclick="selectDepartmentFilter('${d}'); applyScheduleFilters()">
+          <span>${d}</span>
+        </label>`).join('');
+    }
     renderActiveFilters();
     renderSupervisorChips();
   }
@@ -344,6 +392,8 @@
   function toggleHolidayFilter(v){ const i=selectedHolidays.indexOf(v); i>-1?selectedHolidays.splice(i,1):selectedHolidays.push(v); }
   function toggleGroupFilter(v){ const i=selectedGroups.indexOf(v); i>-1?selectedGroups.splice(i,1):selectedGroups.push(v); }
   function toggleTagFilter(v){ const i=selectedTags.indexOf(v); i>-1?selectedTags.splice(i,1):selectedTags.push(v); }
+  function selectBranchFilter(v){ selectedBranchFilter = v; renderScheduleFilters(); }
+  function selectDepartmentFilter(v){ selectedDepartmentFilter = v; renderScheduleFilters(); }
   // 假別組為單選：再次點擊可取消，選新的會取代舊的
   function selectHolidayGroupFilter(v){
     const groupKeys = Object.keys(holidayGroups);
@@ -365,7 +415,9 @@
       ...selectedShifts.map(s => ({ text: s, type: 'shift' })),
       ...selectedHolidays.map(h => ({ text: h, type: 'holiday' })),
       ...selectedGroups.map(g => ({ text: g, type: 'group' })),
-      ...selectedTags.map(t => ({ text: t, type: 'tag' }))
+      ...selectedTags.map(t => ({ text: t, type: 'tag' })),
+      ...(selectedBranchFilter ? [{ text: selectedBranchFilter, type: 'branch' }] : []),
+      ...(selectedDepartmentFilter ? [{ text: selectedDepartmentFilter, type: 'department' }] : [])
     ];
     const af = document.getElementById('activeFilters');
     if (all.length === 0) { af.innerHTML = '<span class="text-xs text-slate-500">尚未選擇</span>'; return; }
@@ -386,6 +438,8 @@
       else if (type === 'holiday') toggleHolidayFilter(text);
       else if (type === 'group') toggleGroupFilter(text);
       else if (type === 'tag') toggleTagFilter(text);
+      else if (type === 'branch') selectBranchFilter('');
+      else if (type === 'department') selectDepartmentFilter('');
       applyScheduleFilters();
     }
   });
@@ -396,6 +450,8 @@
   }
 
   function getPersonTag(idx) { return tags[idx % tags.length] || ''; }
+  function getPersonBranch(idx) { return branches[idx % branches.length] || ''; }
+  function getPersonDepartment(idx) { return departments[idx % departments.length] || ''; }
 
   function renderSchedule() {
     const cur = schedules[currentScheduleIndex] || { start: '2024-01-01', end: '2024-01-31' };
@@ -434,8 +490,14 @@
 
     const filteredPersons = persons.filter(p => {
       if (searchQuery && !p.name.toLowerCase().includes(searchQuery) && !p.id.toLowerCase().includes(searchQuery)) return false;
+      const idx = persons.indexOf(p);
+      const personTag = getPersonTag(idx);
+      const personBranch = getPersonBranch(idx);
+      const personDepartment = getPersonDepartment(idx);
+      const matchesBranch = !selectedBranchFilter || selectedBranchFilter === personBranch;
+      const matchesDepartment = !selectedDepartmentFilter || selectedDepartmentFilter === personDepartment;
+      if (!matchesBranch || !matchesDepartment) return false;
       if (selectedPositions.length === 0 && selectedTags.length === 0) return true;
-      const personTag = getPersonTag(persons.indexOf(p));
       const matchesTag = selectedTags.length === 0 || selectedTags.includes(personTag);
       return matchesTag;
     });
@@ -470,7 +532,7 @@
   // 點擊外部關閉篩選 dropdown
   document.addEventListener('click', (e) => {
     if (!e.target.closest('[id$="Filter"]') && !e.target.closest('button[onclick*="toggleFilterDropdown"]')) {
-      ['positionFilter','shiftFilter','holidayFilter','groupFilter','tagFilter'].forEach(id => {
+      ['positionFilter','shiftFilter','holidayFilter','groupFilter','tagFilter','branchFilter','departmentFilter'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.classList.add('hidden');
       });
