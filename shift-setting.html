@@ -275,8 +275,8 @@
   let currentGroupPunchLocations = [];
   let branches = ['總公司', '北區分店', '中區分店', '南區分店'];
   let departments = ['管理部', '營運部', '倉儲部', '物流部', '客服部', '人資部'];
-  let selectedBranch = '總公司';
-  let selectedDepartment = '營運部';
+  let selectedBranch = '';
+  let selectedDepartment = '';
   let allPositions = ['揀貨員', '包裝員', '理貨員', '搬運工', '品檢員', '分類員', '叉車手', '司機'];
   let positions = ['理貨員', '包裝員'];
   let tags = ['可加班', '新人', '夜班優先'];
@@ -941,11 +941,11 @@
     const b = document.getElementById('branchSelect');
     const d = document.getElementById('departmentSelect');
     if (b) {
-      b.innerHTML = branches.map(x => `<option value="${x}" ${x===selectedBranch?'selected':''}>${x}</option>`).join('');
+      b.innerHTML = `<option value="" ${selectedBranch === '' ? 'selected' : ''}>請選擇</option>` + branches.map(x => `<option value="${x}" ${x===selectedBranch?'selected':''}>${x}</option>`).join('');
       b.onchange = e => { selectedBranch = e.target.value; };
     }
     if (d) {
-      d.innerHTML = departments.map(x => `<option value="${x}" ${x===selectedDepartment?'selected':''}>${x}</option>`).join('');
+      d.innerHTML = `<option value="" ${selectedDepartment === '' ? 'selected' : ''}>請選擇</option>` + departments.map(x => `<option value="${x}" ${x===selectedDepartment?'selected':''}>${x}</option>`).join('');
       d.onchange = e => { selectedDepartment = e.target.value; };
     }
   }
