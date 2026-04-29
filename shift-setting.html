@@ -131,12 +131,14 @@
     <div><label class="block text-sm font-medium text-slate-600 mb-1">班別簡稱</label><input type="text" id="shiftShortName" placeholder="如：早" class="w-full" maxlength="4">
     </div>
     <div class="grid grid-cols-2 gap-3">
-     <div><label class="block text-sm font-medium text-slate-600 mb-1">起始</label><input type="time" id="shiftStart" value="08:00" class="w-full">
+     <div><label class="block text-sm font-medium text-slate-600 mb-1">起始</label><input type="time" id="shiftStart" value="08:00" class="w-full" oninput="onShiftTimeChange()">
      </div>
-     <div><label class="block text-sm font-medium text-slate-600 mb-1">結束</label><input type="time" id="shiftEnd" value="12:00" class="w-full">
+     <div><label class="block text-sm font-medium text-slate-600 mb-1">結束</label><input type="time" id="shiftEnd" value="12:00" class="w-full" oninput="onShiftTimeChange()">
      </div>
     </div>
-    <div><label class="block text-sm font-medium text-slate-600 mb-1">總工時數（小時）</label><input type="number" id="shiftHours" min="0" step="0.5" placeholder="4" class="w-full">
+    <div><label class="block text-sm font-medium text-slate-600 mb-1">休息時數（小時）</label><input type="number" id="shiftRest" min="0" step="0.5" placeholder="0" class="w-full" oninput="updateShiftHoursPreview()">
+     <p class="text-xs text-slate-500 mt-1">勞基法：每繼續工作 4 小時至少休息 30 分鐘（僅工作 4 小時可免）。預設依時段自動帶入，可手動調高。</p>
+     <p class="text-xs text-slate-500 mt-1">總工時 = 結束 - 起始 - 休息；預览：<span id="shiftHoursPreview" class="font-medium text-amber-700">0h</span>、最低法定休息：<span id="shiftMinRest" class="font-medium text-orange-700">0h</span></p>
     </div>
     <div class="border-t border-slate-200 pt-4 mt-4">
      <label class="block text-sm font-medium text-slate-600 mb-3 flex items-center gap-2"><i data-lucide="timer" class="w-4 h-4 text-orange-600"></i>可加班時段（此班別專用）</label>
@@ -253,7 +255,7 @@
   ];
   let supervisors = ['劉經理'];
   let shifts = [
-    { name: '早班', shortName: '早', start: '08:00', end: '12:00', hours: 4, otStart: '', otEnd: '' },
+    { name: '早班', shortName: '早', start: '08:00', end: '17:00', hours: 8, rest: 1, otStart: '', otEnd: '' },
     { name: '午班', shortName: '午', start: '13:00', end: '17:00', hours: 4, otStart: '', otEnd: '' },
     { name: '晚班', shortName: '晚', start: '18:00', end: '22:00', hours: 4, otStart: '18:00', otEnd: '21:00' }
   ];
@@ -261,9 +263,9 @@
     { name: 'A組 - 倉儲', members: ['EMP001', 'EMP002'], scheduleType: 'auto',
       weekdayShifts: { mon:['早班'], tue:['早班'], wed:['早班'], thu:['早班'], fri:['早班'], sat:[], sun:[] } },
     { name: 'B組 - 物流', members: ['EMP003'], scheduleType: 'auto',
-      weekdayShifts: { mon:['早班','午班'], tue:['早班','午班'], wed:['早班','午班'], thu:['早班','午班'], fri:['早班','午班'], sat:[], sun:[] } },
+      weekdayShifts: { mon:['早班'], tue:['早班'], wed:[], thu:['早班'], fri:[], sat:['午班','晚班'], sun:['午班','晚班'] } },
     { name: 'C組 - 客服', members: ['EMP004', 'EMP005'], scheduleType: 'auto',
-      weekdayShifts: { mon:['早班','午班'], tue:['午班','晚班'], wed:['早班','晚班'], thu:['早班','午班'], fri:['午班','晚班'], sat:[], sun:[] } }
+      weekdayShifts: { mon:['早班'], tue:['午班','晚班'], wed:['早班'], thu:['午班','晚班'], fri:['早班'], sat:[], sun:[] } }
   ];
   const WEEKDAYS = [
     { key: 'mon', label: '每週一' },
@@ -590,17 +592,50 @@
     }
   }
 
-  function calcRestHours(start, end, workHours) {
+  function calcDurationHours(start, end) {
+    if (!start || !end) return 0;
     const [sh, sm] = start.split(':').map(Number);
     const [eh, em] = end.split(':').map(Number);
-    const totalMinutes = (eh * 60 + em) - (sh * 60 + sm);
-    const totalHours = totalMinutes / 60;
-    return Math.max(0, totalHours - workHours);
+    return Math.max(0, ((eh * 60 + em) - (sh * 60 + sm)) / 60);
+  }
+  function calcWorkHours(start, end, rest) {
+    return Math.max(0, calcDurationHours(start, end) - (Number(rest) || 0));
+  }
+  // 勞基法 §35：繼續工作 4 小時至少休息 30 分鐘；僅工作 4 小時可免。
+  function minRequiredRest(durationHours) {
+    if (durationHours <= 4) return 0;
+    return Math.floor((durationHours - 0.0001) / 4) * 0.5;
+  }
+  function onShiftTimeChange() {
+    const start = document.getElementById('shiftStart').value;
+    const end = document.getElementById('shiftEnd').value;
+    const duration = calcDurationHours(start, end);
+    const minRest = minRequiredRest(duration);
+    const restEl = document.getElementById('shiftRest');
+    const cur = parseFloat(restEl.value) || 0;
+    // 若使用者尚未手動調高，則自動帶入最低法定休息
+    if (cur < minRest) restEl.value = minRest;
+    updateShiftHoursPreview();
+  }
+  function updateShiftHoursPreview() {
+    const start = document.getElementById('shiftStart').value;
+    const end = document.getElementById('shiftEnd').value;
+    const rest = parseFloat(document.getElementById('shiftRest').value) || 0;
+    const hours = calcWorkHours(start, end, rest);
+    const minRest = minRequiredRest(calcDurationHours(start, end));
+    const hoursEl = document.getElementById('shiftHoursPreview');
+    const minEl = document.getElementById('shiftMinRest');
+    if (hoursEl) hoursEl.textContent = `${hours}h`;
+    if (minEl) {
+      minEl.textContent = `${minRest}h`;
+      minEl.classList.toggle('text-red-600', rest < minRest);
+      minEl.classList.toggle('text-orange-700', rest >= minRest);
+    }
   }
 
   function renderShifts() {
     document.getElementById('shiftList').innerHTML = shifts.map((s, i) => {
-      const restHours = calcRestHours(s.start, s.end, s.hours);
+      const rest = Number(s.rest) || 0;
       return `<div class="flex items-center gap-3 p-3 bg-amber-50 rounded-lg">
         <input type="checkbox" checked class="rounded">
         <div class="flex-1">
@@ -609,7 +644,7 @@
         </div>
         <span class="text-xs text-slate-500">${s.start} - ${s.end}</span>
         <span class="chip bg-amber-100 text-amber-800">工時 ${s.hours}h</span>
-        <span class="chip bg-orange-100 text-orange-800">休息 ${restHours.toFixed(1)}h</span>
+        <span class="chip bg-orange-100 text-orange-800">休息 ${rest.toFixed(1)}h</span>
         <button onclick="editShift(${i})" class="ml-auto text-blue-400 hover:text-blue-600 text-sm">編輯</button>
         <button onclick="deleteShift(${i})" class="text-red-400 hover:text-red-600 text-sm">刪除</button>
       </div>`;
@@ -638,9 +673,10 @@
     document.getElementById('shiftShortName').value = s.shortName || '';
     document.getElementById('shiftStart').value = s.start || '08:00';
     document.getElementById('shiftEnd').value = s.end || '12:00';
-    document.getElementById('shiftHours').value = s.hours || '';
+    document.getElementById('shiftRest').value = (s.rest != null ? s.rest : 0);
     document.getElementById('shiftOtStart').value = s.otStart || '';
     document.getElementById('shiftOtEnd').value = s.otEnd || '';
+    updateShiftHoursPreview();
     document.getElementById('shiftModal').classList.remove('hidden');
   }
 
@@ -947,9 +983,10 @@
     document.getElementById('shiftShortName').value = '';
     document.getElementById('shiftStart').value = '08:00';
     document.getElementById('shiftEnd').value = '12:00';
-    document.getElementById('shiftHours').value = '';
+    document.getElementById('shiftRest').value = '0';
     document.getElementById('shiftOtStart').value = '';
     document.getElementById('shiftOtEnd').value = '';
+    updateShiftHoursPreview();
     document.getElementById('shiftModal').classList.remove('hidden');
   }
   function closeShiftModal() {
@@ -1003,10 +1040,11 @@
     const shortName = document.getElementById('shiftShortName').value.trim();
     const start = document.getElementById('shiftStart').value;
     const end = document.getElementById('shiftEnd').value;
-    const hours = parseFloat(document.getElementById('shiftHours').value) || 0;
+    const rest = parseFloat(document.getElementById('shiftRest').value) || 0;
     const otStart = document.getElementById('shiftOtStart').value || '';
     const otEnd = document.getElementById('shiftOtEnd').value || '';
-    
+    const hours = calcWorkHours(start, end, rest);
+
     if (!name) {
       alert('請輸入班別名稱');
       return;
@@ -1015,14 +1053,27 @@
       alert('請輸入班別簡稱');
       return;
     }
-    if (hours <= 0) {
-      alert('請輸入正確的工時數');
+    if (calcDurationHours(start, end) <= 0) {
+      alert('結束時間必須晚於起始時間');
       return;
     }
-    
+    if (rest < 0) {
+      alert('休息時數不可為負數');
+      return;
+    }
+    const minRest = minRequiredRest(calcDurationHours(start, end));
+    if (rest < minRest) {
+      alert(`依勞基法，此時段至少需休息 ${minRest}h（現設 ${rest}h）。`);
+      return;
+    }
+    if (hours <= 0) {
+      alert('總工時 = 結束-起始-休息，請調整使總工時大於 0');
+      return;
+    }
+
     if (editingShiftIndex >= 0 && shifts[editingShiftIndex]) {
       const oldName = shifts[editingShiftIndex].name;
-      shifts[editingShiftIndex] = { name, shortName, start, end, hours, otStart, otEnd };
+      shifts[editingShiftIndex] = { name, shortName, start, end, hours, rest, otStart, otEnd };
       // 同步更新考勤組中引用此班別名稱
       if (oldName !== name) {
         attendanceGroups.forEach(g => {
@@ -1037,7 +1088,7 @@
         renderAttendanceGroups();
       }
     } else {
-      shifts.push({ name, shortName, start, end, hours, otStart, otEnd });
+      shifts.push({ name, shortName, start, end, hours, rest, otStart, otEnd });
     }
     renderShifts();
     closeShiftModal();

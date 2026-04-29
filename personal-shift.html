@@ -216,7 +216,7 @@
     ],
     supervisors: [],
     shifts: [
-      { name: '早班', shortName: '早', start: '08:00', end: '12:00', hours: 4 },
+      { name: '早班', shortName: '早', start: '08:00', end: '17:00', hours: 8, rest: 1 },
       { name: '午班', shortName: '午', start: '13:00', end: '17:00', hours: 4 },
       { name: '晚班', shortName: '晚', start: '18:00', end: '22:00', hours: 4 }
     ],
@@ -226,9 +226,9 @@
       { name: 'A組 - 倉儲', members: ['EMP001', 'EMP002'], scheduleType: 'auto',
         weekdayShifts: { mon:['早班'], tue:['早班'], wed:['早班'], thu:['早班'], fri:['早班'], sat:[], sun:[] } },
       { name: 'B組 - 物流', members: ['EMP003'], scheduleType: 'auto',
-        weekdayShifts: { mon:['早班','午班'], tue:['早班','午班'], wed:['早班','午班'], thu:['早班','午班'], fri:['早班','午班'], sat:[], sun:[] } },
+        weekdayShifts: { mon:['早班'], tue:['早班'], wed:[], thu:['早班'], fri:[], sat:['午班','晚班'], sun:['午班','晚班'] } },
       { name: 'C組 - 客服', members: ['EMP004', 'EMP005'], scheduleType: 'auto',
-        weekdayShifts: { mon:['早班','午班'], tue:['午班','晚班'], wed:['早班','晚班'], thu:['早班','午班'], fri:['午班','晚班'], sat:[], sun:[] } }
+        weekdayShifts: { mon:['早班'], tue:['午班','晚班'], wed:['早班'], thu:['午班','晚班'], fri:['早班'], sat:[], sun:[] } }
     ],
     allPositions: ['揀貨員','包裝員','理貨員','搬運工','品檢員','分類員','叉車手','司機'],
     positions: ['理貨員','包裝員'],
@@ -236,7 +236,7 @@
     schedules: []
   };
   let G = FALLBACK;
-  const DATA_VERSION = 4;
+  const DATA_VERSION = 9;
   try {
     const raw = localStorage.getItem('shiftMgmt:global');
     if (raw) {
