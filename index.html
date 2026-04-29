@@ -39,7 +39,7 @@
      <div class="bg-white rounded-xl shadow-sm p-4 space-y-3">
       <div class="flex items-center justify-between border-b border-slate-200 pb-3 mb-3">
        <div class="flex flex-wrap items-center gap-3">
-        <h2 class="text-lg font-bold text-slate-800" id="schedulePageTitle">2024年1月排班</h2><span id="scheduleDateRange" class="text-xs text-slate-500"></span><button onclick="toggleScheduleList()" class="text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-600 transition">切換班表</button>
+        <h2 class="text-lg font-bold text-slate-800" id="schedulePageTitle">2026年1月排班</h2><span id="scheduleDateRange" class="text-xs text-slate-500"></span><button onclick="toggleScheduleList()" class="text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-600 transition">切換班表</button>
         <div class="relative"><button onclick="toggleFilterDropdown('branchFilter')" class="text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-600 transition">分公司/分店/案場</button>
          <div id="branchFilter" class="hidden absolute top-full left-0 bg-white border border-slate-300 rounded-md shadow-lg mt-1 min-w-[220px] z-30">
           <div id="branchFilterList" class="p-2 space-y-1"></div>
@@ -131,7 +131,7 @@
   <div id="newScheduleModal" class="modal-overlay hidden">
    <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-md space-y-4">
     <h3 class="font-bold text-lg">新增班表</h3>
-    <div><label class="block text-sm font-medium text-slate-600 mb-1">班表名稱</label><input type="text" id="newScheduleName" placeholder="如：2024年2月排班" class="w-full">
+    <div><label class="block text-sm font-medium text-slate-600 mb-1">班表名稱</label><input type="text" id="newScheduleName" placeholder="如：2026年2月排班" class="w-full">
     </div>
     <div><label class="block text-sm font-medium text-slate-600 mb-1">起始日期</label><input type="date" id="newScheduleStart" class="w-full">
     </div>
@@ -146,11 +146,11 @@
   // ===== 從 localStorage 載入全域資料（由 shift-setting.html 寫入） =====
   const FALLBACK = {
     holidayGroups: {
-      '台灣國定假日': ['2024-01-01', '2024-02-28', '2024-04-04', '2024-06-10'],
-      '自訂假別A': ['2024-01-15', '2024-02-15'],
-      '自訂假別B': ['2024-03-01', '2024-03-15']
+      '台灣國定假日': ['2026-01-01', '2026-02-28', '2026-04-04', '2026-06-10'],
+      '自訂假別A': ['2026-01-15', '2026-02-15'],
+      '自訂假別B': ['2026-03-01', '2026-03-15']
     },
-    individualHolidays: ['2024-01-20', '2024-02-20'],
+    individualHolidays: ['2026-01-20', '2026-02-20'],
     persons: [
       { name: '王小明', id: 'EMP001' },
       { name: '李小華', id: 'EMP002' },
@@ -180,9 +180,9 @@
     selectedDepartment: '',
     tags: ['可加班', '新人', '夜班優先'],
     schedules: [
-      { name: '2024年1月排班', start: '2024-01-01', end: '2024-01-31' },
-      { name: '2024年2月排班', start: '2024-02-01', end: '2024-02-29' },
-      { name: '2024年3月排班', start: '2024-03-01', end: '2024-03-31' }
+      { name: '2026年1月排班', start: '2026-01-01', end: '2026-01-31' },
+      { name: '2026年2月排班', start: '2026-02-01', end: '2026-02-28' },
+      { name: '2026年3月排班', start: '2026-03-01', end: '2026-03-31' }
     ]
   };
   let G = FALLBACK;
@@ -499,7 +499,7 @@
   }
 
   function renderSchedule() {
-    const cur = schedules[currentScheduleIndex] || { start: '2024-01-01', end: '2024-01-31' };
+    const cur = schedules[currentScheduleIndex] || { start: '2026-01-01', end: '2026-01-31' };
     const start = new Date(cur.start);
     const end = new Date(cur.end);
     const days = [];

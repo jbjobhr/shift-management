@@ -42,13 +42,13 @@
       <h2 class="font-bold text-lg text-slate-800 flex items-center gap-2"><i data-lucide="clipboard-list" class="w-5 h-5 text-blue-600"></i>基本資訊</h2>
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
        <div>
-        <label class="block text-sm font-medium text-slate-600 mb-1">班表名稱</label> <input type="text" id="scheduleName" value="2024年1月排班" class="w-full">
+        <label class="block text-sm font-medium text-slate-600 mb-1">班表名稱</label> <input type="text" id="scheduleName" value="2026年1月排班" class="w-full">
        </div>
        <div>
-        <label class="block text-sm font-medium text-slate-600 mb-1">起始日期</label> <input type="date" id="startDate" value="2024-01-01" class="w-full">
+        <label class="block text-sm font-medium text-slate-600 mb-1">起始日期</label> <input type="date" id="startDate" value="2026-01-01" class="w-full">
        </div>
        <div>
-        <label class="block text-sm font-medium text-slate-600 mb-1">結束日期</label> <input type="date" id="endDate" value="2024-01-31" class="w-full">
+        <label class="block text-sm font-medium text-slate-600 mb-1">結束日期</label> <input type="date" id="endDate" value="2026-01-31" class="w-full">
        </div>
        <div>
         <label class="block text-sm font-medium text-slate-600 mb-1">分公司/分店/案場</label>
@@ -155,7 +155,7 @@
   <div id="newScheduleModal" class="modal-overlay hidden">
    <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-md space-y-4">
     <h3 class="font-bold text-lg">複製班表</h3>
-    <div><label class="block text-sm font-medium text-slate-600 mb-1">班表名稱</label><input type="text" id="newScheduleName" placeholder="如：2024年2月排班" class="w-full">
+    <div><label class="block text-sm font-medium text-slate-600 mb-1">班表名稱</label><input type="text" id="newScheduleName" placeholder="如：2026年2月排班" class="w-full">
     </div>
     <div><label class="block text-sm font-medium text-slate-600 mb-1">起始日期</label><input type="date" id="newScheduleStart" class="w-full">
     </div>
@@ -224,11 +224,11 @@
   </div>
   <script>
   let holidayGroups = {
-    '台灣國定假日': ['2024-01-01', '2024-02-28', '2024-04-04', '2024-06-10'],
-    '自訂假別A': ['2024-01-15', '2024-02-15'],
-    '自訂假別B': ['2024-03-01', '2024-03-15']
+    '台灣國定假日': ['2026-01-01', '2026-02-28', '2026-04-04', '2026-06-10'],
+    '自訂假別A': ['2026-01-15', '2026-02-15'],
+    '自訂假別B': ['2026-03-01', '2026-03-15']
   };
-  let individualHolidays = ['2024-01-20', '2024-02-20'];
+  let individualHolidays = ['2026-01-20', '2026-02-20'];
   let selectedHolidayGroup = '台灣國定假日';
   let holidays = holidayGroups[selectedHolidayGroup] || [];
   let editingHolidayGroup = null;
@@ -290,9 +290,9 @@
 
   // 班表列表
   let schedules = [
-    { name: '2024年1月排班', start: '2024-01-01', end: '2024-01-31' },
-    { name: '2024年2月排班', start: '2024-02-01', end: '2024-02-29' },
-    { name: '2024年3月排班', start: '2024-03-01', end: '2024-03-31' }
+    { name: '2026年1月排班', start: '2026-01-01', end: '2026-01-31' },
+    { name: '2026年2月排班', start: '2026-02-01', end: '2026-02-28' },
+    { name: '2026年3月排班', start: '2026-03-01', end: '2026-03-31' }
   ];
   let currentScheduleIndex = 0;
 
