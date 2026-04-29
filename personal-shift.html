@@ -100,13 +100,13 @@
       <table class="w-full border-collapse table-fixed">
        <thead>
         <tr class="bg-slate-100 text-slate-600 text-sm">
-         <th class="p-2 border border-slate-200">日</th>
          <th class="p-2 border border-slate-200">一</th>
          <th class="p-2 border border-slate-200">二</th>
          <th class="p-2 border border-slate-200">三</th>
          <th class="p-2 border border-slate-200">四</th>
          <th class="p-2 border border-slate-200">五</th>
          <th class="p-2 border border-slate-200">六</th>
+         <th class="p-2 border border-slate-200">日</th>
          <th class="p-2 border border-slate-200 w-20">週合計</th>
         </tr>
        </thead>
@@ -387,9 +387,11 @@
     const todayStr = fmt(new Date());
     const rs = personal.rangeStart, re = personal.rangeEnd;
 
+    // 週一為首：計算首日之前需填充几天（Sun=0 -> 6，Mon=1 -> 0）
+    const leadDays = (firstDay + 6) % 7;
     const cells = [];
     const prevMonthDays = new Date(year, month, 0).getDate();
-    for (let i = firstDay-1; i >= 0; i--) cells.push({ date: new Date(year, month-1, prevMonthDays-i), other: true });
+    for (let i = leadDays-1; i >= 0; i--) cells.push({ date: new Date(year, month-1, prevMonthDays-i), other: true });
     for (let i = 1; i <= daysInMonth; i++) cells.push({ date: new Date(year, month, i), other: false });
     let extra = 1;
     while (cells.length % 7 !== 0 || cells.length < 35) cells.push({ date: new Date(year, month+1, extra++), other: true });
