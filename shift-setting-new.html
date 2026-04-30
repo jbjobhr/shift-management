@@ -251,8 +251,8 @@
     '台灣國定假日': Array.from(new Set([..._genWeekendsOfYear(2026), '2026-01-01', '2026-02-28', '2026-04-04', '2026-06-10'])).sort()
   };
   let individualHolidays = [];
-  let selectedHolidayGroup = '台灣國定假日';
-  let holidays = holidayGroups[selectedHolidayGroup] || [];
+  let selectedHolidayGroups = ['台灣國定假日'];
+  let holidays = [];
   let editingHolidayGroup = null;
   let editingHolidayDates = [];
   let persons = [
@@ -363,8 +363,9 @@
     const container = document.getElementById('holidayGroupList');
     container.innerHTML = Object.keys(holidayGroups).map(groupName => {
       const dates = holidayGroups[groupName];
+      const checked = selectedHolidayGroups.includes(groupName) ? 'checked' : '';
       return `<div class="flex items-center gap-3 p-3 bg-red-50 rounded-lg">
-        <input type="radio" name="holidayGroupSelect" class="rounded">
+        <input type="checkbox" ${checked} onchange="toggleHolidayGroupSelection('${groupName.replace(/'/g, "\\'")}', this.checked)" class="rounded">
         <div class="flex-1">
           <div class="font-medium text-sm">${groupName}</div>
           <div class="text-xs text-slate-500">${dates.length} 個假日</div>
@@ -373,6 +374,12 @@
         <button onclick="deleteHolidayGroup('${groupName}')" class="text-red-400 hover:text-red-600 text-sm">刪除</button>
       </div>`;
     }).join('');
+  }
+
+  function toggleHolidayGroupSelection(name, checked) {
+    const idx = selectedHolidayGroups.indexOf(name);
+    if (checked && idx === -1) selectedHolidayGroups.push(name);
+    if (!checked && idx > -1) selectedHolidayGroups.splice(idx, 1);
   }
 
   function searchPersonById() {
@@ -1145,6 +1152,7 @@
         supervisors,
         shifts,
         holidayGroups,
+        selectedHolidayGroups,
         individualHolidays,
         attendanceGroups,
         branches,

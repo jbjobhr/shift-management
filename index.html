@@ -159,8 +159,7 @@
   }
   const FALLBACK = {
     holidayGroups: {
-      '台灣國定假日': Array.from(new Set([
-        ..._genWeekendsOfYear(2026),
+      '台灣國定假日': [
         // 元旦
         '2026-01-01', '2026-01-02',
         // 春節 (2/14–2/22)
@@ -179,8 +178,8 @@
         '2026-10-09', '2026-10-10', '2026-10-11',
         // 行憲紀念日 (12/25–12/27)
         '2026-12-25', '2026-12-26', '2026-12-27'
-      ])).sort(),
-      '自訂假別A': ['2026-01-15', '2026-02-15'],
+      ],
+      '一例一休': _genWeekendsOfYear(2026),
       '自訂假別B': ['2026-03-01', '2026-03-15']
     },
     individualHolidays: ['2026-01-20', '2026-02-20'],
@@ -219,7 +218,7 @@
     ]
   };
   let G = FALLBACK;
-  const DATA_VERSION = 12;
+  const DATA_VERSION = 13;
   try {
     const raw = localStorage.getItem('shiftMgmt:global');
     if (raw) {

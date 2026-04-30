@@ -209,6 +209,15 @@
   </div>
 
   <script>
+  function _genWeekendsOfYear(year) {
+    const out = [], d = new Date(year, 0, 1);
+    while (d.getFullYear() === year) {
+      const w = d.getDay();
+      if (w === 0 || w === 6) out.push(`${year}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+      d.setDate(d.getDate() + 1);
+    }
+    return out;
+  }
   // ===== 全域資料：自 localStorage 載入（由 index.html 同步） =====
   const FALLBACK = {
     persons: [
@@ -224,16 +233,8 @@
       { name: '午班', shortName: '午', start: '13:00', end: '17:00', hours: 4 },
       { name: '晚班', shortName: '晚', start: '18:00', end: '22:00', hours: 4 }
     ],
-    holidayGroups: (function(){
-      const out = [];
-      const d = new Date(2026, 0, 1);
-      while (d.getFullYear() === 2026) {
-        const w = d.getDay();
-        if (w === 0 || w === 6) out.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
-        d.setDate(d.getDate() + 1);
-      }
-      return { '台灣國定假日': Array.from(new Set([
-        ...out,
+    holidayGroups: {
+      '台灣國定假日': [
         // 元旦
         '2026-01-01', '2026-01-02',
         // 春節 (2/14–2/22)
@@ -252,8 +253,10 @@
         '2026-10-09', '2026-10-10', '2026-10-11',
         // 行憲紀念日 (12/25–12/27)
         '2026-12-25', '2026-12-26', '2026-12-27'
-      ])).sort() };
-    })(),
+      ],
+      '一例一休': _genWeekendsOfYear(2026),
+      '自訂假別B': ['2026-03-01', '2026-03-15']
+    },
     individualHolidays: [],
     attendanceGroups: [
       { name: 'A組 - 倉儲', members: ['EMP001', 'EMP002'], scheduleType: 'auto',
@@ -269,7 +272,7 @@
     schedules: []
   };
   let G = FALLBACK;
-  const DATA_VERSION = 11;
+  const DATA_VERSION = 13;
   try {
     const raw = localStorage.getItem('shiftMgmt:global');
     if (raw) {
@@ -614,13 +617,20 @@
     if (!names.length) { c.innerHTML = '<div class="text-sm text-slate-400">尚未建立任何假別組</div>'; return; }
     c.innerHTML = names.map(n => `
       <label class="flex items-center gap-3 p-2 bg-red-50 rounded-lg cursor-pointer">
-        <input type="radio" name="personalHolidayGroup" ${draft.holidayGroups.includes(n)?'checked':''} onclick="selectDraftSingle('holidayGroups','${n.replace(/'/g,"\\'")}')">
+        <input type="checkbox" ${draft.holidayGroups.includes(n)?'checked':''} onclick="toggleDraftHolidayGroup('${n.replace(/'/g,"\\'")}')">
         <div class="flex-1">
           <div class="text-sm font-medium">${n}</div>
           <div class="text-xs text-slate-500">${(G.holidayGroups[n]||[]).length} 個假日</div>
         </div>
       </label>
     `).join('');
+  }
+  function toggleDraftHolidayGroup(name){
+    const idx = draft.holidayGroups.indexOf(name);
+    if (idx === -1) draft.holidayGroups.push(name);
+    else draft.holidayGroups.splice(idx, 1);
+    setDirty(true);
+    renderHolidayGroupsPanel();
   }
   function renderAttendanceGroupsPanel(){
     const c = document.getElementById('personalAttendanceGroups');
@@ -825,9 +835,13 @@
         // 採用考勤組的設定（即使週末，只要有排班就排）
         dayShifts = groupWeekday[DOW_KEYS[dow]] || [];
       } else {
-        // 沒選考勤組：週末預設休，平日用可排班別
+        // 沒選考勤組：若也沒選班別，只處理假別組明確列出的日期，其餘清空
+        if (!shiftNames.length) {
+          delete personal.assignments[ds];
+          continue;
+        }
+        // 有班別：週末預設休，平日排班
         if (dow === 0 || dow === 6) {
-          // keep 模式且已有資料：不覆蓋
           if (mode === 'keep' && existing) continue;
           personal.assignments[ds] = { type: 'off' }; continue;
         }
