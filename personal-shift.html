@@ -232,7 +232,27 @@
         if (w === 0 || w === 6) out.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
         d.setDate(d.getDate() + 1);
       }
-      return { '台灣國定假日': Array.from(new Set([...out, '2026-01-01', '2026-02-28', '2026-04-04', '2026-06-10'])).sort() };
+      return { '台灣國定假日': Array.from(new Set([
+        ...out,
+        // 元旦
+        '2026-01-01', '2026-01-02',
+        // 春節 (2/14–2/22)
+        '2026-02-14', '2026-02-15', '2026-02-16', '2026-02-17', '2026-02-18', '2026-02-19', '2026-02-20', '2026-02-21', '2026-02-22',
+        // 和平紀念日 (2/27補假、2/28、3/1)
+        '2026-02-27', '2026-02-28', '2026-03-01',
+        // 兒童節／清明節 (4/3補假、4/4、4/5、4/6補假)
+        '2026-04-03', '2026-04-04', '2026-04-05', '2026-04-06',
+        // 勞動節
+        '2026-05-01',
+        // 端午節
+        '2026-06-19',
+        // 中秋節／教師節 (9/25–9/28)
+        '2026-09-25', '2026-09-26', '2026-09-27', '2026-09-28',
+        // 國慶日 (10/9補假、10/10、10/11)
+        '2026-10-09', '2026-10-10', '2026-10-11',
+        // 行憲紀念日 (12/25–12/27)
+        '2026-12-25', '2026-12-26', '2026-12-27'
+      ])).sort() };
     })(),
     individualHolidays: [],
     attendanceGroups: [
@@ -806,7 +826,11 @@
         dayShifts = groupWeekday[DOW_KEYS[dow]] || [];
       } else {
         // 沒選考勤組：週末預設休，平日用可排班別
-        if (dow === 0 || dow === 6) { personal.assignments[ds] = { type: 'off' }; continue; }
+        if (dow === 0 || dow === 6) {
+          // keep 模式且已有資料：不覆蓋
+          if (mode === 'keep' && existing) continue;
+          personal.assignments[ds] = { type: 'off' }; continue;
+        }
         dayShifts = shiftNames;
       }
       if (mode === 'keep' && existing) {
@@ -820,7 +844,8 @@
 
       if (dayShifts.length) {
         personal.assignments[ds] = { type: 'work', shiftNames: [...dayShifts] };
-      } else {
+      } else if (mode !== 'keep') {
+        // keep 模式不強制把無班別的日期設為休假
         personal.assignments[ds] = { type: 'off' };
       }
     }
