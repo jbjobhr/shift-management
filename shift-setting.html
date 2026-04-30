@@ -857,7 +857,7 @@
     container.innerHTML = currentGroupMembers.map((empId, idx) => {
       const person = persons.find(p => p.id === empId);
       return `<div class="flex items-center justify-between bg-white p-2 rounded border border-slate-200">
-        <span class="text-sm">${person?.name} (${empId})</span>
+        <a href="personal-shift.html?empId=${encodeURIComponent(empId)}" class="text-sm text-blue-600 hover:underline cursor-pointer">${person?.name} (${empId})</a>
         <button onclick="currentGroupMembers.splice(${idx}, 1); renderSelectedPersonsInGroup()" class="text-red-400 hover:text-red-600 text-xs">移除</button>
       </div>`;
     }).join('');
