@@ -145,8 +145,13 @@
       <!-- 考勤組 -->
       <section class="bg-white rounded-xl shadow-sm p-5 space-y-3">
        <h2 class="font-bold text-lg text-slate-800 flex items-center gap-2">
-        <i data-lucide="users" class="w-5 h-5 text-green-600"></i>所屬考勤組
+        <i data-lucide="users" class="w-5 h-5 text-green-600"></i>套用考勤組
+        <span class="text-xs font-normal text-slate-400 ml-1">（一次性套用週排班規則）</span>
        </h2>
+       <p class="text-xs text-slate-500 flex items-start gap-1">
+        <i data-lucide="info" class="w-3.5 h-3.5 mt-0.5 shrink-0"></i>
+        <span>此選擇僅用於本次套用，不影響班表設定中的考勤組成員歸屬。</b></span>
+       </p>
        <div id="personalAttendanceGroups" class="space-y-2"></div>
       </section>
 
@@ -637,6 +642,15 @@
     const list = G.attendanceGroups || [];
     if (!list.length) { c.innerHTML = '<div class="text-sm text-slate-400">尚未建立任何考勤組</div>'; return; }
     const DOW_LABELS = [['mon','一'],['tue','二'],['wed','三'],['thu','四'],['fri','五'],['sat','六'],['sun','日']];
+    const noneSelected = !draft.attendanceGroups.length;
+    const noneOption = `
+      <label class="flex items-center gap-3 p-2 bg-slate-50 rounded-lg cursor-pointer border ${noneSelected?'border-slate-400':'border-transparent'}">
+        <input type="radio" name="personalAttendanceGroup" ${noneSelected?'checked':''} onclick="clearDraftAttendanceGroup()">
+        <div class="flex-1 min-w-0">
+          <div class="text-sm font-medium text-slate-600">不套用考勤組</div>
+          <div class="text-xs text-slate-500">僅依「適用班別」與假別組規則處理</div>
+        </div>
+      </label>`;
     c.innerHTML = list.map(g => {
       const isAuto = (g.scheduleType || 'auto') === 'auto';
       // 若考勤組沒設定 weekdayShifts，提供預設：週一到週五 = 第一個班別、週六日休
@@ -672,7 +686,7 @@
           ${weekdayHtml}
         </div>
       </label>
-    `;}).join('');
+    `;}).join('') + noneOption;
   }
   function renderShiftsPanel(){
     const c = document.getElementById('personalShifts');
@@ -762,6 +776,12 @@
     setDirty(true);
     if (key === 'holidayGroups') renderHolidayGroupsPanel();
     if (key === 'attendanceGroups') renderAttendanceGroupsPanel();
+  }
+
+  function clearDraftAttendanceGroup(){
+    draft.attendanceGroups = [];
+    setDirty(true);
+    renderAttendanceGroupsPanel();
   }
 
   function applyPersonalSettings(mode){
@@ -940,6 +960,7 @@
   window.removePersonalTag = removePersonalTag;
   window.savePersonal = savePersonal;
   window.cancelPersonalChanges = cancelPersonalChanges;
+  window.clearDraftAttendanceGroup = clearDraftAttendanceGroup;
   </script>
  </body>
 </html>
