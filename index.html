@@ -15,9 +15,16 @@
     .tab-inactive { background: transparent; color: #ffffff; }
     .chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 9999px; font-size: 12px; }
     .calendar-cell { min-width: 50px; min-height: 40px; border: 1px solid #e2e8f0; text-align: center; font-size: 12px; padding: 4px; }
-    .calendar-cell.holiday { background: #fef2f2; color: #dc2626; }
-    .calendar-cell.assigned { background: #dbeafe; color: #1e40af; font-weight: 500; }
-    .calendar-cell.holiday-ot { background: #fff7ed; color: #c2410c; font-weight: 600; border-color: #fed7aa; }
+    /* ── 色彩語義 Token（與 personal-shift.html 共用） ────────────
+       考勤組排班 : bg #dcfce7 / text #166534  (.assigned)
+       個人排班 : bg #dbeafe / text #1e40af  (.personal)
+       加班     : bg #ffedd5 / text #c2410c  (.holiday-ot)
+       休假     : bg #fef2f2 / text #dc2626  (.holiday)
+    ── ─────────────────────────────────────────────────────── */
+    .calendar-cell.holiday  { background: #fef2f2; color: #dc2626; }                  /* 休假 */
+    .calendar-cell.assigned { background: #dcfce7; color: #166534; font-weight: 500; } /* 考勤組 */
+    .calendar-cell.holiday-ot { background: #ffedd5; color: #c2410c; font-weight: 600; border-color: #fdba74; } /* 加班 */
+    .calendar-cell.personal { background: #dbeafe !important; color: #1e40af !important; border-left: 3px solid #7c3aed !important; } /* 個人排班 */
     .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 50; }
     .tag-item { display: inline-flex; align-items: center; gap: 6px; background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 4px; font-size: 13px; margin: 3px; }
     input[type="date"], input[type="time"], input[type="text"], select { border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 10px; font-size: 14px; }
@@ -128,6 +135,13 @@
      </div>
     </div>
    </div>
+  </div>
+  <div id="legendBar" class="shrink-0 px-6 py-2 bg-white border-t border-slate-200 flex flex-wrap items-center gap-4 text-xs text-slate-500">
+   <span class="font-medium text-slate-600">圖例</span>
+   <span class="flex items-center gap-1"><span class="inline-block w-10 h-4 rounded" style="background:#dcfce7"></span><span style="color:#166534">考勤組排班</span></span>
+   <span class="flex items-center gap-1"><span class="inline-block w-10 h-4 rounded" style="background:#dbeafe;border-left:3px solid #7c3aed"></span><span style="color:#1e40af">個人排班（覆蓋）</span></span>
+   <span class="flex items-center gap-1"><span class="inline-block w-10 h-4 rounded" style="background:#ffedd5;border:1px solid #fdba74"></span><span style="color:#c2410c">假日加班</span></span>
+   <span class="flex items-center gap-1"><span class="inline-block w-10 h-4 rounded" style="background:#fef2f2"></span><span style="color:#dc2626">休假</span></span>
   </div>
   <div id="newScheduleModal" class="modal-overlay hidden">
    <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-md space-y-4">
@@ -570,7 +584,27 @@
     function getPersonGroup(empId) {
       return (attendanceGroups || []).find(g => Array.isArray(g.members) && g.members.includes(empId));
     }
+    // 個人排班資料快取（每次 renderSchedule 重新建立）
+    const _pdCache = {};
+    function _getPersonalData(eid) {
+      if (!(eid in _pdCache)) {
+        try { const r = localStorage.getItem(`shiftMgmt:personal:${eid}`); _pdCache[eid] = r ? JSON.parse(r) : null; }
+        catch(e) { _pdCache[eid] = null; }
+      }
+      return _pdCache[eid];
+    }
     function getShiftsForPersonOnDate(empId, dateStr, dow) {
+      // 優先採用個人排班指派
+      const pd = _getPersonalData(empId);
+      if (pd && pd.assignments && pd.assignments[dateStr]) {
+        const a = pd.assignments[dateStr];
+        if (a.type === 'off') return { list: [], isHolidayOt: false, isPersonal: true };
+        if (a.type === 'work') {
+          const names = a.shiftNames || (a.shiftName ? [a.shiftName] : []);
+          return { list: names, isHolidayOt: false, isPersonal: true };
+        }
+      }
+      // 否則依考勤組自動計算
       const g = getPersonGroup(empId);
       if (!g || (g.scheduleType && g.scheduleType !== 'auto')) return { list: [], isHolidayOt: false };
       const isHoliday = conflictHolidaySet.has(dateStr);
@@ -626,7 +660,7 @@
         // \u73ed\u5225\u7be9\u9078\uff1a\u50c5\u4fdd\u7559\u88ab\u52fe\u9078\u4e4b\u73ed\u5225\uff08\u672a\u52fe\u9078\u5247\u5168\u986f\u793a\uff09\n
         const filteredList = selectedShifts.length === 0 ? result.list : result.list.filter(n => selectedShifts.includes(n));
         filteredList.forEach(n => { totalHrs += shiftHoursMap[n] || 0; });
-        return { dateStr, isHolidayDisplay, isHolidayActual, assignedShifts: filteredList, isHolidayOt: result.isHolidayOt && filteredList.length > 0 };
+        return { dateStr, isHolidayDisplay, isHolidayActual, assignedShifts: filteredList, isHolidayOt: result.isHolidayOt && filteredList.length > 0, isPersonal: !!result.isPersonal, isPersonalOff: !!result.isPersonal && result.list.length === 0 };
       });
       return { p, totalHrs, dayShifts };
     });
@@ -645,7 +679,7 @@
         : '<span class="text-xs text-slate-400">未分組</span>';
       return `<tr class="border-t hover:bg-blue-50/30">
         <td class="sticky left-0 bg-white z-10 px-3 py-2 font-medium text-sm whitespace-nowrap">
-          <a href="personal-shift.html?empId=${encodeURIComponent(p.id)}" onclick="syncGlobalData()" class="text-blue-700 hover:text-blue-900 hover:underline cursor-pointer">${p.name}</a>
+          <a href="personal-shift.html?empId=${encodeURIComponent(p.id)}&scheduleIndex=${currentScheduleIndex}" onclick="syncGlobalData()" class="text-blue-700 hover:text-blue-900 hover:underline cursor-pointer">${p.name}</a>
           <div class="text-xs text-slate-500">${p.id}</div>
         </td>
         <td class="px-2 py-2 text-center text-xs whitespace-nowrap">${groupCell}</td>
@@ -662,6 +696,9 @@
           if (ds.isHolidayOt) {
             label = shiftLabel;
             cls = 'holiday-ot';
+          } else if (ds.isPersonalOff) {
+            label = '休';
+            cls = 'holiday';
           } else if (ds.isHolidayDisplay) {
             label = '休';
             cls = 'holiday';
@@ -672,8 +709,9 @@
             label = '';
             cls = '';
           }
-          const title = ds.isHolidayOt ? `假日加班：${ds.assignedShifts.join('、')}` : '';
-          return `<td class="calendar-cell ${cls} text-xs" title="${title}">${label}</td>`;
+          const personalCls = ds.isPersonal ? ' personal' : '';
+          const title = ds.isHolidayOt ? `假日加班：${ds.assignedShifts.join('、')}` : (ds.isPersonal ? '個人指派（點擊編輯）' : '');
+          return `<td class="calendar-cell ${cls}${personalCls} text-xs cursor-pointer" title="${title}" onclick="syncGlobalData();window.location.href='personal-shift.html?empId=${encodeURIComponent(p.id)}&scheduleIndex=${currentScheduleIndex}'">${label}</td>`;
         }).join('')}
       </tr>`;
     }).join('');
@@ -685,6 +723,11 @@
   renderSchedule();
   syncGlobalData();
   lucide.createIcons();
+
+  // 從個人排班返回（bfcache 恢復）時重新讀取個人排班資料
+  window.addEventListener('pageshow', (e) => {
+    if (e.persisted) renderSchedule();
+  });
 
   // 點擊外部關閉篩選 dropdown
   document.addEventListener('click', (e) => {
