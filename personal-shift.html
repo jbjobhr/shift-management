@@ -609,9 +609,10 @@
         let body = '', dayTotalH = 0;
         if (a){
           if (a.type === 'off') {
-            // 系統假日（週末/個別假日/假別組）→ 紅底；
-            // 非系統假日的 off（手動指派或 autoFill 在平日無班別時設為休）→ 視為個人覆蓋（藍底）
-            const isSystemHoliday = isHolidayDate(ds, dow);
+            // 系統假日（個別假日 / 個人已勾選的假別組）→ 紅底；
+            // 其他 off（手動指派、週末、未勾選之假別、autoFill 平日無班別等）→ 視為個人覆蓋（藍底）
+            const isSystemHoliday = (G.individualHolidays || []).includes(ds)
+              || personal.holidayGroups.some(grp => ((G.holidayGroups || {})[grp] || []).includes(ds));
             const isPersonalOff = a.source === 'manual' || !isSystemHoliday;
             if (!cell.other && isSystemHoliday) td.classList.add('holiday');
             const personalCls = isPersonalOff ? ' personal' : '';

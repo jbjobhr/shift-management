@@ -50,6 +50,11 @@
       <div class="flex items-center justify-between border-b border-slate-200 pb-3 mb-3">
        <div class="flex flex-wrap items-center gap-3">
         <h2 class="text-lg font-bold text-slate-800" id="schedulePageTitle">2026年1月排班</h2><span id="scheduleDateRange" class="text-xs text-slate-500"></span><button onclick="toggleScheduleList()" class="text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-600 transition">切換班表</button>
+        <div class="flex items-center gap-1 ml-1">
+         <button onclick="schedulePrevMonth()" class="text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-600 transition">‹ 上月</button>
+         <button onclick="scheduleNextMonth()" class="text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-600 transition">下月 ›</button>
+         <button onclick="scheduleGoToday()" class="text-xs px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded transition">今天</button>
+        </div>
         <div class="relative"><button onclick="toggleFilterDropdown('branchFilter')" class="text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-600 transition">分公司/分店/案場</button>
          <div id="branchFilter" class="hidden absolute top-full left-0 bg-white border border-slate-300 rounded-md shadow-lg mt-1 min-w-[220px] z-30">
           <div id="branchFilterList" class="p-2 space-y-1"></div>
@@ -268,6 +273,8 @@
   let tags = G.tags;
   let schedules = G.schedules;
   let currentScheduleIndex = 0;
+  // 月份覆寫：使用上月/下月/今天時，覆蓋目前班表的時間範圍（不變更 schedules 資料）
+  let viewOverride = null; // { start: 'YYYY-MM-DD', end: 'YYYY-MM-DD', name: 'YYYY年M月' }
   // Allow deep-linking from shift-list.html via ?index=N
   try {
     const _qs = new URLSearchParams(location.search);
@@ -319,10 +326,48 @@
   window.syncGlobalData = syncGlobalData;
 
   // ===== 班表切換 =====
+  function _fmtDate(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+  function getCurrentRange() {
+    if (viewOverride) return viewOverride;
+    return schedules[currentScheduleIndex] || { name: '', start: '2026-01-01', end: '2026-01-31' };
+  }
+  function setMonthOverride(year, month /* 0-based */) {
+    const start = new Date(year, month, 1);
+    const end = new Date(year, month + 1, 0);
+    viewOverride = {
+      start: _fmtDate(start),
+      end: _fmtDate(end),
+      name: `${year}年${month + 1}月排班`
+    };
+  }
+  function schedulePrevMonth() {
+    const cur = getCurrentRange();
+    const d = new Date(cur.start);
+    setMonthOverride(d.getFullYear(), d.getMonth() - 1);
+    updateSchedulePageTitle();
+    renderSchedule();
+  }
+  function scheduleNextMonth() {
+    const cur = getCurrentRange();
+    const d = new Date(cur.start);
+    setMonthOverride(d.getFullYear(), d.getMonth() + 1);
+    updateSchedulePageTitle();
+    renderSchedule();
+  }
+  function scheduleGoToday() {
+    const t = new Date();
+    setMonthOverride(t.getFullYear(), t.getMonth());
+    updateSchedulePageTitle();
+    renderSchedule();
+  }
+  window.schedulePrevMonth = schedulePrevMonth;
+  window.scheduleNextMonth = scheduleNextMonth;
+  window.scheduleGoToday = scheduleGoToday;
+
   function updateSchedulePageTitle() {
-    const cur = schedules[currentScheduleIndex];
+    const cur = getCurrentRange();
     if (cur) {
-      document.getElementById('schedulePageTitle').textContent = cur.name;
+      document.getElementById('schedulePageTitle').textContent = cur.name || '';
       document.getElementById('scheduleDateRange').textContent = `${cur.start} ~ ${cur.end}`;
     }
   }
@@ -338,6 +383,7 @@
   }
   function switchToSchedule(i) {
     currentScheduleIndex = i;
+    viewOverride = null;
     updateSchedulePageTitle();
     renderScheduleFilters();
     renderSchedule();
@@ -364,6 +410,7 @@
     if (start > end) { alert('起始日期不能晚於結束日期'); return; }
     schedules.push({ name, start, end });
     currentScheduleIndex = schedules.length - 1;
+    viewOverride = null;
     syncGlobalData();
     closeNewScheduleModal();
     updateSchedulePageTitle();
@@ -549,7 +596,7 @@
   }
 
   function renderSchedule() {
-    const cur = schedules[currentScheduleIndex] || { start: '2026-01-01', end: '2026-01-31' };
+    const cur = getCurrentRange();
     const start = new Date(cur.start);
     const end = new Date(cur.end);
     const days = [];
@@ -602,13 +649,13 @@
         const a = pd.assignments[dateStr];
         const isManual = a.source === 'manual';
         if (a.type === 'off') {
-          // 該人「個人假別組」與週末才視為系統假日（紅底）；其他 off 視為個人覆蓋（藍底）
+          // 紅底休假：個別假日 + 該員工已勾選之假別組；其他（含週末、未勾選假別）→ 個人覆蓋藍底
           const personalHolidaySet = new Set();
           (pd.holidayGroups || []).forEach(grp => {
             ((holidayGroups || {})[grp] || []).forEach(d => personalHolidaySet.add(d));
           });
           (individualHolidays || []).forEach(d => personalHolidaySet.add(d));
-          const isSystemHoliday = personalHolidaySet.has(dateStr) || dow === 0 || dow === 6;
+          const isSystemHoliday = personalHolidaySet.has(dateStr);
           if (isManual || !isSystemHoliday) {
             return { list: [], isHolidayOt: false, isPersonal: true };
           }
