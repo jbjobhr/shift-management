@@ -187,12 +187,15 @@
       </section>
 
       <!-- 標籤 -->
-      <section class="bg-white rounded-xl shadow-sm p-5 space-y-3 md:col-span-2">
+      <section class="bg-white rounded-xl shadow-sm p-5 space-y-3">
        <h2 class="font-bold text-lg text-slate-800 flex items-center gap-2">
         <i data-lucide="tag" class="w-5 h-5 text-teal-600"></i>標籤
        </h2>
        <div class="flex gap-2">
-        <input type="text" id="personalTagInput" placeholder="搜尋或輸入新標籤" class="flex-1 max-w-sm">
+        <div class="relative flex-1">
+         <input type="text" id="personalTagInput" placeholder="搜尋或輸入新標籤" class="w-full" oninput="filterPersonalTagDropdown()" onfocus="filterPersonalTagDropdown()">
+         <div id="personalTagDropdown" class="absolute top-full left-0 right-0 bg-white border border-slate-200 rounded-md shadow-lg mt-1 max-h-40 overflow-y-auto z-10 hidden"></div>
+        </div>
         <button onclick="addPersonalTag()" class="px-3 py-1.5 bg-teal-50 text-teal-700 rounded-md text-sm font-medium hover:bg-teal-100 transition">新增</button>
        </div>
        <div id="personalTagList" class="flex flex-wrap"></div>
@@ -843,19 +846,38 @@
       <span class="tag-item bg-teal-50 text-teal-700">${t}<button onclick="removePersonalTag(${i})" class="ml-1 text-red-400 hover:text-red-600">×</button></span>
     `).join('');
   }
-  function addPersonalTag(){
+  function filterPersonalTagDropdown() {
     const input = document.getElementById('personalTagInput');
-    const v = input.value.trim();
-    if (v && !personal.tags.includes(v)) {
-      personal.tags.push(v);
-      // 同時補入全域標籤庫，方便其他頁面使用
-      if (!G.tags.includes(v)) {
-        G.tags.push(v);
+    const dropdown = document.getElementById('personalTagDropdown');
+    const query = input.value.toLowerCase().trim();
+    const available = (G.tags || []).filter(t => !personal.tags.includes(t));
+    const filtered = query.length === 0 ? available : available.filter(t => t.toLowerCase().includes(query));
+    if (filtered.length === 0 && query.length === 0) { dropdown.classList.add('hidden'); return; }
+    let options = filtered.map(t => `<div class="px-3 py-2 cursor-pointer hover:bg-teal-50" onclick="selectPersonalTag('${t.replace(/'/g,"\\'")}')">${t}</div>`).join('');
+    if (query.length > 0 && !filtered.map(t=>t.toLowerCase()).includes(query) && query.trim() !== '') {
+      options += `<div class="px-3 py-2 cursor-pointer hover:bg-teal-50 font-medium text-teal-600" onclick="selectPersonalTag('${query.replace(/'/g,"\\'")}')">+ 新增「${query}」</div>`;
+    }
+    dropdown.innerHTML = options || `<div class="px-3 py-2 text-slate-500 text-sm">沒有符合的標籤</div>`;
+    dropdown.classList.remove('hidden');
+  }
+  function selectPersonalTag(tag) {
+    if (!personal.tags.includes(tag)) {
+      personal.tags.push(tag);
+      if (!G.tags.includes(tag)) {
+        G.tags.push(tag);
         try { localStorage.setItem('shiftMgmt:global', JSON.stringify(G)); } catch(e){}
       }
       persistPersonal(); renderTagsPanel();
     }
+    document.getElementById('personalTagInput').value = '';
+    document.getElementById('personalTagDropdown').classList.add('hidden');
+  }
+  function addPersonalTag(){
+    const input = document.getElementById('personalTagInput');
+    const v = input.value.trim();
+    if (v) { selectPersonalTag(v); return; }
     input.value = '';
+    document.getElementById('personalTagDropdown').classList.add('hidden');
   }
   function removePersonalTag(i){
     personal.tags.splice(i,1);
@@ -1073,6 +1095,16 @@
   window.savePersonal = savePersonal;
   window.cancelPersonalChanges = cancelPersonalChanges;
   window.clearDraftAttendanceGroup = clearDraftAttendanceGroup;
+  window.filterPersonalTagDropdown = filterPersonalTagDropdown;
+  window.selectPersonalTag = selectPersonalTag;
+
+  document.addEventListener('click', e => {
+    const input = document.getElementById('personalTagInput');
+    const dd = document.getElementById('personalTagDropdown');
+    if (dd && input && !input.contains(e.target) && !dd.contains(e.target)) {
+      dd.classList.add('hidden');
+    }
+  });
   </script>
  </body>
 </html>
