@@ -282,6 +282,20 @@
     if (!Number.isNaN(_idx) && _idx >= 0 && _idx < schedules.length) {
       currentScheduleIndex = _idx;
     }
+    // 從個人排班頁返回時，依 start/end 覆寫顯示月份
+    const _qsStart = _qs.get('start');
+    const _qsEnd = _qs.get('end');
+    if (_qsStart && _qsEnd) {
+      const _d = new Date(_qsStart);
+      if (!isNaN(_d.getTime())) {
+        const y = _d.getFullYear(), m = _d.getMonth();
+        viewOverride = {
+          start: _qsStart,
+          end: _qsEnd,
+          name: `${y}年${m + 1}月排班`
+        };
+      }
+    }
   } catch (e) {}
 
   let selectedPositions = [];
@@ -739,7 +753,7 @@
         : '<span class="text-xs text-slate-400">未分組</span>';
       return `<tr class="border-t hover:bg-blue-50/30">
         <td class="sticky left-0 bg-white z-10 px-3 py-2 font-medium text-sm whitespace-nowrap">
-          <a href="personal-shift.html?empId=${encodeURIComponent(p.id)}&scheduleIndex=${currentScheduleIndex}" onclick="syncGlobalData()" class="text-blue-700 hover:text-blue-900 hover:underline cursor-pointer">${p.name}</a>
+          <a href="personal-shift.html?empId=${encodeURIComponent(p.id)}&scheduleIndex=${currentScheduleIndex}${viewOverride ? `&start=${viewOverride.start}&end=${viewOverride.end}` : ''}" onclick="syncGlobalData()" class="text-blue-700 hover:text-blue-900 hover:underline cursor-pointer">${p.name}</a>
           <div class="text-xs text-slate-500">${p.id}</div>
         </td>
         <td class="px-2 py-2 text-center text-xs whitespace-nowrap">${groupCell}</td>
@@ -775,7 +789,7 @@
           }
           const personalCls = ds.isPersonal ? ' personal' : '';
           const title = ds.isHolidayOt ? `假日加班：${ds.assignedShifts.join('、')}` : (ds.isPersonal ? '個人指派（點擊編輯）' : '');
-          return `<td class="calendar-cell ${cls}${personalCls} text-xs cursor-pointer" title="${title}" onclick="syncGlobalData();window.location.href='personal-shift.html?empId=${encodeURIComponent(p.id)}&scheduleIndex=${currentScheduleIndex}'">${label}</td>`;
+          return `<td class="calendar-cell ${cls}${personalCls} text-xs cursor-pointer" title="${title}" onclick="syncGlobalData();window.location.href='personal-shift.html?empId=${encodeURIComponent(p.id)}&scheduleIndex=${currentScheduleIndex}${viewOverride ? `&start=${viewOverride.start}&end=${viewOverride.end}` : ''}'">${label}</td>`;
         }).join('')}
       </tr>`;
     }).join('');

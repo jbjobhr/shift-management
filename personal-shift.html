@@ -366,6 +366,13 @@
     personal.rangeStart = scheduleSource.start;
     personal.rangeEnd   = scheduleSource.end;
   }
+  // URL 直接帶入 start/end（總覽頁切換月份後導航）
+  const _qsStart = params.get('start');
+  const _qsEnd   = params.get('end');
+  if (_qsStart && _qsEnd) {
+    personal.rangeStart = _qsStart;
+    personal.rangeEnd   = _qsEnd;
+  }
 
   // 預設區間：當前月份
   const today = new Date();
@@ -1146,9 +1153,17 @@
 
   // ===== 初始化 =====
   document.addEventListener('DOMContentLoaded', () => {
-    // 返回連結帶班表索引
+    // 返回連結帶班表索引與目前檢視月份
     const backEl = document.getElementById('backToOverview');
-    if (backEl && !isNaN(scheduleIdx)) backEl.href = `index.html?index=${scheduleIdx}`;
+    if (backEl) {
+      const params = [];
+      if (!isNaN(scheduleIdx)) params.push(`index=${scheduleIdx}`);
+      if (personal.rangeStart && personal.rangeEnd) {
+        params.push(`start=${personal.rangeStart}`);
+        params.push(`end=${personal.rangeEnd}`);
+      }
+      backEl.href = `index.html${params.length ? '?' + params.join('&') : ''}`;
+    }
     renderHeader();
     renderCalendar();
     renderHolidayGroupsPanel();
