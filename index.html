@@ -25,7 +25,7 @@
     .calendar-cell.assigned { background: #dcfce7; color: #166534; font-weight: 500; } /* 考勤組 */
     .calendar-cell.holiday-ot { background: #ffedd5; color: #c2410c; font-weight: 600; border-color: #fdba74; } /* 加班 */
     /* 個人排班標記：左側紫框；上班時覆蓋藍底，休假時保留紅底（holiday）*/
-    .calendar-cell.personal { border-left: 3px solid #7c3aed !important; }
+    .calendar-cell.personal { /* border-left: 3px solid #7c3aed !important; */ }
     .calendar-cell.personal.assigned { background: #dbeafe !important; color: #1e40af !important; }
     .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 50; }
     .tag-item { display: inline-flex; align-items: center; gap: 6px; background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 4px; font-size: 13px; margin: 3px; }
@@ -141,7 +141,7 @@
   <div id="legendBar" class="shrink-0 px-6 py-2 bg-white border-t border-slate-200 flex flex-wrap items-center gap-4 text-xs text-slate-500">
    <span class="font-medium text-slate-600">圖例</span>
    <span class="flex items-center gap-1"><span class="inline-block w-10 h-4 rounded" style="background:#dcfce7"></span><span style="color:#166534">考勤組排班</span></span>
-   <span class="flex items-center gap-1"><span class="inline-block w-10 h-4 rounded" style="background:#dbeafe;border-left:3px solid #7c3aed"></span><span style="color:#1e40af">個人排班（覆蓋）</span></span>
+   <span class="flex items-center gap-1"><span class="inline-block w-10 h-4 rounded" style="background:#dbeafe"></span><span style="color:#1e40af">個人排班（覆蓋）</span></span>
    <span class="flex items-center gap-1"><span class="inline-block w-10 h-4 rounded" style="background:#ffedd5;border:1px solid #fdba74"></span><span style="color:#c2410c">假日加班</span></span>
    <span class="flex items-center gap-1"><span class="inline-block w-10 h-4 rounded" style="background:#fef2f2"></span><span style="color:#dc2626">休假</span></span>
   </div>

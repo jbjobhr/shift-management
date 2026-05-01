@@ -34,6 +34,7 @@
     .shift-tag.work  { background: #dbeafe; color: #1e40af; }                       /* 個人排班 */
     .shift-tag.work.ot { background: #ffedd5; color: #c2410c; border: 1px solid #fdba74; } /* 加班 */
     .shift-tag.off   { background: transparent; color: #dc2626; font-weight: 600; }  /* 休假（透明底，讓格子紅底色透出）*/
+    .shift-tag.off.personal { background: #dbeafe; color: #1e40af; /* border-left: 3px solid #7c3aed; */ } /* 個人手動指派休假 */
     .shift-tag.group { background: #dcfce7; color: #166534; }                       /* 班表排班（未覆蓋） */
     .week-summary { font-size: 11px; color: #475569; padding: 4px 6px; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 4px; text-align: center; }
     .week-summary.warn { background: #fff7ed; color: #c2410c; border-color: #fed7aa; font-weight: 600; }
@@ -104,7 +105,7 @@
        <h2 id="calendarTitle" class="font-bold text-lg text-slate-800"></h2>
        <div class="flex items-center gap-3 text-xs text-slate-600">
         <span class="flex items-center gap-1"><span class="w-3 h-3 rounded inline-block" style="background:#dcfce7"></span>班表排班</span>
-        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded inline-block" style="background:#dbeafe;border-left:2px solid #7c3aed"></span>個人排班</span>
+        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded inline-block" style="background:#dbeafe"></span>個人排班</span>
         <span class="flex items-center gap-1"><span class="w-3 h-3 rounded inline-block" style="background:#fef2f2;border:1px solid #fca5a5"></span>休假</span>
         <span class="flex items-center gap-1"><span class="w-3 h-3 rounded border-2 border-blue-500 inline-block"></span>今天</span>
        </div>
@@ -610,7 +611,8 @@
           if (a.type === 'off') {
             // 個人指派休假：補 .holiday class，使平日休假也呈現粉紅底（對齊班表總覽）
             if (!cell.other) td.classList.add('holiday');
-            body = `<div class="shift-tag off">休</div>`;
+            const personalCls = a.source === 'manual' ? ' personal' : '';
+            body = `<div class="shift-tag off${personalCls}">休</div>`;
           }
           else if (a.type === 'work') {
             const names = a.shiftNames || (a.shiftName ? [a.shiftName] : []);
@@ -638,6 +640,9 @@
               dayTotalH += h;
               return `<div class="shift-tag group" title="班表排班（點擊可覆蓋或清除）">${n}</div>`;
             }).join('');
+          } else if (isHolidayDate(ds, dow)) {
+            // 週末或假別組指定日期：顯示「休」字
+            body = `<div class="shift-tag off">休</div>`;
           }
         }
         const isOver12 = !cell.other && dayTotalH > MAX_DAILY_TOTAL_HOURS;
@@ -784,7 +789,7 @@
   function setAssignment(type, shiftName){
     if (!assigningDate) return;
     if (type === 'off') {
-      personal.assignments[assigningDate] = { type:'off' };
+      personal.assignments[assigningDate] = { type:'off', source:'manual' };
     } else {
       personal.assignments[assigningDate] = { type:'work', shiftNames: shiftName ? [shiftName] : [] };
     }
