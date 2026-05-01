@@ -609,9 +609,12 @@
         let body = '', dayTotalH = 0;
         if (a){
           if (a.type === 'off') {
-            // 個人指派休假：補 .holiday class，使平日休假也呈現粉紅底（對齊班表總覽）
-            if (!cell.other) td.classList.add('holiday');
-            const personalCls = a.source === 'manual' ? ' personal' : '';
+            // 系統假日（週末/個別假日/假別組）→ 紅底；
+            // 非系統假日的 off（手動指派或 autoFill 在平日無班別時設為休）→ 視為個人覆蓋（藍底）
+            const isSystemHoliday = isHolidayDate(ds, dow);
+            const isPersonalOff = a.source === 'manual' || !isSystemHoliday;
+            if (!cell.other && isSystemHoliday) td.classList.add('holiday');
+            const personalCls = isPersonalOff ? ' personal' : '';
             body = `<div class="shift-tag off${personalCls}">休</div>`;
           }
           else if (a.type === 'work') {
