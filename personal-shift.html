@@ -606,9 +606,17 @@
     lucide.createIcons();
   }
 
-  function prevMonth(){ viewMonth.setMonth(viewMonth.getMonth()-1); renderCalendar(); }
-  function nextMonth(){ viewMonth.setMonth(viewMonth.getMonth()+1); renderCalendar(); }
-  function goToday(){ viewMonth = new Date(); viewMonth.setDate(1); renderCalendar(); }
+  function syncRangeToViewMonth() {
+    const y = viewMonth.getFullYear(), m = viewMonth.getMonth();
+    personal.rangeStart = fmt(new Date(y, m, 1));
+    personal.rangeEnd   = fmt(new Date(y, m + 1, 0));
+    document.getElementById('rangeStart').value = personal.rangeStart;
+    document.getElementById('rangeEnd').value   = personal.rangeEnd;
+    persistPersonal();
+  }
+  function prevMonth(){ viewMonth.setMonth(viewMonth.getMonth()-1); syncRangeToViewMonth(); renderCalendar(); }
+  function nextMonth(){ viewMonth.setMonth(viewMonth.getMonth()+1); syncRangeToViewMonth(); renderCalendar(); }
+  function goToday(){ viewMonth = new Date(); viewMonth.setDate(1); syncRangeToViewMonth(); renderCalendar(); }
 
   // ===== 指派 modal =====
   let assigningDate = null;
