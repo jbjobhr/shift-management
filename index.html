@@ -602,9 +602,13 @@
         const a = pd.assignments[dateStr];
         const isManual = a.source === 'manual';
         if (a.type === 'off') {
-          // 系統假日（週末/個別假日/假別組）的 off 不算個人覆蓋（讓紅底休假繼續顯示）
-          // 非系統假日的 off（手動或個人 autoFill 設為休）則視為個人覆蓋（藍底）
-          const isSystemHoliday = conflictHolidaySet.has(dateStr) || dow === 0 || dow === 6;
+          // 該人「個人假別組」與週末才視為系統假日（紅底）；其他 off 視為個人覆蓋（藍底）
+          const personalHolidaySet = new Set();
+          (pd.holidayGroups || []).forEach(grp => {
+            ((holidayGroups || {})[grp] || []).forEach(d => personalHolidaySet.add(d));
+          });
+          (individualHolidays || []).forEach(d => personalHolidaySet.add(d));
+          const isSystemHoliday = personalHolidaySet.has(dateStr) || dow === 0 || dow === 6;
           if (isManual || !isSystemHoliday) {
             return { list: [], isHolidayOt: false, isPersonal: true };
           }
