@@ -33,6 +33,9 @@
     .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 50; }
     input[type="date"], input[type="time"], input[type="text"], select { border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 10px; font-size: 14px; }
     input:focus, select:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.1); }
+    .calendar-cell.day-over12 { border: 2px solid #dc2626 !important; background: #fff1f2; }
+    .day-hours { font-size: 10px; color: #94a3b8; text-align: right; margin-top: 2px; }
+    .day-hours.over12 { color: #dc2626; font-weight: 600; }
   </style>
  </head>
  <body class="h-full bg-slate-50 w-full">
@@ -116,6 +119,15 @@
        <i data-lucide="info" class="w-3.5 h-3.5"></i>
        點擊區間內的日期可指派班別／休假，再次點擊可清除。
       </p>
+     </section>
+
+     <!-- 加班時數統計（勞基法第 32 條） -->
+     <section class="bg-white rounded-xl shadow-sm p-5">
+      <h2 class="font-bold text-lg text-slate-800 flex items-center gap-2 mb-4">
+       <i data-lucide="bar-chart-2" class="w-5 h-5 text-blue-600"></i>加班時數統計
+       <span class="text-xs font-normal text-slate-400 ml-1">（依勞動基準法第 32 條）</span>
+      </h2>
+      <div id="overtimeStatBody"></div>
      </section>
 
      <!-- 個人化指派：假別組/考勤組/班別/崗位/標籤 -->
@@ -376,6 +388,10 @@
 
   // ===== 渲染：月曆 =====
   const MAX_WEEKLY_HOURS_PERSONAL = 40;
+  const MAX_DAILY_TOTAL_HOURS = 12;      // 每日正常+加班合計上限（勞基法第 32 條）
+  const MAX_MONTHLY_OT_NORMAL = 46;      // 每月加班上限－一般（勞基法第 32 條第 1 項）
+  const MAX_MONTHLY_OT_EXTENDED = 54;    // 每月加班上限－延長（工會/勞資會議同意）
+  const MAX_3MONTH_OT = 138;             // 連續3個月加班合計上限（延長制適用）
   function getShiftHoursByName(name) {
     const s = (G.shifts || []).find(x => x.name === name);
     return s ? (Number(s.hours) || 0) : 0;
@@ -414,6 +430,90 @@
       dateWeekly[ds] = { weekKey: wk, weeklyAfter: weekTotal[wk] };
     });
     return { weekTotal, otFlags, dateWeekly, isoWeekKey };
+  }
+
+  // ===== 勞基法加班統計（第 32 條） =====
+  function computeMonthlyStats(year, month) {
+    const monthStr = `${year}-${String(month).padStart(2, '0')}`;
+    let totalHours = 0, overtimeHours = 0, dailyOver12 = 0;
+    Object.keys(personal.assignments || {}).forEach(ds => {
+      if (!ds.startsWith(monthStr)) return;
+      const a = personal.assignments[ds];
+      if (!a || a.type !== 'work') return;
+      const names = a.shiftNames || (a.shiftName ? [a.shiftName] : []);
+      const dayTotal = names.reduce((s, n) => s + getShiftHoursByName(n), 0);
+      totalHours += dayTotal;
+      overtimeHours += Math.max(0, dayTotal - 8);
+      if (dayTotal > MAX_DAILY_TOTAL_HOURS) dailyOver12++;
+    });
+    return { totalHours, overtimeHours, dailyOver12 };
+  }
+
+  function computeRolling3MonthOT(year, month) {
+    let total = 0;
+    for (let i = 0; i < 3; i++) {
+      let m = month - i, y = year;
+      if (m <= 0) { m += 12; y--; }
+      total += computeMonthlyStats(y, m).overtimeHours;
+    }
+    return total;
+  }
+
+  function renderOvertimeStats() {
+    const el = document.getElementById('overtimeStatBody');
+    if (!el) return;
+    const year = viewMonth.getFullYear(), month = viewMonth.getMonth() + 1;
+    const stats = computeMonthlyStats(year, month);
+    const rolling3 = computeRolling3MonthOT(year, month);
+    const otH = stats.overtimeHours;
+    const monthPct = Math.min(100, Math.round(otH / MAX_MONTHLY_OT_EXTENDED * 100));
+    const r3Pct = Math.min(100, Math.round(rolling3 / MAX_3MONTH_OT * 100));
+    let mColor, mLabel;
+    if (otH > MAX_MONTHLY_OT_EXTENDED)          { mColor = 'text-red-600';    mLabel = `已超過延長上限 ${MAX_MONTHLY_OT_EXTENDED}h`; }
+    else if (otH > MAX_MONTHLY_OT_NORMAL)       { mColor = 'text-orange-600'; mLabel = `已超過一般上限，需工會/勞資會議同意（可達 ${MAX_MONTHLY_OT_EXTENDED}h）`; }
+    else if (otH >= MAX_MONTHLY_OT_NORMAL - 6)  { mColor = 'text-amber-600';  mLabel = `接近月加班上限 ${MAX_MONTHLY_OT_NORMAL}h`; }
+    else                                         { mColor = 'text-green-700';  mLabel = `上限 ${MAX_MONTHLY_OT_NORMAL}h（同意後可達 ${MAX_MONTHLY_OT_EXTENDED}h）`; }
+    const mBarColor  = otH > MAX_MONTHLY_OT_EXTENDED ? 'bg-red-500' : otH > MAX_MONTHLY_OT_NORMAL ? 'bg-orange-500' : 'bg-blue-500';
+    const r3Color    = rolling3 > MAX_3MONTH_OT ? 'text-red-600' : rolling3 >= MAX_3MONTH_OT - 20 ? 'text-amber-600' : 'text-green-700';
+    const r3Label    = rolling3 > MAX_3MONTH_OT ? `已超過3個月合計上限 ${MAX_3MONTH_OT}h` : rolling3 >= MAX_3MONTH_OT - 20 ? `接近3個月合計上限 ${MAX_3MONTH_OT}h` : `上限 ${MAX_3MONTH_OT}h`;
+    const r3BarColor = rolling3 > MAX_3MONTH_OT ? 'bg-red-500' : 'bg-blue-500';
+    el.innerHTML = `
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-slate-50 rounded-lg p-4">
+          <div class="text-xs text-slate-500 mb-1">本月總工時</div>
+          <div class="text-2xl font-bold text-slate-800">${stats.totalHours}h</div>
+          <div class="text-xs text-slate-400 mt-1">日工時上限 ${MAX_DAILY_TOTAL_HOURS}h／日</div>
+        </div>
+        <div class="bg-slate-50 rounded-lg p-4">
+          <div class="text-xs text-slate-500 mb-1">本月加班時數</div>
+          <div class="text-2xl font-bold ${mColor}">${otH}h</div>
+          <div class="text-xs mt-0.5 ${mColor}">${mLabel}</div>
+          <div class="mt-2 bg-slate-200 rounded-full h-1.5">
+            <div class="h-1.5 rounded-full ${mBarColor} transition-all" style="width:${monthPct}%"></div>
+          </div>
+          <div class="text-xs text-slate-400 mt-1">${otH} / ${MAX_MONTHLY_OT_EXTENDED}h（${monthPct}%）</div>
+        </div>
+        <div class="bg-slate-50 rounded-lg p-4">
+          <div class="text-xs text-slate-500 mb-1">近3個月加班合計</div>
+          <div class="text-2xl font-bold ${r3Color}">${rolling3}h</div>
+          <div class="text-xs mt-0.5 ${r3Color}">${r3Label}</div>
+          <div class="mt-2 bg-slate-200 rounded-full h-1.5">
+            <div class="h-1.5 rounded-full ${r3BarColor} transition-all" style="width:${r3Pct}%"></div>
+          </div>
+          <div class="text-xs text-slate-400 mt-1">${rolling3} / ${MAX_3MONTH_OT}h（${r3Pct}%）</div>
+        </div>
+      </div>
+      ${stats.dailyOver12 > 0 ? `
+      <div class="mt-3 flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+        <i data-lucide="alert-triangle" class="w-4 h-4 mt-0.5 shrink-0"></i>
+        <span>本月有 <strong>${stats.dailyOver12}</strong> 天日工時超過 ${MAX_DAILY_TOTAL_HOURS}h 上限，已在月曆中以紅框標示。</span>
+      </div>` : ''}
+      <div class="mt-3 text-xs text-slate-500 flex items-start gap-1 border-t pt-3">
+        <i data-lucide="info" class="w-3.5 h-3.5 mt-0.5 shrink-0"></i>
+        <span>加班時數以「日工時超過 8 小時之部分」計算。休息日加班計入月加班上限；國定假日、特休假加班不計入。天災、事變或突發事件不受此限（事後須通報）。上述規範適用《勞動基準法》一般勞工，第 84 條之 1 責任制人員不在此限。</span>
+      </div>
+    `;
+    lucide.createIcons();
   }
 
   function renderCalendar(){
@@ -459,7 +559,7 @@
         if (ds === todayStr) td.classList.add('today');
 
         const a = personal.assignments[ds];
-        let body = '';
+        let body = '', dayTotalH = 0;
         if (a){
           if (a.type === 'off') body = `<div class="shift-tag off">休</div>`;
           else if (a.type === 'work') {
@@ -468,16 +568,21 @@
             body = names.length
               ? names.map((n, i) => {
                   const isOt = flags[i];
+                  const h = getShiftHoursByName(n);
                   if (!cell.other) {
-                    weekHours += getShiftHoursByName(n);
+                    weekHours += h;
+                    dayTotalH += h;
                     if (isOt) weekHasOt = true;
                   }
-                  return `<div class="shift-tag work${isOt ? ' ot' : ''}" title="${isOt ? '\u5df2\u8d85\u904e\u6bcf\u9031 40h\uff0c\u8a72\u73ed\u6b21\u8a08\u52a0\u73ed' : ''}">${n}${isOt ? ' \u52a0' : ''}</div>`;
+                  return `<div class="shift-tag work${isOt ? ' ot' : ''}" title="${isOt ? '已超過每週 40h，該班次計加班' : ''}">${n}${isOt ? ' 加' : ''}</div>`;
                 }).join('')
               : `<div class="shift-tag work">已排</div>`;
           }
         }
-        td.innerHTML = `<div class="date-num text-right text-slate-700">${cell.date.getDate()}</div>${body}`;
+        const isOver12 = !cell.other && dayTotalH > MAX_DAILY_TOTAL_HOURS;
+        if (isOver12) td.classList.add('day-over12');
+        const hoursHint = (!cell.other && dayTotalH > 0) ? `<div class="day-hours${isOver12 ? ' over12' : ''}">${dayTotalH}h${isOver12 ? ' ⚠' : ''}</div>` : '';
+        td.innerHTML = `<div class="date-num text-right text-slate-700">${cell.date.getDate()}</div>${body}${hoursHint}`;
 
         if (!cell.other && inRange) {
           td.addEventListener('click', () => openAssignModal(ds));
@@ -494,6 +599,7 @@
       tr.appendChild(sumTd);
       tbody.appendChild(tr);
     }
+    renderOvertimeStats();
     lucide.createIcons();
   }
 
@@ -582,6 +688,12 @@
       if (overTotal != null) {
         const ot = overTotal - MAX_WEEKLY_HOURS_PERSONAL;
         if (!confirm(`本週累計將達 ${overTotal}h，超過 ${MAX_WEEKLY_HOURS_PERSONAL}h 上限 ${ot}h，將視為「加班」。\n是否繼續儲存？`)) {
+          return;
+        }
+      }
+      const dayTotalH = assigningSelected.reduce((s, n) => s + getShiftHoursByName(n), 0);
+      if (dayTotalH > MAX_DAILY_TOTAL_HOURS) {
+        if (!confirm(`本日工時合計將達 ${dayTotalH}h，超過勞基法每日上限 ${MAX_DAILY_TOTAL_HOURS}h（正常 8h + 加班最多 4h）。\n是否仍要繼續儲存？`)) {
           return;
         }
       }
