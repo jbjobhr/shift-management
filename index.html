@@ -695,15 +695,35 @@
 
     const head = document.getElementById('scheduleHead');
     const weekdays = ['日','一','二','三','四','五','六'];
-    head.innerHTML = `<tr class="bg-slate-100">
+    // 計算跨月分組（跨月時才顯示月份標題列）
+    const monthGroups = [];
+    days.forEach((d, i) => {
+      const label = `${d.getFullYear()}年${d.getMonth()+1}月`;
+      if (!monthGroups.length || monthGroups[monthGroups.length-1].label !== label) {
+        monthGroups.push({ label, count: 1, firstIdx: i });
+      } else {
+        monthGroups[monthGroups.length-1].count++;
+      }
+    });
+    const isCrossMonth = monthGroups.length > 1;
+    // 月份交界日的欄位索引（除第一個月外每月首日）
+    const monthBoundarySet = new Set(monthGroups.slice(1).map(mg => mg.firstIdx));
+    const monthHeaderRow = isCrossMonth
+      ? `<tr class="bg-slate-200 text-slate-700">
+          <th class="sticky left-0 bg-slate-200 z-10 px-3 py-1" colspan="3"></th>
+          ${monthGroups.map(mg => `<th class="py-1 text-xs font-bold text-center border-l-2 border-slate-400" colspan="${mg.count}">${mg.label}</th>`).join('')}
+        </tr>`
+      : '';
+    head.innerHTML = monthHeaderRow + `<tr class="bg-slate-100">
       <th class="sticky left-0 bg-slate-100 z-10 px-3 py-2 text-left min-w-[140px]">姓名</th>
       <th class="px-2 py-2 min-w-[100px] whitespace-nowrap">考勤組</th>
       <th class="px-2 py-2 min-w-[72px] whitespace-nowrap">總工時</th>
-      ${days.map(d => {
+      ${days.map((d, i) => {
         const dateStr = d.toISOString().split('T')[0];
         const isHoliday = allHolidaysForDisplay.includes(dateStr) || d.getDay() === 0 || d.getDay() === 6;
         const isToday = dateStr === _todayStr;
-        return `<th class="calendar-cell ${isHoliday ? 'holiday' : ''}${isToday ? ' today' : ''} text-xs">${d.getDate()}<br><span class="text-[10px]">${weekdays[d.getDay()]}</span></th>`;
+        const boundaryStyle = monthBoundarySet.has(i) ? ' style="border-left:2px solid #94a3b8"' : '';
+        return `<th class="calendar-cell ${isHoliday ? 'holiday' : ''}${isToday ? ' today' : ''} text-xs"${boundaryStyle}>${d.getDate()}<br><span class="text-[10px]">${weekdays[d.getDay()]}</span></th>`;
       }).join('')}
     </tr>`;
 
@@ -730,15 +750,15 @@
 
     const personRows = filteredPersons.map(p => {
       let totalHrs = 0;
-      const dayShifts = days.map(d => {
+      const dayShifts = days.map((d, i) => {
         const dateStr = d.toISOString().split('T')[0];
         const isHolidayDisplay = allHolidaysForDisplay.includes(dateStr);
         const isHolidayActual = conflictHolidaySet.has(dateStr);
         const result = getShiftsForPersonOnDate(p.id, dateStr, d.getDay());
-        // \u73ed\u5225\u7be9\u9078\uff1a\u50c5\u4fdd\u7559\u88ab\u52fe\u9078\u4e4b\u73ed\u5225\uff08\u672a\u52fe\u9078\u5247\u5168\u986f\u793a\uff09\n
+        // 班別篩選：僅保留被勾選之班別（未勾選則全顯示）
         const filteredList = selectedShifts.length === 0 ? result.list : result.list.filter(n => selectedShifts.includes(n));
         filteredList.forEach(n => { totalHrs += shiftHoursMap[n] || 0; });
-        return { dateStr, isHolidayDisplay, isHolidayActual, assignedShifts: filteredList, isHolidayOt: result.isHolidayOt && filteredList.length > 0, isPersonal: !!result.isPersonal, isPersonalOff: !!result.isPersonal && result.list.length === 0 };
+        return { dateStr, isHolidayDisplay, isHolidayActual, assignedShifts: filteredList, isHolidayOt: result.isHolidayOt && filteredList.length > 0, isPersonal: !!result.isPersonal, isPersonalOff: !!result.isPersonal && result.list.length === 0, isMonthBoundary: monthBoundarySet.has(i) };
       });
       return { p, totalHrs, dayShifts };
     });
@@ -793,8 +813,9 @@
           }
           const personalCls = ds.isPersonal ? ' personal' : '';
           const todayCls = ds.dateStr === _todayStr ? ' today' : '';
+          const boundaryStyle = ds.isMonthBoundary ? ' style="border-left:2px solid #94a3b8"' : '';
           const title = ds.isHolidayOt ? `假日加班：${ds.assignedShifts.join('、')}` : (ds.isPersonal ? '個人指派（點擊編輯）' : '');
-          return `<td class="calendar-cell ${cls}${personalCls}${todayCls} text-xs cursor-pointer" title="${title}" onclick="syncGlobalData();window.location.href='personal-shift.html?empId=${encodeURIComponent(p.id)}&scheduleIndex=${currentScheduleIndex}${viewOverride ? `&start=${viewOverride.start}&end=${viewOverride.end}` : ''}'">${label}</td>`;
+          return `<td class="calendar-cell ${cls}${personalCls}${todayCls} text-xs cursor-pointer"${boundaryStyle} title="${title}" onclick="syncGlobalData();window.location.href='personal-shift.html?empId=${encodeURIComponent(p.id)}&scheduleIndex=${currentScheduleIndex}${viewOverride ? `&start=${viewOverride.start}&end=${viewOverride.end}` : ''}'">${label}</td>`;
         }).join('')}
       </tr>`;
     }).join('');
