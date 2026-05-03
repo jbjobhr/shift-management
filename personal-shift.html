@@ -409,10 +409,14 @@
     }
     return false;
   }
+  function isDateInAnySchedule(dateStr){
+    return (G.schedules || []).some(s => s && s.start && s.end && s.start <= dateStr && dateStr <= s.end);
+  }
 
   // 取得考勤組對該日自動排的班別（當作「底稿」，不含個人指派）
   const _DOW_KEYS = ['sun','mon','tue','wed','thu','fri','sat'];
   function getGroupShiftsForDate(dateStr, dow) {
+    if (!isDateInAnySchedule(dateStr)) return [];
     const grp = (G.attendanceGroups || []).find(
       g => Array.isArray(g.members) && g.members.includes(empId)
     );
@@ -487,6 +491,9 @@
       const ds = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
       const dow = new Date(year, month - 1, d).getDay();
       const a = personal.assignments[ds];
+      const hasScheduleData = isDateInAnySchedule(ds);
+      const hasPersonalData = !!a;
+      if (!hasScheduleData && !hasPersonalData) continue;
       let names;
       if (a) {
         if (a.type !== 'work') continue;
@@ -605,11 +612,14 @@
         const ds = fmt(cell.date);
         const dow = cell.date.getDay();
         const inRange = (!rs || ds >= rs) && (!re || ds <= re);
+        const hasScheduleData = isDateInAnySchedule(ds);
+        const hasPersonalData = !!personal.assignments[ds];
+        const canShowDate = hasScheduleData || hasPersonalData;
 
         if (cell.other) td.classList.add('other-month');
         else if (!inRange) td.classList.add('out-of-range');
 
-        if (!cell.other && isHolidayDate(ds, dow)) td.classList.add('holiday');
+        if (!cell.other && canShowDate && isHolidayDate(ds, dow)) td.classList.add('holiday');
         if (ds === todayStr) td.classList.add('today');
 
         const a = personal.assignments[ds];
@@ -641,7 +651,7 @@
                 }).join('')
               : `<div class="shift-tag work">已排</div>`;
           }
-        } else if (!cell.other && inRange) {
+        } else if (!cell.other && inRange && canShowDate) {
           // 無個人指派時，顯示考勤組底稿（紫色虛線標籤）
           const groupNames = getGroupShiftsForDate(ds, dow);
           if (groupNames.length) {
