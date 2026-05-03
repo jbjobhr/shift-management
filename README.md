@@ -293,3 +293,34 @@ index.html               班表總覽（主視圖，橫向日曆表格）
 **版本控制**：`__version` 欄位目前為 `13`。載入時若儲存版本低於此值，自動重置 `attendanceGroups`、`holidayGroups`、`shifts` 為 Fallback 預設值，避免舊結構導致顯示錯誤。
 
 **跨頁同步**：從個人排班返回總覽時，總覽頁監聽 `pageshow` 事件，若為 bfcache 恢復（`e.persisted`）則重新執行 `renderSchedule()`，確保個人排班變更即時反映。
+---
+
+## 資料庫（MSSQL）
+
+提供與前端 `localStorage` 結構對應的 MSSQL 2022 schema，供未來後端整合或資料分析使用。
+
+### 啟動
+
+```bash
+docker compose up -d           # 啟動 sqlserver (port 1433)
+./db/init.sh                   # 等待就緒並建立 schema + seed 資料
+```
+
+預設 SA 密碼：`Shift@Pass2026`（可由環境變數 `MSSQL_SA_PASSWORD` 覆寫）。
+連線字串範例：
+`Server=localhost,1433;Database=ShiftManagement;User Id=sa;Password=Shift@Pass2026;TrustServerCertificate=True;`
+
+### 對應關係
+
+| 前端 (localStorage) | 資料表 |
+|---|---|
+| `persons[]` | `Employee` |
+| `shifts[]` | `Shift` |
+| `schedules[]` | `Schedule` (+ `SchedulePosition`) |
+| `holidayGroups{}` / `individualHolidays[]` | `HolidayGroup` + `HolidayGroupDate` / `IndividualHoliday` |
+| `attendanceGroups[]` | `AttendanceGroup` (+ `Member` / `Weekday` / `PunchLoc`) |
+| `branches/departments/allPositions/tags/supervisors` | `Branch` / `Department` / `Position` / `Tag` / `Supervisor` |
+| `shiftMgmt:personal:{empId}` | `PersonalShiftConfig` + `PersonalAssignment` + `PersonalSetting` |
+| `__version` | `AppMeta` (Key=`DataVersion`) |
+
+詳細 DDL 請見 [db/schema.sql](db/schema.sql)、種子資料 [db/seed.sql](db/seed.sql)。
