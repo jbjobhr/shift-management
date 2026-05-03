@@ -659,6 +659,13 @@
       }
       return _pdCache[eid];
     }
+    function isDateInAnySchedule(dateStr) {
+      return (schedules || []).some(s => s && s.start && s.end && s.start <= dateStr && dateStr <= s.end);
+    }
+    function hasPersonalAssignmentOnDate(empId, dateStr) {
+      const pd = _getPersonalData(empId);
+      return !!(pd && pd.assignments && pd.assignments[dateStr]);
+    }
     function getShiftsForPersonOnDate(empId, dateStr, dow) {
       // 優先採用個人排班指派
       const pd = _getPersonalData(empId);
@@ -681,6 +688,8 @@
           return { list: names, isHolidayOt: false, isPersonal: true };
         }
       }
+      // 僅顯示 schedules 範圍內的系統排班；範圍外若無個人排班，維持空白
+      if (!isDateInAnySchedule(dateStr)) return { list: [], isHolidayOt: false };
       // 否則依考勤組自動計算
       const g = getPersonGroup(empId);
       if (!g || (g.scheduleType && g.scheduleType !== 'auto')) return { list: [], isHolidayOt: false };
@@ -749,13 +758,16 @@
       let totalHrs = 0;
       const dayShifts = days.map((d, i) => {
         const dateStr = d.toISOString().split('T')[0];
-        const isHolidayDisplay = allHolidaysForDisplay.includes(dateStr);
+        const hasScheduleData = isDateInAnySchedule(dateStr);
+        const hasPersonalData = hasPersonalAssignmentOnDate(p.id, dateStr);
+        const canShowDate = hasScheduleData || hasPersonalData;
+        const isHolidayDisplay = canShowDate && allHolidaysForDisplay.includes(dateStr);
         const isHolidayActual = conflictHolidaySet.has(dateStr);
         const result = getShiftsForPersonOnDate(p.id, dateStr, d.getDay());
         // 班別篩選：僅保留被勾選之班別（未勾選則全顯示）
         const filteredList = selectedShifts.length === 0 ? result.list : result.list.filter(n => selectedShifts.includes(n));
         filteredList.forEach(n => { totalHrs += shiftHoursMap[n] || 0; });
-        return { dateStr, isHolidayDisplay, isHolidayActual, assignedShifts: filteredList, isHolidayOt: result.isHolidayOt && filteredList.length > 0, isPersonal: !!result.isPersonal, isPersonalOff: !!result.isPersonal && result.list.length === 0, isMonthBoundary: monthBoundarySet.has(i) };
+        return { dateStr, canShowDate, isHolidayDisplay, isHolidayActual, assignedShifts: filteredList, isHolidayOt: result.isHolidayOt && filteredList.length > 0, isPersonal: !!result.isPersonal, isPersonalOff: !!result.isPersonal && result.list.length === 0, isMonthBoundary: monthBoundarySet.has(i) };
       });
       return { p, totalHrs, dayShifts };
     });
@@ -780,6 +792,11 @@
         <td class="px-2 py-2 text-center text-xs whitespace-nowrap">${groupCell}</td>
         <td class="px-2 py-2 text-center text-xs font-medium text-blue-700">${totalHrs}h</td>
         ${dayShifts.map(ds => {
+          if (!ds.canShowDate) {
+            const todayCls = ds.dateStr === _todayStr ? ' today' : '';
+            const boundaryStyle = ds.isMonthBoundary ? ' style="border-left:2px solid #94a3b8"' : '';
+            return `<td class="calendar-cell ${todayCls} text-xs cursor-pointer"${boundaryStyle} onclick="syncGlobalData();window.location.href='personal-shift.html?empId=${encodeURIComponent(p.id)}&scheduleIndex=${currentScheduleIndex}${viewOverride ? `&start=${viewOverride.start}&end=${viewOverride.end}` : ''}'"></td>`;
+          }
           const hasShift = ds.assignedShifts.length > 0;
           const shiftLabel = hasShift
             ? ds.assignedShifts.map(n => {
