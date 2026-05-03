@@ -803,9 +803,8 @@
         <td class="px-2 py-2 text-center text-xs font-medium text-blue-700">${totalHrs}h</td>
         ${dayShifts.map(ds => {
           if (!ds.canShowDate) {
-            const todayCls = ds.dateStr === _todayStr ? ' today' : '';
             const boundaryStyle = ds.isMonthBoundary ? ' style="border-left:2px solid #94a3b8"' : '';
-            return `<td class="calendar-cell ${todayCls} text-xs cursor-pointer"${boundaryStyle} onclick="syncGlobalData();window.location.href='personal-shift.html?empId=${encodeURIComponent(p.id)}&scheduleIndex=${currentScheduleIndex}${viewOverride ? `&start=${viewOverride.start}&end=${viewOverride.end}` : ''}'"></td>`;
+            return `<td class="calendar-cell text-xs cursor-pointer"${boundaryStyle} onclick="syncGlobalData();window.location.href='personal-shift.html?empId=${encodeURIComponent(p.id)}&scheduleIndex=${currentScheduleIndex}${viewOverride ? `&start=${viewOverride.start}&end=${viewOverride.end}` : ''}'"></td>`;
           }
           const hasShift = ds.assignedShifts.length > 0;
           const shiftLabel = hasShift
@@ -836,10 +835,9 @@
             cls = '';
           }
           const personalCls = ds.isPersonal ? ' personal' : '';
-          const todayCls = ds.dateStr === _todayStr ? ' today' : '';
           const boundaryStyle = ds.isMonthBoundary ? ' style="border-left:2px solid #94a3b8"' : '';
           const title = ds.isHolidayOt ? `假日加班：${ds.assignedShifts.join('、')}` : (ds.isPersonal ? '個人指派（點擊編輯）' : '');
-          return `<td class="calendar-cell ${cls}${personalCls}${todayCls} text-xs cursor-pointer"${boundaryStyle} title="${title}" onclick="syncGlobalData();window.location.href='personal-shift.html?empId=${encodeURIComponent(p.id)}&scheduleIndex=${currentScheduleIndex}${viewOverride ? `&start=${viewOverride.start}&end=${viewOverride.end}` : ''}'">${label}</td>`;
+          return `<td class="calendar-cell ${cls}${personalCls} text-xs cursor-pointer"${boundaryStyle} title="${title}" onclick="syncGlobalData();window.location.href='personal-shift.html?empId=${encodeURIComponent(p.id)}&scheduleIndex=${currentScheduleIndex}${viewOverride ? `&start=${viewOverride.start}&end=${viewOverride.end}` : ''}'">${label}</td>`;
         }).join('')}
       </tr>`;
     }).join('');
