@@ -97,26 +97,17 @@
        </div>
       </div>
      </section>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
      <section class="bg-white rounded-xl shadow-sm p-5 space-y-4">
-      <h2 class="font-bold text-lg text-slate-800 flex items-center gap-2"><i data-lucide="eye" class="w-5 h-5 text-purple-600"></i>檢視人員（主管）</h2>
+      <h2 class="font-bold text-lg text-slate-800 flex items-center gap-2"><i data-lucide="eye" class="w-5 h-5 text-purple-600"></i>可編輯人員（主管）</h2>
       <div class="flex gap-2">
        <input type="text" id="addSupervisor" placeholder="主管姓名" class="flex-1 max-w-xs"> <button onclick="addSupervisorFn()" class="px-3 py-1.5 bg-purple-50 text-purple-700 rounded-md text-sm font-medium hover:bg-purple-100 transition">新增</button>
       </div>
       <div id="supervisorList" class="flex flex-wrap gap-1"></div>
      </section>
-     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
       <section class="bg-white rounded-xl shadow-sm p-5 space-y-4">
        <h2 class="font-bold text-lg text-slate-800 flex items-center gap-2"><i data-lucide="briefcase" class="w-5 h-5 text-teal-600"></i>崗位</h2><select id="positionSelect" class="w-full" onchange="addPositionFromSelect()"> <option value="">-- 選擇崗位 --</option> </select>
        <div id="positionList" class="flex flex-wrap gap-1"></div>
-      </section>
-      <section class="bg-white rounded-xl shadow-sm p-5 space-y-4">
-       <h2 class="font-bold text-lg text-slate-800 flex items-center gap-2"><i data-lucide="tag" class="w-5 h-5 text-teal-600"></i>標籤</h2>
-       <div class="flex gap-2">
-        <div class="relative flex-1"><input type="text" id="tagInput" placeholder="搜尋或輸入新標籤" class="w-full" oninput="filterTagDropdown()" onfocus="filterTagDropdown()">
-         <div id="tagDropdown" class="absolute top-full left-0 right-0 bg-white border border-slate-200 rounded-md shadow-lg mt-1 max-h-40 overflow-y-auto z-10 hidden"></div>
-        </div><button onclick="addCustomTag()" class="px-3 py-1.5 bg-teal-50 text-teal-700 rounded-md text-sm font-medium hover:bg-teal-100 transition">新增</button>
-       </div>
-       <div id="tagList" class="flex flex-wrap gap-1"></div>
       </section>
      </div>
      <div class="flex justify-end">
@@ -691,6 +682,7 @@
   function filterTagDropdown() {
     const input = document.getElementById('tagInput');
     const dropdown = document.getElementById('tagDropdown');
+    if (!input || !dropdown) return;
     const query = input.value.toLowerCase().trim();
     
     const allTags = ['可加班', '新人', '夜班優先'];
@@ -718,22 +710,29 @@
       tags.push(tag);
       renderTags();
     }
-    document.getElementById('tagInput').value = '';
-    document.getElementById('tagDropdown').classList.add('hidden');
+    const input = document.getElementById('tagInput');
+    const dropdown = document.getElementById('tagDropdown');
+    if (input) input.value = '';
+    if (dropdown) dropdown.classList.add('hidden');
   }
 
   function addCustomTag() {
-    const v = document.getElementById('tagInput').value.trim();
+    const input = document.getElementById('tagInput');
+    const dropdown = document.getElementById('tagDropdown');
+    if (!input) return;
+    const v = input.value.trim();
     if (v && !tags.includes(v)) {
       tags.push(v);
       renderTags();
-      document.getElementById('tagInput').value = '';
-      document.getElementById('tagDropdown').classList.add('hidden');
+      input.value = '';
+      if (dropdown) dropdown.classList.add('hidden');
     }
   }
 
   function renderTags() {
-    document.getElementById('tagList').innerHTML = tags.map(t => `<span class="tag-item bg-teal-50 text-teal-700">${t}<button onclick="tags.splice(tags.indexOf('${t}'),1);renderTags()" class="ml-1 text-red-400 hover:text-red-600">×</button></span>`).join('');
+    const container = document.getElementById('tagList');
+    if (!container) return;
+    container.innerHTML = tags.map(t => `<span class="tag-item bg-teal-50 text-teal-700">${t}<button onclick="tags.splice(tags.indexOf('${t}'),1);renderTags()" class="ml-1 text-red-400 hover:text-red-600">×</button></span>`).join('');
   }
 
   function renderPositions() {
@@ -1384,7 +1383,8 @@
   window.addEventListener('beforeunload', syncGlobalData);
   document.addEventListener('click', (e) => {
     if (!e.target.closest('#tagInput') && !e.target.closest('#tagDropdown')) {
-      document.getElementById('tagDropdown').classList.add('hidden');
+      const dropdown = document.getElementById('tagDropdown');
+      if (dropdown) dropdown.classList.add('hidden');
     }
   });
   </script>
