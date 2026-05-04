@@ -252,56 +252,174 @@
     }
     return out;
   }
-  let holidayGroups = {
-    '台灣國定假日': [
-      // 元旦
-      '2026-01-01', '2026-01-02',
-      // 春節 (2/14–2/22)
-      '2026-02-14', '2026-02-15', '2026-02-16', '2026-02-17', '2026-02-18', '2026-02-19', '2026-02-20', '2026-02-21', '2026-02-22',
-      // 和平紀念日 (2/27補假、2/28、3/1)
-      '2026-02-27', '2026-02-28', '2026-03-01',
-      // 兒童節／清明節 (4/3補假、4/4、4/5、4/6補假)
-      '2026-04-03', '2026-04-04', '2026-04-05', '2026-04-06',
-      // 勞動節
-      '2026-05-01',
-      // 端午節
-      '2026-06-19',
-      // 中秋節／教師節 (9/25–9/28)
-      '2026-09-25', '2026-09-26', '2026-09-27', '2026-09-28',
-      // 國慶日 (10/9補假、10/10、10/11)
-      '2026-10-09', '2026-10-10', '2026-10-11',
-      // 行憲紀念日 (12/25–12/27)
-      '2026-12-25', '2026-12-26', '2026-12-27'
-    ],
-    '一例一休': _genWeekendsOfYear(2026),
-    '自訂假別B': ['2026-03-01', '2026-03-15']
-  };
-  let individualHolidays = ['2026-01-20', '2026-02-20'];
-  let selectedHolidayGroups = ['台灣國定假日', '一例一休'];
-  let holidays = [];
-  let editingHolidayGroup = null;
-  let editingHolidayDates = [];
-  let persons = [
-    { name: '王小明', id: 'EMP001' },
-    { name: '李小華', id: 'EMP002' },
-    { name: '張大偉', id: 'EMP003' },
-    { name: '陳美玲', id: 'EMP004' },
-    { name: '林志豪', id: 'EMP005' }
-  ];
-  let supervisors = ['劉經理'];
-  let shifts = [
-    { name: '早班', shortName: '早', start: '08:00', end: '17:00', hours: 8, rest: 1, otStart: '', otEnd: '' },
-    { name: '午班', shortName: '午', start: '13:00', end: '17:00', hours: 4, otStart: '', otEnd: '' },
-    { name: '晚班', shortName: '晚', start: '18:00', end: '22:00', hours: 4, otStart: '18:00', otEnd: '21:00' }
-  ];
-  let attendanceGroups = [
+  // ── 每個班表各自的預設設定（3 個不同班表） ─────────────────────────────
+  // 三個班表共用的考勤組清單
+  const _ALL_ATTENDANCE_GROUPS = [
     { name: 'A組 - 倉儲', members: ['EMP001', 'EMP002'], scheduleType: 'auto',
       weekdayShifts: { mon:['早班'], tue:['早班'], wed:['早班'], thu:['早班'], fri:['早班'], sat:[], sun:[] } },
     { name: 'B組 - 物流', members: ['EMP003'], scheduleType: 'auto', workOnHoliday: true,
-      weekdayShifts: { mon:['早班'], tue:['早班'], wed:[], thu:['早班'], fri:[], sat:['午班','晚班'], sun:['午班','晚班'] } },
+      weekdayShifts: { mon:['早班'], tue:['早班'], wed:[], thu:['早班'], fri:[], sat:['晚班'], sun:['晚班'] } },
     { name: 'C組 - 客服', members: ['EMP004', 'EMP005'], scheduleType: 'auto',
       weekdayShifts: { mon:['早班'], tue:['午班','晚班'], wed:['早班'], thu:['午班','晚班'], fri:['早班'], sat:[], sun:[] } }
   ];
+
+  // 全部班表共用的假別組清單
+  const _ALL_HOLIDAY_GROUPS = {
+    '台灣國定假日': [
+      '2026-01-01','2026-01-02',
+      '2026-02-14','2026-02-15','2026-02-16','2026-02-17','2026-02-18',
+      '2026-02-19','2026-02-20','2026-02-21','2026-02-22',
+      '2026-02-27','2026-02-28','2026-03-01',
+      '2026-04-03','2026-04-04','2026-04-05','2026-04-06',
+      '2026-05-01','2026-06-19',
+      '2026-09-25','2026-09-26','2026-09-27','2026-09-28',
+      '2026-10-09','2026-10-10','2026-10-11',
+      '2026-12-25','2026-12-26','2026-12-27'
+    ],
+    '一例一休': _genWeekendsOfYear(2026),
+    '自訂假別': ['2026-03-01','2026-03-15']
+  };
+
+  const _SCHED_FALLBACK = [
+    {
+      // 班表 0 — 2026年1月：預設選 A組，預設勾選台灣國定假日
+      name: '2026年1月排班', start: '2026-01-01', end: '2026-01-31', branch: '總公司',
+      selectedAttendanceGroupIndex: 0,
+      selectedHolidayGroups: ['台灣國定假日'],
+      shifts: [
+        { name: '早班', shortName: '早', start: '08:00', end: '17:00', hours: 8, rest: 1, otStart: '', otEnd: '' },
+        { name: '午班', shortName: '午', start: '13:00', end: '17:00', hours: 4, rest: 0, otStart: '', otEnd: '' }
+      ],
+      attendanceGroups: JSON.parse(JSON.stringify(_ALL_ATTENDANCE_GROUPS)),
+      holidayGroups: JSON.parse(JSON.stringify(_ALL_HOLIDAY_GROUPS)),
+      individualHolidays: ['2026-01-20'],
+      supervisors: ['劉經理'],
+      positions: ['理貨員', '包裝員'],
+      tags: ['可加班']
+    },
+    {
+      // 班表 1 — 2026年2月：預設選 B組，預設勾選一例一休
+      name: '2026年2月排班', start: '2026-02-01', end: '2026-02-28', branch: '北區分店',
+      selectedAttendanceGroupIndex: 1,
+      selectedHolidayGroups: ['一例一休'],
+      shifts: [
+        { name: '早班', shortName: '早', start: '08:00', end: '17:00', hours: 8, rest: 1, otStart: '', otEnd: '' },
+        { name: '晚班', shortName: '晚', start: '18:00', end: '22:00', hours: 4, rest: 0, otStart: '22:00', otEnd: '23:00' }
+      ],
+      attendanceGroups: JSON.parse(JSON.stringify(_ALL_ATTENDANCE_GROUPS)),
+      holidayGroups: JSON.parse(JSON.stringify(_ALL_HOLIDAY_GROUPS)),
+      individualHolidays: ['2026-02-20'],
+      supervisors: ['陳副理'],
+      positions: ['包裝員', '搬運工'],
+      tags: ['夜班優先']
+    },
+    {
+      // 班表 2 — 2026年3月：預設選 C組，預設勾選台灣國定假日+一例一休
+      name: '2026年3月排班', start: '2026-03-01', end: '2026-03-31', branch: '中區分店',
+      selectedAttendanceGroupIndex: 2,
+      selectedHolidayGroups: ['台灣國定假日', '一例一休'],
+      shifts: [
+        { name: '早班', shortName: '早', start: '08:00', end: '17:00', hours: 8, rest: 1, otStart: '', otEnd: '' },
+        { name: '午班', shortName: '午', start: '13:00', end: '17:00', hours: 4, rest: 0, otStart: '', otEnd: '' },
+        { name: '晚班', shortName: '晚', start: '18:00', end: '22:00', hours: 4, rest: 0, otStart: '22:00', otEnd: '23:00' }
+      ],
+      attendanceGroups: JSON.parse(JSON.stringify(_ALL_ATTENDANCE_GROUPS)),
+      holidayGroups: JSON.parse(JSON.stringify(_ALL_HOLIDAY_GROUPS)),
+      individualHolidays: [],
+      supervisors: ['林組長'],
+      positions: ['揀貨員', '分類員', '品檢員'],
+      tags: ['新人', '可加班']
+    }
+  ];
+
+  // ── 全域共用 Fallback ──────────────────────────────────────────────────
+  const _GLOBAL_FALLBACK = {
+    persons: [
+      { name: '王小明', id: 'EMP001' },
+      { name: '李小華', id: 'EMP002' },
+      { name: '張大偉', id: 'EMP003' },
+      { name: '陳美玲', id: 'EMP004' },
+      { name: '林志豪', id: 'EMP005' }
+    ],
+    branches: ['總公司', '北區分店', '中區分店', '南區分店'],
+    departments: ['管理部', '營運部', '倉儲部', '物流部', '客服部', '人資部'],
+    allPositions: ['揀貨員','包裝員','理貨員','搬運工','品檢員','分類員','叉車手','司機'],
+    allPunchLocations: ['總公司','倉儲中心','北區分部','中區分部','南區分部','外勤'],
+    schedules: _SCHED_FALLBACK
+  };
+
+  // ── 讀取 localStorage ────────────────────────────────────────────────
+  let G = _GLOBAL_FALLBACK;
+  try {
+    const raw = localStorage.getItem('shiftMgmt:global');
+    if (raw) G = Object.assign({}, _GLOBAL_FALLBACK, JSON.parse(raw));
+  } catch(e) { console.warn('load global failed', e); }
+
+  // ── 讀取 URL ?index=N，決定目前編輯哪個班表 ──────────────────────────
+  let schedules = Array.isArray(G.schedules) && G.schedules.length ? G.schedules : [..._SCHED_FALLBACK];
+  // 若 schedules 筆數不足，補入 FALLBACK (保留既有資料不覆蓋)
+  while (schedules.length < _SCHED_FALLBACK.length) {
+    schedules.push({ ..._SCHED_FALLBACK[schedules.length] });
+  }
+  // ── 對所有班表補齊 per-schedule 預設欄位（舊資料遷移）──────────────
+  // 版本號升高時強制重置各班表至各自的 FALLBACK（保留 name/start/end/branch）
+  const _SCHED_CONFIG_VERSION = 4;
+  schedules.forEach((s, i) => {
+    const fb = _SCHED_FALLBACK[i] || _SCHED_FALLBACK[0];
+    if ((s._schedConfigVersion || 0) >= _SCHED_CONFIG_VERSION) return; // 已是最新，不重置
+    s.shifts             = JSON.parse(JSON.stringify(fb.shifts));
+    s.attendanceGroups   = JSON.parse(JSON.stringify(fb.attendanceGroups));
+    s.selectedAttendanceGroupIndex = fb.selectedAttendanceGroupIndex || 0;
+    s.holidayGroups      = JSON.parse(JSON.stringify(fb.holidayGroups));
+    s.selectedHolidayGroups = fb.selectedHolidayGroups ? [...fb.selectedHolidayGroups] : Object.keys(fb.holidayGroups).slice(0, 1);
+    s.individualHolidays = [...fb.individualHolidays];
+    s.supervisors        = [...fb.supervisors];
+    s.positions          = [...fb.positions];
+    s.tags               = [...fb.tags];
+    if (!s.branch) s.branch = fb.branch;
+    s._schedConfigVersion = _SCHED_CONFIG_VERSION;
+  });
+  G.schedules = schedules;
+  try { localStorage.setItem('shiftMgmt:global', JSON.stringify(G)); } catch(e) {}
+  let currentScheduleIndex = 0;
+  try {
+    const _idx = parseInt(new URLSearchParams(location.search).get('index'), 10);
+    if (!isNaN(_idx) && _idx >= 0 && _idx < schedules.length) currentScheduleIndex = _idx;
+  } catch(e) {}
+
+  // ── 取得目前班表物件 ────────────────────────────────────────────────
+  function _sfb(idx) { return _SCHED_FALLBACK[idx] || _SCHED_FALLBACK[0]; }
+  const _cs = schedules[currentScheduleIndex] || _sfb(currentScheduleIndex);
+
+  // ── Per-schedule 變數（每個班表各自獨立） ─────────────────────────────
+  let holidayGroups     = (_cs.holidayGroups && Object.keys(_cs.holidayGroups).length)
+                            ? JSON.parse(JSON.stringify(_cs.holidayGroups))
+                            : JSON.parse(JSON.stringify(_sfb(currentScheduleIndex).holidayGroups));
+  let individualHolidays = Array.isArray(_cs.individualHolidays)
+                            ? [..._cs.individualHolidays]
+                            : [..._sfb(currentScheduleIndex).individualHolidays];
+  let shifts            = Array.isArray(_cs.shifts) && _cs.shifts.length
+                            ? JSON.parse(JSON.stringify(_cs.shifts))
+                            : JSON.parse(JSON.stringify(_sfb(currentScheduleIndex).shifts));
+  let attendanceGroups  = Array.isArray(_cs.attendanceGroups) && _cs.attendanceGroups.length
+                            ? JSON.parse(JSON.stringify(_cs.attendanceGroups))
+                            : JSON.parse(JSON.stringify(_sfb(currentScheduleIndex).attendanceGroups));
+  let supervisors       = Array.isArray(_cs.supervisors)
+                            ? [..._cs.supervisors]
+                            : [..._sfb(currentScheduleIndex).supervisors];
+
+  // ── 全域共用變數 ────────────────────────────────────────────────────
+  let persons           = Array.isArray(G.persons)   ? G.persons   : _GLOBAL_FALLBACK.persons;
+
+  // UI 狀態
+  let selectedHolidayGroups = Array.isArray(_cs.selectedHolidayGroups) && _cs.selectedHolidayGroups.length
+    ? [..._cs.selectedHolidayGroups]
+    : (_sfb(currentScheduleIndex).selectedHolidayGroups
+        ? [..._sfb(currentScheduleIndex).selectedHolidayGroups]
+        : Object.keys(holidayGroups).slice(0, 1));
+  let holidays = [];
+  let editingHolidayGroup = null;
+  let editingHolidayDates = [];
   const WEEKDAYS = [
     { key: 'mon', label: '每週一' },
     { key: 'tue', label: '每週二' },
@@ -321,29 +439,29 @@
   let currentGroupWorkOnHoliday = false;
   let editingGroupIndex = -1;
   let currentGroupMembers = [];
-  let allPunchLocations = ['總公司', '倉儲中心', '北區分部', '中區分部', '南區分部', '外勤'];
+  let allPunchLocations = Array.isArray(G.allPunchLocations) ? G.allPunchLocations : _GLOBAL_FALLBACK.allPunchLocations;
   let currentGroupPunchLocations = [];
-  let branches = ['總公司', '北區分店', '中區分店', '南區分店'];
-  let departments = ['管理部', '營運部', '倉儲部', '物流部', '客服部', '人資部'];
-  let selectedBranch = '總公司';
-  let selectedDepartment = '';
-  let allPositions = ['揀貨員', '包裝員', '理貨員', '搬運工', '品檢員', '分類員', '叉車手', '司機'];
-  let positions = ['理貨員', '包裝員'];
-  let tags = ['可加班', '新人', '夜班優先'];
+  let branches = Array.isArray(G.branches) ? G.branches : _GLOBAL_FALLBACK.branches;
+  let departments = Array.isArray(G.departments) ? G.departments : _GLOBAL_FALLBACK.departments;
+  let selectedBranch    = _cs.branch      || _sfb(currentScheduleIndex).branch || '總公司';
+  let selectedDepartment = _cs.department || '';
+  let allPositions = Array.isArray(G.allPositions) ? G.allPositions : _GLOBAL_FALLBACK.allPositions;
+  let positions = Array.isArray(_cs.positions) && _cs.positions.length
+                    ? [..._cs.positions] : [..._sfb(currentScheduleIndex).positions];
+  let tags = Array.isArray(_cs.tags) && _cs.tags.length
+               ? [..._cs.tags] : [..._sfb(currentScheduleIndex).tags];
 
   let selectedPositions = [];
   let selectedShifts = [];
   let selectedHolidays = [];
   let selectedGroups = [];
   let selectedTags = [];
+  let selectedAttendanceGroupIndex = (typeof _cs.selectedAttendanceGroupIndex === 'number')
+    ? _cs.selectedAttendanceGroupIndex
+    : (_sfb(currentScheduleIndex).selectedAttendanceGroupIndex || 0);
+  if (selectedAttendanceGroupIndex >= attendanceGroups.length) selectedAttendanceGroupIndex = 0;
 
-  // 班表列表
-  let schedules = [
-    { name: '2026年1月排班', start: '2026-01-01', end: '2026-01-31' },
-    { name: '2026年2月排班', start: '2026-02-01', end: '2026-02-28' },
-    { name: '2026年3月排班', start: '2026-03-01', end: '2026-03-31' }
-  ];
-  let currentScheduleIndex = 0;
+  // 班表列表已在上方初始化（schedules / currentScheduleIndex）
 
   const defaultConfig = {
     app_title: '班表設定',
@@ -749,8 +867,9 @@
       } else {
         weekdayHtml = `<div class="mt-2 text-xs text-slate-500">手動排班</div>`;
       }
-      return `<div class="flex items-start gap-2 p-2 bg-green-50 rounded-lg">
-      <input type="radio" name="attendanceGroupSelect" class="rounded mt-1">
+      const isSelected = (i === selectedAttendanceGroupIndex);
+      return `<div class="flex items-start gap-2 p-2 rounded-lg transition ${isSelected ? 'bg-green-100 ring-2 ring-green-400' : 'bg-green-50'}">
+      <input type="radio" name="attendanceGroupSelect" class="rounded mt-1" ${isSelected ? 'checked' : ''} onchange="selectedAttendanceGroupIndex=${i};renderAttendanceGroups()">
       <div class="flex-1 min-w-0">
         <div class="font-medium text-sm flex items-center gap-2">
           <span>${g.name}</span>
@@ -760,7 +879,7 @@
         ${weekdayHtml}
       </div>
       <button onclick="editAttendanceGroup(${i})" class="text-blue-400 hover:text-blue-600 text-sm px-2">編輯</button>
-      <button onclick="attendanceGroups.splice(${i},1);renderAttendanceGroups()" class="text-red-400 hover:text-red-600 text-sm">刪除</button>
+      <button onclick="attendanceGroups.splice(${i},1);if(selectedAttendanceGroupIndex>=attendanceGroups.length)selectedAttendanceGroupIndex=attendanceGroups.length-1;renderAttendanceGroups()" class="text-red-400 hover:text-red-600 text-sm">刪除</button>
     </div>`;
     }).join('');
   }
@@ -1005,7 +1124,9 @@
       attendanceGroups[editingGroupIndex] = payload;
     } else {
       attendanceGroups.push(payload);
+      selectedAttendanceGroupIndex = attendanceGroups.length - 1;
     }
+    if (selectedAttendanceGroupIndex < 0 && attendanceGroups.length > 0) selectedAttendanceGroupIndex = 0;
     editingGroupIndex = -1;
     renderAttendanceGroups();
     closeAttendanceGroupModal();
@@ -1155,6 +1276,10 @@
   renderPositions();
   renderTags();
   renderBranchAndDepartment();
+  // 初始化基本資訊欄位（依目前班表 index）
+  document.getElementById('scheduleName').value = schedules[currentScheduleIndex].name || '';
+  document.getElementById('startDate').value    = schedules[currentScheduleIndex].start || '';
+  document.getElementById('endDate').value      = schedules[currentScheduleIndex].end || '';
   lucide.createIcons();
 
   function renderBranchAndDepartment() {
@@ -1170,27 +1295,46 @@
     }
   }
 
-  // 將目前全域資料同步到 localStorage，提供 personal-shift.html 讀取
+  // 將目前班表設定存入該班表物件，再寫回 localStorage
   function syncGlobalData() {
     try {
-      const data = {
-        persons,
-        supervisors,
-        shifts,
-        holidayGroups,
-        selectedHolidayGroups,
-        individualHolidays,
-        attendanceGroups,
-        branches,
-        departments,
-        selectedBranch,
-        selectedDepartment,
-        allPositions,
-        positions,
-        tags,
-        schedules
-      };
-      localStorage.setItem('shiftMgmt:global', JSON.stringify(data));
+      const sched = schedules[currentScheduleIndex] || {};
+      // 基本資訊
+      sched.name         = document.getElementById('scheduleName').value.trim() || sched.name;
+      sched.start        = document.getElementById('startDate').value || sched.start;
+      sched.end          = document.getElementById('endDate').value || sched.end;
+      sched.branch       = selectedBranch;
+      sched.department   = selectedDepartment;
+      // Per-schedule 設定
+      sched.shifts                       = shifts;
+      sched.attendanceGroups             = attendanceGroups;
+      sched.selectedAttendanceGroupIndex = selectedAttendanceGroupIndex;
+      sched.holidayGroups                = holidayGroups;
+      sched.selectedHolidayGroups        = selectedHolidayGroups;
+      sched.individualHolidays           = individualHolidays;
+      sched.supervisors                  = supervisors;
+      sched.positions                    = positions;
+      sched.tags                         = tags;
+      schedules[currentScheduleIndex] = sched;
+
+      // 寫回 G（保留全域欄位向後相容）
+      G.schedules          = schedules;
+      G.persons            = persons;
+      G.branches           = branches;
+      G.departments        = departments;
+      G.allPositions       = allPositions;
+      G.allPunchLocations  = allPunchLocations;
+      // 讓 index.html 在未切換班表時仍能讀到合理的全域值
+      G.shifts             = shifts;
+      G.attendanceGroups   = attendanceGroups;
+      G.holidayGroups      = holidayGroups;
+      G.individualHolidays = individualHolidays;
+      G.supervisors        = supervisors;
+      G.positions          = positions;
+      G.tags               = tags;
+      G.selectedBranch     = selectedBranch;
+      G.selectedDepartment = selectedDepartment;
+      localStorage.setItem('shiftMgmt:global', JSON.stringify(G));
     } catch (e) { console.warn('syncGlobalData failed', e); }
   }
   window.syncGlobalData = syncGlobalData;
@@ -1205,6 +1349,11 @@
     if (!end) { alert('請選擇結束日期'); return; }
     if (start > end) { alert('起始日期不能晚於結束日期'); return; }
     if (!branch) { alert('請選擇分公司/分店/案場'); return; }
+    if (attendanceGroups.length === 0) {
+      alert('請至少新增一個考勤組');
+      document.getElementById('attendanceGroupList').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
     syncGlobalData();
     window.location.href = 'index.html';
   }

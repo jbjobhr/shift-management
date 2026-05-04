@@ -272,18 +272,26 @@
   } catch (e) { console.warn('load global failed', e); }
 
   // 為了保留原渲染邏輯，將 G 的欄位展開為 module-scope 變數
-  let holidayGroups = G.holidayGroups;
-  let individualHolidays = G.individualHolidays;
+  let holidayGroups, individualHolidays, shifts, attendanceGroups, positions;
   let holidays = [];
   let persons = G.persons;
-  let shifts = G.shifts;
-  let attendanceGroups = G.attendanceGroups;
-  let positions = G.positions;
   let branches = G.branches || FALLBACK.branches;
   let departments = G.departments || FALLBACK.departments;
   let tags = G.tags;
   let schedules = G.schedules;
   let currentScheduleIndex = 0;
+
+  // 載入指定班表的 per-schedule 設定（fallback 到全域值）
+  function _loadScheduleSettings(idx) {
+    const s = (G.schedules || [])[idx] || {};
+    shifts             = s.shifts             || G.shifts             || FALLBACK.shifts;
+    attendanceGroups   = s.attendanceGroups   || G.attendanceGroups   || FALLBACK.attendanceGroups;
+    holidayGroups      = s.holidayGroups      || G.holidayGroups      || FALLBACK.holidayGroups;
+    individualHolidays = s.individualHolidays != null ? s.individualHolidays : (G.individualHolidays || FALLBACK.individualHolidays);
+    positions          = s.positions          || G.positions          || FALLBACK.positions;
+    tags               = s.tags               || G.tags               || FALLBACK.tags;
+  }
+  _loadScheduleSettings(0);
   // 月份覆寫：使用上月/下月/今天時，覆蓋目前班表的時間範圍（不變更 schedules 資料）
   let viewOverride = null; // { start: 'YYYY-MM-DD', end: 'YYYY-MM-DD', name: 'YYYY年M月' }
   // Allow deep-linking from shift-list.html via ?index=N
@@ -292,6 +300,7 @@
     const _idx = parseInt(_qs.get('index'), 10);
     if (!Number.isNaN(_idx) && _idx >= 0 && _idx < schedules.length) {
       currentScheduleIndex = _idx;
+      _loadScheduleSettings(_idx);
     }
     // 從個人排班頁返回時，依 start/end 覆寫顯示月份
     const _qsStart = _qs.get('start');
@@ -408,6 +417,7 @@
   }
   function switchToSchedule(i) {
     currentScheduleIndex = i;
+    _loadScheduleSettings(i);
     viewOverride = null;
     updateSchedulePageTitle();
     renderScheduleFilters();
