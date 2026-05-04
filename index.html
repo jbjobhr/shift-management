@@ -50,7 +50,7 @@
      <div class="bg-white rounded-xl shadow-sm p-4 space-y-3">
       <div class="flex items-center justify-between border-b border-slate-200 pb-3 mb-3">
        <div class="flex flex-wrap items-center gap-3">
-        <h2 class="text-lg font-bold text-slate-800" id="schedulePageTitle">2026年1月排班</h2><span id="scheduleDateRange" class="text-xs text-slate-500"></span><button onclick="toggleScheduleList()" class="text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-600 transition">切換班表</button>
+        <h2 class="text-lg font-bold text-slate-800" id="schedulePageTitle">2026年1月 全部班表</h2><span id="scheduleDateRange" class="text-xs text-slate-500"></span><button onclick="toggleScheduleList()" class="text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-600 transition">切換班表</button>
         <div class="relative"><button onclick="toggleFilterDropdown('branchFilter')" class="text-xs px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-600 transition">分公司/分店/案場</button>
          <div id="branchFilter" class="hidden absolute top-full left-0 bg-white border border-slate-300 rounded-md shadow-lg mt-1 min-w-[220px] z-30">
           <div id="branchFilterList" class="p-2 space-y-1"></div>
@@ -279,11 +279,11 @@
   let departments = G.departments || FALLBACK.departments;
   let tags = G.tags;
   let schedules = G.schedules;
-  let currentScheduleIndex = 0;
+  let currentScheduleIndex = -1;
 
   // 載入指定班表的 per-schedule 設定（fallback 到全域值）
   function _loadScheduleSettings(idx) {
-    const s = (G.schedules || [])[idx] || {};
+    const s = idx >= 0 ? ((G.schedules || [])[idx] || {}) : {};
     shifts             = s.shifts             || G.shifts             || FALLBACK.shifts;
     attendanceGroups   = s.attendanceGroups   || G.attendanceGroups   || FALLBACK.attendanceGroups;
     holidayGroups      = s.holidayGroups      || G.holidayGroups      || FALLBACK.holidayGroups;
@@ -291,14 +291,17 @@
     positions          = s.positions          || G.positions          || FALLBACK.positions;
     tags               = s.tags               || G.tags               || FALLBACK.tags;
   }
-  _loadScheduleSettings(0);
+  _loadScheduleSettings(currentScheduleIndex);
   // 月份覆寫：使用上月/下月/今天時，覆蓋目前班表的時間範圍（不變更 schedules 資料）
   let viewOverride = null; // { start: 'YYYY-MM-DD', end: 'YYYY-MM-DD', name: 'YYYY年M月' }
   // Allow deep-linking from shift-list.html via ?index=N
   try {
     const _qs = new URLSearchParams(location.search);
     const _idx = parseInt(_qs.get('index'), 10);
-    if (!Number.isNaN(_idx) && _idx >= 0 && _idx < schedules.length) {
+    if (_idx === -1) {
+      currentScheduleIndex = -1;
+      _loadScheduleSettings(-1);
+    } else if (!Number.isNaN(_idx) && _idx >= 0 && _idx < schedules.length) {
       currentScheduleIndex = _idx;
       _loadScheduleSettings(_idx);
     }
@@ -312,7 +315,7 @@
         viewOverride = {
           start: _qsStart,
           end: _qsEnd,
-          name: `${y}年${m + 1}月排班`
+          name: _buildOverrideName(y, m)
         };
       }
     }
@@ -363,6 +366,20 @@
   function _fmtDate(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
   function getCurrentRange() {
     if (viewOverride) return viewOverride;
+    if (currentScheduleIndex < 0) {
+      const validSchedules = (schedules || []).filter(s => s && s.start && s.end);
+      if (validSchedules.length > 0) {
+        const starts = validSchedules.map(s => s.start).sort();
+        const ends = validSchedules.map(s => s.end).sort();
+        const first = new Date(starts[0]);
+        return {
+          name: `${first.getFullYear()}年${first.getMonth() + 1}月 全部班表`,
+          start: starts[0],
+          end: ends[ends.length - 1]
+        };
+      }
+      return { name: '2026年1月 全部班表', start: '2026-01-01', end: '2026-01-31' };
+    }
     return schedules[currentScheduleIndex] || { name: '', start: '2026-01-01', end: '2026-01-31' };
   }
   function _buildOverrideName(year, month /* 0-based */) {
@@ -374,7 +391,10 @@
     const sourceName = selectedName || fallbackName;
     const m = sourceName.match(/^\s*\d{4}年\d{1,2}月(.*)$/);
     const suffix = m ? (m[1] || '') : sourceName;
-    return `${normalizedYear}年${normalizedMonth}月${suffix || '排班'}`;
+    const normalizedSuffix = suffix.trim() === '全部班表'
+      ? ' 全部班表'
+      : (suffix || '排班');
+    return `${normalizedYear}年${normalizedMonth}月${normalizedSuffix}`;
   }
   function setMonthOverride(year, month /* 0-based */) {
     const start = new Date(year, month, 1);
@@ -422,7 +442,10 @@
     if (!dropdown.classList.contains('hidden')) renderScheduleList();
   }
   function renderScheduleList() {
-    document.getElementById('scheduleListContainer').innerHTML = schedules.map((s, i) => `
+    const allOption = `
+      <button onclick="switchToSchedule(-1)" class="w-full text-left px-3 py-2 text-sm rounded transition ${currentScheduleIndex < 0 ? 'bg-blue-100 text-blue-700 font-medium' : 'hover:bg-slate-100 text-slate-700'}">全部班表</button>
+    `;
+    document.getElementById('scheduleListContainer').innerHTML = allOption + schedules.map((s, i) => `
       <button onclick="switchToSchedule(${i})" class="w-full text-left px-3 py-2 text-sm rounded transition ${i === currentScheduleIndex ? 'bg-blue-100 text-blue-700 font-medium' : 'hover:bg-slate-100 text-slate-700'}">${s.name}</button>
     `).join('');
   }
@@ -878,7 +901,7 @@
       if (raw) {
         G = Object.assign({}, FALLBACK, JSON.parse(raw));
         schedules = Array.isArray(G.schedules) ? G.schedules : FALLBACK.schedules;
-        if (currentScheduleIndex >= schedules.length) currentScheduleIndex = 0;
+        if (currentScheduleIndex >= schedules.length) currentScheduleIndex = -1;
         _loadScheduleSettings(currentScheduleIndex);
         branches = G.branches || FALLBACK.branches;
         departments = G.departments || FALLBACK.departments;
