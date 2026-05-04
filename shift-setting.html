@@ -32,8 +32,8 @@
     <div class="flex gap-2">
      <button onclick="showNewScheduleModal()" class="px-4 py-1.5 rounded-md text-sm font-medium transition bg-blue-600 hover:bg-blue-700 flex items-center gap-2"><i data-lucide="plus" class="w-4 h-4"></i>複製班表</button>
     <div class="flex gap-2">
-     <a href="index.html" class="px-4 py-1.5 rounded-md text-sm font-medium transition tab-inactive">班表總覽</a>
-     <a href="shift-list.html" class="px-4 py-1.5 rounded-md text-sm font-medium transition tab-active">返回</a>
+    <a href="index.html" onclick="syncGlobalData()" class="px-4 py-1.5 rounded-md text-sm font-medium transition tab-inactive">班表總覽</a>
+    <a href="shift-list.html" onclick="syncGlobalData()" class="px-4 py-1.5 rounded-md text-sm font-medium transition tab-active">返回</a>
     </div>
    </header>
    <div id="pageSettings" class="flex-1 overflow-auto p-6">
@@ -1356,6 +1356,13 @@
   }
   window.validateAndSave = validateAndSave;
   syncGlobalData();
+  // 即時保存基本資訊，避免快速切頁時名稱更新遺失
+  ['scheduleName', 'startDate', 'endDate', 'branchSelect', 'departmentSelect'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const evt = el.tagName === 'SELECT' ? 'change' : 'input';
+    el.addEventListener(evt, syncGlobalData);
+  });
   // 在設定變動時隨時同步並在離開頁面前保存一次
   setInterval(syncGlobalData, 1500);
   window.addEventListener('beforeunload', syncGlobalData);

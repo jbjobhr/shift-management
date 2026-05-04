@@ -90,6 +90,21 @@
       } catch (e) {}
     }
 
+    function reloadSchedulesFromStorage() {
+      try {
+        const raw = localStorage.getItem('shiftMgmt:global');
+        if (!raw) return;
+        const latest = Object.assign({}, FALLBACK, JSON.parse(raw));
+        if (Array.isArray(latest.schedules)) {
+          G = latest;
+          schedules = latest.schedules;
+          schedules.forEach(s => { if (!s.branch) s.branch = '總公司'; });
+        }
+      } catch (e) {
+        console.warn('reload schedules failed', e);
+      }
+    }
+
     function daysBetween(start, end) {
       if (!start || !end) return 0;
       const s = new Date(start), e = new Date(end);
@@ -169,6 +184,11 @@
     }
 
     window.deleteSchedule = deleteSchedule;
+
+    window.addEventListener('pageshow', () => {
+      reloadSchedulesFromStorage();
+      renderList();
+    });
 
     renderList();
     if (window.lucide) lucide.createIcons();

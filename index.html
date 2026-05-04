@@ -860,9 +860,26 @@
   syncGlobalData();
   lucide.createIcons();
 
-  // 從個人排班返回（bfcache 恢復）時重新讀取個人排班資料
-  window.addEventListener('pageshow', (e) => {
-    if (e.persisted) renderSchedule();
+  // 從其他頁返回時，重讀 localStorage，避免班表名稱/設定顯示舊資料
+  window.addEventListener('pageshow', () => {
+    try {
+      const raw = localStorage.getItem('shiftMgmt:global');
+      if (raw) {
+        G = Object.assign({}, FALLBACK, JSON.parse(raw));
+        schedules = Array.isArray(G.schedules) ? G.schedules : FALLBACK.schedules;
+        if (currentScheduleIndex >= schedules.length) currentScheduleIndex = 0;
+        _loadScheduleSettings(currentScheduleIndex);
+        branches = G.branches || FALLBACK.branches;
+        departments = G.departments || FALLBACK.departments;
+        selectedBranchFilter = G.selectedBranch || '';
+        selectedDepartmentFilter = G.selectedDepartment || '';
+      }
+    } catch (e) {
+      console.warn('reload global failed', e);
+    }
+    updateSchedulePageTitle();
+    renderScheduleFilters();
+    renderSchedule();
   });
 
   // 點擊外部關閉篩選 dropdown
