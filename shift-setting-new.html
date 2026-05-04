@@ -53,10 +53,10 @@
         <label class="block text-sm font-medium text-slate-600 mb-1">分公司/分店/案場 <span class="text-red-500">*</span></label>
         <select id="branchSelect" class="w-full"></select>
        </div>
-       <div>
-        <label class="block text-sm font-medium text-slate-600 mb-1">部門/工作地</label>
-        <select id="departmentSelect" class="w-full"></select>
-       </div>
+      <div>
+       <label class="block text-sm font-medium text-slate-600 mb-1">部門/工作地 <span class="text-red-500">*</span></label>
+       <select id="departmentSelect" class="w-full"></select>
+      </div>
       </div>
      </section>
      <section class="bg-white rounded-xl shadow-sm p-5 space-y-4">
@@ -1064,17 +1064,19 @@
     const start = document.getElementById('startDate').value;
     const end = document.getElementById('endDate').value;
     const branch = document.getElementById('branchSelect').value;
+    const department = document.getElementById('departmentSelect').value;
     if (!name) { alert('請輸入班表名稱'); return; }
     if (!start) { alert('請選擇起始日期'); return; }
     if (!end) { alert('請選擇結束日期'); return; }
     if (start > end) { alert('起始日期不能晚於結束日期'); return; }
     if (!branch) { alert('請選擇分公司/分店/案場'); return; }
+    if (!department) { alert('請選擇部門/工作地'); return; }
     schedules.push({
       name,
       start,
       end,
       branch,
-      department: selectedDepartment,
+      department,
       shifts: JSON.parse(JSON.stringify(shifts)),
       attendanceGroups: JSON.parse(JSON.stringify(attendanceGroups)),
       holidayGroups: JSON.parse(JSON.stringify(holidayGroups)),
@@ -1085,6 +1087,7 @@
       tags: [...tags]
     });
     currentScheduleIndex = schedules.length - 1;
+    selectedDepartment = department;
     syncGlobalData();
     localStorage.removeItem(NEW_SCHEDULE_DRAFT_KEY);
     window.location.href = 'index.html';
