@@ -66,7 +66,9 @@
     if (raw) G = Object.assign({}, FALLBACK, JSON.parse(raw));
   } catch (e) { console.warn('load global failed', e); }
 
+  const DRAFT_KEY = 'shiftMgmt:newScheduleDraft';
   const params = new URLSearchParams(location.search);
+  const source = params.get('source') || 'edit';
   let currentScheduleIndex = parseInt(params.get('index'), 10);
   if (Number.isNaN(currentScheduleIndex)) currentScheduleIndex = 0;
   const editingGroupName = params.get('groupName') || '';
@@ -74,7 +76,17 @@
   let schedules = Array.isArray(G.schedules) && G.schedules.length ? G.schedules : FALLBACK.schedules;
   if (currentScheduleIndex < 0 || currentScheduleIndex >= schedules.length) currentScheduleIndex = 0;
 
-  const sched = schedules[currentScheduleIndex] || FALLBACK.schedules[0];
+  let draft = null;
+  if (source === 'new') {
+    try {
+      const rawDraft = localStorage.getItem(DRAFT_KEY);
+      if (rawDraft) draft = JSON.parse(rawDraft);
+    } catch (e) { console.warn('load draft failed', e); }
+  }
+
+  const sched = source === 'new'
+    ? (draft || { holidayGroups: G.holidayGroups || {}, selectedHolidayGroups: G.selectedHolidayGroups || [] })
+    : (schedules[currentScheduleIndex] || FALLBACK.schedules[0]);
   let holidayGroups = (sched.holidayGroups && typeof sched.holidayGroups === 'object') ? { ...sched.holidayGroups } : {};
   let selectedHolidayGroups = Array.isArray(sched.selectedHolidayGroups) ? [...sched.selectedHolidayGroups] : [];
   let editingHolidayDates = [];
@@ -142,17 +154,27 @@
     }
 
     holidayGroups[groupName] = [...editingHolidayDates];
-    sched.holidayGroups = holidayGroups;
-    sched.selectedHolidayGroups = selectedHolidayGroups;
+    if (source === 'new') {
+      const nextDraft = Object.assign({}, draft || {}, {
+        holidayGroups,
+        selectedHolidayGroups
+      });
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(nextDraft));
+    } else {
+      sched.holidayGroups = holidayGroups;
+      sched.selectedHolidayGroups = selectedHolidayGroups;
 
-    schedules[currentScheduleIndex] = sched;
-    G.schedules = schedules;
-    localStorage.setItem('shiftMgmt:global', JSON.stringify(G));
+      schedules[currentScheduleIndex] = sched;
+      G.schedules = schedules;
+      localStorage.setItem('shiftMgmt:global', JSON.stringify(G));
+    }
     goBack();
   }
 
   function goBack() {
-    window.location.href = `shift-setting.html?index=${currentScheduleIndex}`;
+    window.location.href = source === 'new'
+      ? 'shift-setting-new.html'
+      : `shift-setting.html?index=${currentScheduleIndex}`;
   }
 
   window.addHolidayDate = addHolidayDate;

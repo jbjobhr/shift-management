@@ -68,7 +68,7 @@
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
        <div>
         <label class="block text-sm font-medium text-slate-600 mb-2">假別組管理</label>
-        <div id="holidayGroupList" class="space-y-2"></div><button onclick="showAddHolidayGroup()" class="mt-3 px-3 py-1.5 bg-red-50 text-red-600 rounded-md text-sm font-medium hover:bg-red-100 transition flex items-center gap-1"><i data-lucide="plus" class="w-4 h-4"></i>新增假別組</button>
+        <div id="holidayGroupList" class="space-y-2"></div><button onclick="openHolidayGroupPage()" class="mt-3 px-3 py-1.5 bg-red-50 text-red-600 rounded-md text-sm font-medium hover:bg-red-100 transition flex items-center gap-1"><i data-lucide="plus" class="w-4 h-4"></i>新增假別組</button>
        </div>
        <div>
         <label class="block text-sm font-medium text-slate-600 mb-2">彈性假期</label>
@@ -84,7 +84,7 @@
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
        <div>
         <label class="block text-sm font-medium text-slate-600 mb-2">考勤組</label>
-        <div class="space-y-2" id="attendanceGroupList"></div><button onclick="showAddAttendanceGroup()" class="mt-3 px-3 py-1.5 bg-green-50 text-green-700 rounded-md text-sm font-medium hover:bg-green-100 transition flex items-center gap-1"><i data-lucide="plus" class="w-4 h-4"></i>新增考勤組</button>
+        <div class="space-y-2" id="attendanceGroupList"></div><button onclick="openShiftGroupPage()" class="mt-3 px-3 py-1.5 bg-green-50 text-green-700 rounded-md text-sm font-medium hover:bg-green-100 transition flex items-center gap-1"><i data-lucide="plus" class="w-4 h-4"></i>新增考勤組</button>
        </div>
        <div>
         <label class="block text-sm font-medium text-slate-600 mb-2">臨時人員</label>
@@ -302,6 +302,8 @@
   let selectedGroups = [];
   let selectedTags = [];
 
+  const NEW_SCHEDULE_DRAFT_KEY = 'shiftMgmt:newScheduleDraft';
+
   // 載入既有班表列表
   let schedules = [];
   let currentScheduleIndex = -1;
@@ -312,6 +314,33 @@
       if (Array.isArray(saved.schedules)) schedules = saved.schedules;
     }
   } catch (e) { console.warn('load schedules failed', e); }
+
+  try {
+    const rawDraft = localStorage.getItem(NEW_SCHEDULE_DRAFT_KEY);
+    if (rawDraft) {
+      const draft = JSON.parse(rawDraft);
+      if (draft && typeof draft === 'object') {
+        if (typeof draft.name === 'string') document.getElementById('scheduleName').value = draft.name;
+        if (typeof draft.start === 'string') document.getElementById('startDate').value = draft.start;
+        if (typeof draft.end === 'string') document.getElementById('endDate').value = draft.end;
+        if (Array.isArray(draft.holidayGroups) || typeof draft.holidayGroups === 'object') holidayGroups = draft.holidayGroups || holidayGroups;
+        if (Array.isArray(draft.individualHolidays)) individualHolidays = [...draft.individualHolidays];
+        if (Array.isArray(draft.selectedHolidayGroups)) selectedHolidayGroups = [...draft.selectedHolidayGroups];
+        if (Array.isArray(draft.persons)) persons = [...draft.persons];
+        if (Array.isArray(draft.shifts)) shifts = [...draft.shifts];
+        if (Array.isArray(draft.attendanceGroups)) attendanceGroups = [...draft.attendanceGroups];
+        if (Array.isArray(draft.allPunchLocations)) allPunchLocations = [...draft.allPunchLocations];
+        if (Array.isArray(draft.branches)) branches = [...draft.branches];
+        if (Array.isArray(draft.departments)) departments = [...draft.departments];
+        if (typeof draft.selectedBranch === 'string') selectedBranch = draft.selectedBranch;
+        if (typeof draft.selectedDepartment === 'string') selectedDepartment = draft.selectedDepartment;
+        if (Array.isArray(draft.allPositions)) allPositions = [...draft.allPositions];
+        if (Array.isArray(draft.positions)) positions = [...draft.positions];
+        if (Array.isArray(draft.tags)) tags = [...draft.tags];
+        if (Array.isArray(draft.supervisors)) supervisors = [...draft.supervisors];
+      }
+    }
+  } catch (e) { console.warn('load draft failed', e); }
 
   const defaultConfig = {
     app_title: '新增班表設定',
@@ -372,10 +401,18 @@
           <div class="font-medium text-sm">${groupName}</div>
           <div class="text-xs text-slate-500">${dates.length} 個假日</div>
         </div>
-        <button onclick="editHolidayGroup('${groupName}')" class="text-blue-400 hover:text-blue-600 text-sm px-2">編輯</button>
+        <button onclick="openHolidayGroupPage('${groupName.replace(/'/g, "\\'")}')" class="text-blue-400 hover:text-blue-600 text-sm px-2">編輯</button>
         <button onclick="deleteHolidayGroup('${groupName}')" class="text-red-400 hover:text-red-600 text-sm">刪除</button>
       </div>`;
     }).join('');
+  }
+
+  function openHolidayGroupPage(groupName = '') {
+    syncGlobalData();
+    const params = new URLSearchParams();
+    params.set('source', 'new');
+    if (groupName) params.set('groupName', groupName);
+    window.location.href = `holiday-group.html?${params.toString()}`;
   }
 
   function toggleHolidayGroupSelection(name, checked) {
@@ -727,10 +764,18 @@
         <div class="text-xs text-slate-500">${g.members.length} 人</div>
         ${weekdayHtml}
       </div>
-      <button onclick="editAttendanceGroup(${i})" class="text-blue-400 hover:text-blue-600 text-sm px-2">編輯</button>
+      <button onclick="openShiftGroupPage(${i})" class="text-blue-400 hover:text-blue-600 text-sm px-2">編輯</button>
       <button onclick="attendanceGroups.splice(${i},1);renderAttendanceGroups()" class="text-red-400 hover:text-red-600 text-sm">刪除</button>
     </div>`;
     }).join('');
+  }
+
+  function openShiftGroupPage(groupIndex = -1) {
+    syncGlobalData();
+    const params = new URLSearchParams();
+    params.set('source', 'new');
+    if (groupIndex >= 0) params.set('groupIndex', String(groupIndex));
+    window.location.href = `shift-group.html?${params.toString()}`;
   }
 
   function showAddAttendanceGroup() {
@@ -1025,9 +1070,24 @@
     if (!end) { alert('請選擇結束日期'); return; }
     if (start > end) { alert('起始日期不能晚於結束日期'); return; }
     if (!branch) { alert('請選擇分公司/分店/案場'); return; }
-    schedules.push({ name, start, end });
+    schedules.push({
+      name,
+      start,
+      end,
+      branch,
+      department: selectedDepartment,
+      shifts: JSON.parse(JSON.stringify(shifts)),
+      attendanceGroups: JSON.parse(JSON.stringify(attendanceGroups)),
+      holidayGroups: JSON.parse(JSON.stringify(holidayGroups)),
+      selectedHolidayGroups: [...selectedHolidayGroups],
+      individualHolidays: [...individualHolidays],
+      supervisors: [...supervisors],
+      positions: [...positions],
+      tags: [...tags]
+    });
     currentScheduleIndex = schedules.length - 1;
     syncGlobalData();
+    localStorage.removeItem(NEW_SCHEDULE_DRAFT_KEY);
     window.location.href = 'index.html';
   }
   window.validateAndSave = validateAndSave;
@@ -1131,6 +1191,9 @@
   renderPositions();
   renderTags();
   renderBranchAndDepartment();
+  document.getElementById('scheduleName').value = document.getElementById('scheduleName').value || '';
+  document.getElementById('startDate').value = document.getElementById('startDate').value || '';
+  document.getElementById('endDate').value = document.getElementById('endDate').value || '';
   lucide.createIcons();
 
   function renderBranchAndDepartment() {
@@ -1161,12 +1224,33 @@
         departments,
         selectedBranch,
         selectedDepartment,
+        allPunchLocations,
         allPositions,
         positions,
         tags,
         schedules
       };
       localStorage.setItem('shiftMgmt:global', JSON.stringify(data));
+      localStorage.setItem(NEW_SCHEDULE_DRAFT_KEY, JSON.stringify({
+        name: document.getElementById('scheduleName').value.trim(),
+        start: document.getElementById('startDate').value,
+        end: document.getElementById('endDate').value,
+        holidayGroups,
+        selectedHolidayGroups,
+        individualHolidays,
+        persons,
+        supervisors,
+        shifts,
+        attendanceGroups,
+        branches,
+        departments,
+        selectedBranch,
+        selectedDepartment,
+        allPunchLocations,
+        allPositions,
+        positions,
+        tags
+      }));
     } catch (e) { console.warn('syncGlobalData failed', e); }
   }
   window.syncGlobalData = syncGlobalData;

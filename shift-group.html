@@ -125,7 +125,9 @@
     if (raw) G = Object.assign({}, FALLBACK, JSON.parse(raw));
   } catch(e) { console.warn('load global failed', e); }
 
+  const DRAFT_KEY = 'shiftMgmt:newScheduleDraft';
   const params = new URLSearchParams(location.search);
+  const source = params.get('source') || 'edit';
   let currentScheduleIndex = parseInt(params.get('index'), 10);
   if (Number.isNaN(currentScheduleIndex)) currentScheduleIndex = 0;
   const editingGroupIndex = parseInt(params.get('groupIndex'), 10);
@@ -133,11 +135,25 @@
   let schedules = Array.isArray(G.schedules) && G.schedules.length ? G.schedules : FALLBACK.schedules;
   if (currentScheduleIndex < 0 || currentScheduleIndex >= schedules.length) currentScheduleIndex = 0;
 
-  const sched = schedules[currentScheduleIndex] || FALLBACK.schedules[0];
+  let draft = null;
+  if (source === 'new') {
+    try {
+      const rawDraft = localStorage.getItem(DRAFT_KEY);
+      if (rawDraft) draft = JSON.parse(rawDraft);
+    } catch (e) { console.warn('load draft failed', e); }
+  }
+
+  const sched = source === 'new'
+    ? (draft || { shifts: G.shifts || FALLBACK.schedules[0].shifts, attendanceGroups: G.attendanceGroups || [] })
+    : (schedules[currentScheduleIndex] || FALLBACK.schedules[0]);
   let shifts = Array.isArray(sched.shifts) ? sched.shifts : FALLBACK.schedules[0].shifts;
   let attendanceGroups = Array.isArray(sched.attendanceGroups) ? sched.attendanceGroups : [];
   let persons = Array.isArray(G.persons) ? G.persons : FALLBACK.persons;
   let allPunchLocations = Array.isArray(G.allPunchLocations) ? G.allPunchLocations : FALLBACK.allPunchLocations;
+  if (source === 'new' && draft) {
+    if (Array.isArray(draft.persons)) persons = draft.persons;
+    if (Array.isArray(draft.allPunchLocations)) allPunchLocations = draft.allPunchLocations;
+  }
 
   function defaultWeekdayShifts() {
     const first = (shifts[0] && shifts[0].name) ? [shifts[0].name] : [];
@@ -341,13 +357,23 @@
   }
 
   function persistAndBack() {
-    sched.attendanceGroups = attendanceGroups;
-    if (typeof sched.selectedAttendanceGroupIndex !== 'number') {
-      sched.selectedAttendanceGroupIndex = attendanceGroups.length > 0 ? 0 : -1;
+    if (source === 'new') {
+      const nextDraft = Object.assign({}, draft || {}, {
+        shifts,
+        attendanceGroups,
+        persons,
+        allPunchLocations
+      });
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(nextDraft));
+    } else {
+      sched.attendanceGroups = attendanceGroups;
+      if (typeof sched.selectedAttendanceGroupIndex !== 'number') {
+        sched.selectedAttendanceGroupIndex = attendanceGroups.length > 0 ? 0 : -1;
+      }
+      schedules[currentScheduleIndex] = sched;
+      G.schedules = schedules;
+      localStorage.setItem('shiftMgmt:global', JSON.stringify(G));
     }
-    schedules[currentScheduleIndex] = sched;
-    G.schedules = schedules;
-    localStorage.setItem('shiftMgmt:global', JSON.stringify(G));
     goBack();
   }
 
@@ -390,7 +416,9 @@
   }
 
   function goBack() {
-    window.location.href = `shift-setting.html?index=${currentScheduleIndex}`;
+    window.location.href = source === 'new'
+      ? 'shift-setting-new.html'
+      : `shift-setting.html?index=${currentScheduleIndex}`;
   }
 
   initPage();
