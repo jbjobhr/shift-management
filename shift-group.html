@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="zh-TW" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>考勤組設定</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Noto Sans TC', sans-serif; }
+    html, body { height: 100%; width: 100%; }
+    .chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 9999px; font-size: 12px; }
+  </style>
+ </head>
+ <body class="h-full bg-slate-50 w-full">
+  <div class="h-full w-full flex flex-col overflow-auto">
+   <header class="bg-[#1e3a5f] text-white px-6 py-4 flex items-center justify-between shrink-0">
+    <h1 id="pageTitle" class="text-xl font-bold tracking-wide">新增考勤組</h1>
+    <div class="flex gap-2">
+      <button onclick="goBack()" class="px-4 py-1.5 rounded-md text-sm font-medium transition hover:bg-white/10">返回班表設定</button>
+    </div>
+   </header>
+
+   <main class="flex-1 overflow-auto p-6">
+    <div class="max-w-3xl mx-auto">
+      <section class="bg-white rounded-xl shadow-sm p-5 space-y-4">
+        <h2 class="font-bold text-lg text-slate-800 flex items-center gap-2"><i data-lucide="users" class="w-5 h-5 text-green-600"></i>考勤組資訊</h2>
+
+        <div>
+          <label class="block text-sm font-medium text-slate-600 mb-1">考勤組名稱</label>
+          <input type="text" id="groupName" placeholder="如：A組 - 倉儲" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm">
+        </div>
+
+        <div>
+          <div class="flex items-center gap-4 mb-1">
+            <label class="text-sm font-bold text-slate-700">排班型態</label>
+            <label class="flex items-center gap-1 text-sm cursor-pointer"><input type="radio" name="scheduleType" value="auto" checked onchange="updateScheduleTypeUI()">自動排班</label>
+            <label class="flex items-center gap-1 text-sm cursor-pointer"><input type="radio" name="scheduleType" value="manual" onchange="updateScheduleTypeUI()">手動排班</label>
+          </div>
+          <p class="text-xs text-slate-500 mb-2" id="scheduleTypeHint">自動排班適用於週間固定上班日之行業</p>
+          <div id="weekdayShiftsBlock" class="border border-slate-200 rounded-md overflow-hidden"></div>
+          <div id="weeklyHoursIndicator" class="mt-2 flex items-center justify-between text-xs px-3 py-2 rounded-md bg-slate-50 border border-slate-200">
+            <span class="text-slate-600">每週總工時（上限 40h）</span>
+            <span id="weeklyHoursValue" class="font-semibold">0 h</span>
+          </div>
+          <p class="text-xs text-slate-500 mt-1" id="weekdayShiftsFooter">請設定固定上班日之班別。</p>
+          <label id="workOnHolidayWrap" class="mt-2 flex items-start gap-2 text-sm cursor-pointer bg-orange-50 border border-orange-200 rounded-md px-3 py-2">
+            <input type="checkbox" id="workOnHoliday" class="mt-0.5" onchange="currentGroupWorkOnHoliday = this.checked">
+            <span>
+              <span class="font-medium text-orange-700">假日仍排班（視為加班）</span>
+              <span class="block text-xs text-slate-500">勾選後，同仍依週間設定排班，並以「假日加班」樣式顯示；未勾選則施行「假日優先」，假日不排班。</span>
+            </span>
+          </label>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-slate-600 mb-2">打卡地</label>
+          <div id="punchLocationOptions" class="flex flex-wrap gap-x-4 gap-y-1 border border-slate-200 rounded-md px-3 py-2 bg-slate-50"></div>
+          <p class="text-xs text-slate-500 mt-1">可複選適用於本考勤組的打卡地點。</p>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-slate-600 mb-2">搜尋人員</label>
+          <div class="flex gap-2 mb-2">
+            <input type="text" id="searchPersonInput" placeholder="員工編號或身份證" class="flex-1 border border-slate-300 rounded-md px-3 py-2 text-sm">
+            <button onclick="searchPersonForGroup()" class="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-md text-sm font-medium hover:bg-blue-100 transition">搜尋</button>
+          </div>
+          <div id="searchResultsList" class="border border-slate-200 rounded-md max-h-40 overflow-y-auto bg-slate-50"></div>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="block text-sm font-medium text-slate-600">已選人員</label>
+            <button type="button" onclick="syncAssigneeList()" class="px-2.5 py-1 text-xs font-medium text-red-600 border border-red-300 rounded-md hover:bg-red-50 transition flex items-center gap-1">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>同步派任名單
+            </button>
+          </div>
+          <div id="selectedPersonsInGroup" class="bg-slate-50 border border-slate-200 rounded-md p-2 min-h-[60px] space-y-1 max-h-40 overflow-y-auto"></div>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2">
+          <button onclick="goBack()" class="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-md">取消</button>
+          <button onclick="saveGroup()" class="px-4 py-2 text-sm bg-[#1e3a5f] text-white rounded-md hover:bg-[#2a4f7f]">儲存</button>
+        </div>
+      </section>
+    </div>
+   </main>
+  </div>
+
+  <script>
+  const WEEKDAYS = [
+    { key: 'mon', label: '每週一' },
+    { key: 'tue', label: '每週二' },
+    { key: 'wed', label: '每週三' },
+    { key: 'thu', label: '每週四' },
+    { key: 'fri', label: '每週五' },
+    { key: 'sat', label: '每週六' },
+    { key: 'sun', label: '每週日' }
+  ];
+  const MAX_WEEKLY_HOURS = 40;
+
+  const FALLBACK = {
+    persons: [
+      { name: '王小明', id: 'EMP001' },
+      { name: '李小華', id: 'EMP002' }
+    ],
+    allPunchLocations: ['總公司', '倉儲中心', '北區分部', '中區分部', '南區分部', '外勤'],
+    schedules: [
+      {
+        name: '2026年1月倉儲班表',
+        shifts: [
+          { name: '早班', shortName: '早', start: '08:00', end: '17:00', hours: 8, rest: 1, otStart: '', otEnd: '' },
+          { name: '午班', shortName: '午', start: '13:00', end: '17:00', hours: 4, rest: 0, otStart: '', otEnd: '' },
+          { name: '晚班', shortName: '晚', start: '18:00', end: '22:00', hours: 4, rest: 0, otStart: '22:00', otEnd: '23:00' }
+        ],
+        attendanceGroups: []
+      }
+    ]
+  };
+
+  let G = FALLBACK;
+  try {
+    const raw = localStorage.getItem('shiftMgmt:global');
+    if (raw) G = Object.assign({}, FALLBACK, JSON.parse(raw));
+  } catch(e) { console.warn('load global failed', e); }
+
+  const params = new URLSearchParams(location.search);
+  let currentScheduleIndex = parseInt(params.get('index'), 10);
+  if (Number.isNaN(currentScheduleIndex)) currentScheduleIndex = 0;
+  const editingGroupIndex = parseInt(params.get('groupIndex'), 10);
+
+  let schedules = Array.isArray(G.schedules) && G.schedules.length ? G.schedules : FALLBACK.schedules;
+  if (currentScheduleIndex < 0 || currentScheduleIndex >= schedules.length) currentScheduleIndex = 0;
+
+  const sched = schedules[currentScheduleIndex] || FALLBACK.schedules[0];
+  let shifts = Array.isArray(sched.shifts) ? sched.shifts : FALLBACK.schedules[0].shifts;
+  let attendanceGroups = Array.isArray(sched.attendanceGroups) ? sched.attendanceGroups : [];
+  let persons = Array.isArray(G.persons) ? G.persons : FALLBACK.persons;
+  let allPunchLocations = Array.isArray(G.allPunchLocations) ? G.allPunchLocations : FALLBACK.allPunchLocations;
+
+  function defaultWeekdayShifts() {
+    const first = (shifts[0] && shifts[0].name) ? [shifts[0].name] : [];
+    return { mon: [...first], tue: [...first], wed: [...first], thu: [...first], fri: [...first], sat: [], sun: [] };
+  }
+
+  let currentGroupScheduleType = 'auto';
+  let currentGroupWeekdayShifts = defaultWeekdayShifts();
+  let currentGroupWorkOnHoliday = false;
+  let currentGroupMembers = [];
+  let currentGroupPunchLocations = [];
+
+  function initPage() {
+    const isEdit = Number.isInteger(editingGroupIndex) && editingGroupIndex >= 0 && editingGroupIndex < attendanceGroups.length;
+    const pageTitle = document.getElementById('pageTitle');
+    pageTitle.textContent = isEdit ? '編輯考勤組' : '新增考勤組';
+
+    if (isEdit) {
+      const group = attendanceGroups[editingGroupIndex];
+      currentGroupMembers = Array.isArray(group.members) ? [...group.members] : [];
+      currentGroupScheduleType = group.scheduleType || 'auto';
+      currentGroupPunchLocations = Array.isArray(group.punchLocations) ? [...group.punchLocations] : [];
+      currentGroupWorkOnHoliday = !!group.workOnHoliday;
+      const base = defaultWeekdayShifts();
+      if (group.weekdayShifts) {
+        WEEKDAYS.forEach(w => {
+          const v = group.weekdayShifts[w.key];
+          if (Array.isArray(v)) base[w.key] = [...v];
+          else if (typeof v === 'string' && v) base[w.key] = [v];
+        });
+      }
+      currentGroupWeekdayShifts = base;
+      document.getElementById('groupName').value = group.name || '';
+      const radio = document.querySelector(`input[name="scheduleType"][value="${currentGroupScheduleType}"]`);
+      if (radio) radio.checked = true;
+      document.getElementById('workOnHoliday').checked = currentGroupWorkOnHoliday;
+    }
+
+    renderWeekdayShifts();
+    renderPunchLocationOptions();
+    renderSelectedPersonsInGroup();
+    updateScheduleTypeUI();
+    updateWeeklyHoursIndicator();
+    lucide.createIcons();
+  }
+
+  function renderPunchLocationOptions() {
+    const box = document.getElementById('punchLocationOptions');
+    if (!box) return;
+    if (!allPunchLocations.length) {
+      box.innerHTML = '<span class="text-sm text-slate-500">尚未設定打卡地。</span>';
+      return;
+    }
+    box.innerHTML = allPunchLocations.map(loc => `
+      <label class="flex items-center gap-1 text-sm cursor-pointer">
+        <input type="checkbox" value="${loc}" ${currentGroupPunchLocations.includes(loc) ? 'checked' : ''} onchange="togglePunchLocation('${loc}', this.checked)">
+        <span>${loc}</span>
+      </label>`).join('');
+  }
+
+  function togglePunchLocation(loc, checked) {
+    const idx = currentGroupPunchLocations.indexOf(loc);
+    if (checked && idx === -1) currentGroupPunchLocations.push(loc);
+    if (!checked && idx > -1) currentGroupPunchLocations.splice(idx, 1);
+  }
+
+  function searchPersonForGroup() {
+    const query = document.getElementById('searchPersonInput').value.toLowerCase().trim();
+    const resultsList = document.getElementById('searchResultsList');
+
+    if (!query) {
+      resultsList.innerHTML = '';
+      return;
+    }
+
+    const filtered = persons.filter(p =>
+      p.id.toLowerCase().includes(query) || p.name.toLowerCase().includes(query)
+    ).filter(p => !currentGroupMembers.includes(p.id));
+
+    if (filtered.length === 0) {
+      resultsList.innerHTML = '<div class="px-3 py-2 text-sm text-slate-500">未找到符合的人員</div>';
+      return;
+    }
+
+    resultsList.innerHTML = filtered.map(p => `
+      <div class="px-3 py-2 text-sm hover:bg-white cursor-pointer border-b border-slate-200 flex items-center justify-between" onclick="addPersonToGroup('${p.id}', '${p.name}')">
+        <span>${p.name} (${p.id})</span>
+        <span class="text-blue-500 font-medium">+ 添加</span>
+      </div>
+    `).join('');
+  }
+
+  function addPersonToGroup(empId) {
+    if (!currentGroupMembers.includes(empId)) {
+      currentGroupMembers.push(empId);
+      renderSelectedPersonsInGroup();
+      document.getElementById('searchPersonInput').value = '';
+      document.getElementById('searchResultsList').innerHTML = '';
+    }
+  }
+
+  function renderSelectedPersonsInGroup() {
+    const container = document.getElementById('selectedPersonsInGroup');
+    if (currentGroupMembers.length === 0) {
+      container.innerHTML = '<div class="text-sm text-slate-500 py-2">尚未添加人員</div>';
+      return;
+    }
+
+    container.innerHTML = currentGroupMembers.map((empId, idx) => {
+      const person = persons.find(p => p.id === empId);
+      return `<div class="flex items-center justify-between bg-white p-2 rounded border border-slate-200">
+        <a href="personal-shift.html?empId=${encodeURIComponent(empId)}" class="text-sm text-blue-600 hover:underline cursor-pointer">${person?.name || empId} (${empId})</a>
+        <button onclick="currentGroupMembers.splice(${idx}, 1); renderSelectedPersonsInGroup()" class="text-red-400 hover:text-red-600 text-xs">移除</button>
+      </div>`;
+    }).join('');
+  }
+
+  function updateScheduleTypeUI() {
+    const checked = document.querySelector('input[name="scheduleType"]:checked');
+    currentGroupScheduleType = checked ? checked.value : 'auto';
+    const block = document.getElementById('weekdayShiftsBlock');
+    const footer = document.getElementById('weekdayShiftsFooter');
+    const hint = document.getElementById('scheduleTypeHint');
+    const indicator = document.getElementById('weeklyHoursIndicator');
+    if (currentGroupScheduleType === 'auto') {
+      block.classList.remove('hidden');
+      footer.classList.remove('hidden');
+      if (indicator) indicator.classList.remove('hidden');
+      hint.textContent = '自動排班適用於週間固定上班日之行業';
+    } else {
+      block.classList.add('hidden');
+      footer.classList.add('hidden');
+      if (indicator) indicator.classList.add('hidden');
+      hint.textContent = '手動排班可於排班表中逐日指定班別';
+    }
+  }
+
+  function renderWeekdayShifts() {
+    const block = document.getElementById('weekdayShiftsBlock');
+    const options = shifts.map(s => s.name);
+    if (options.length === 0) {
+      block.innerHTML = '<div class="px-3 py-3 text-sm text-slate-500">尚未設定班別，請先回到「班別排班」新增。</div>';
+      return;
+    }
+    block.innerHTML = WEEKDAYS.map(w => {
+      const selected = currentGroupWeekdayShifts[w.key] || [];
+      const opts = options.map(o => `
+        <label class="flex items-center gap-1 text-sm cursor-pointer px-2 py-1 hover:bg-slate-50 rounded">
+          <input type="checkbox" value="${o}" ${selected.includes(o) ? 'checked' : ''} onchange="toggleWeekdayShift('${w.key}','${o}', this.checked)">
+          <span>${o}</span>
+        </label>`).join('');
+      return `<div class="flex items-stretch border-b border-slate-200 last:border-b-0">
+        <div class="px-3 py-2 bg-slate-50 text-sm text-slate-700 w-20 flex items-center justify-center border-r border-slate-200">${w.label}</div>
+        <div class="flex-1 px-2 py-1 flex flex-wrap gap-x-3 gap-y-1">${opts}</div>
+      </div>`;
+    }).join('');
+  }
+
+  function toggleWeekdayShift(dayKey, shiftName, checked) {
+    if (!currentGroupWeekdayShifts[dayKey]) currentGroupWeekdayShifts[dayKey] = [];
+    const arr = currentGroupWeekdayShifts[dayKey];
+    const idx = arr.indexOf(shiftName);
+    if (checked && idx === -1) arr.push(shiftName);
+    if (!checked && idx > -1) arr.splice(idx, 1);
+    updateWeeklyHoursIndicator();
+  }
+
+  function calcWeeklyHours(weekdayShifts) {
+    const shiftMap = {};
+    (shifts || []).forEach(s => { shiftMap[s.name] = Number(s.hours) || 0; });
+    let total = 0;
+    Object.values(weekdayShifts || {}).forEach(arr => {
+      if (!Array.isArray(arr)) return;
+      arr.forEach(n => { total += shiftMap[n] || 0; });
+    });
+    return total;
+  }
+
+  function updateWeeklyHoursIndicator() {
+    const el = document.getElementById('weeklyHoursValue');
+    const wrap = document.getElementById('weeklyHoursIndicator');
+    if (!el || !wrap) return;
+    const total = calcWeeklyHours(currentGroupWeekdayShifts);
+    el.textContent = `${total} h`;
+    wrap.classList.remove('bg-slate-50','border-slate-200','bg-red-50','border-red-200','bg-amber-50','border-amber-200');
+    el.classList.remove('text-slate-700','text-red-600','text-amber-600');
+    if (total > MAX_WEEKLY_HOURS) {
+      wrap.classList.add('bg-red-50','border-red-200');
+      el.classList.add('text-red-600');
+    } else if (total === MAX_WEEKLY_HOURS) {
+      wrap.classList.add('bg-amber-50','border-amber-200');
+      el.classList.add('text-amber-600');
+    } else {
+      wrap.classList.add('bg-slate-50','border-slate-200');
+      el.classList.add('text-slate-700');
+    }
+  }
+
+  function syncAssigneeList() {
+    alert('同步派任名單功能尚未實作');
+  }
+
+  function persistAndBack() {
+    sched.attendanceGroups = attendanceGroups;
+    if (typeof sched.selectedAttendanceGroupIndex !== 'number') {
+      sched.selectedAttendanceGroupIndex = attendanceGroups.length > 0 ? 0 : -1;
+    }
+    schedules[currentScheduleIndex] = sched;
+    G.schedules = schedules;
+    localStorage.setItem('shiftMgmt:global', JSON.stringify(G));
+    goBack();
+  }
+
+  function saveGroup() {
+    const groupName = document.getElementById('groupName').value.trim();
+    if (!groupName) {
+      alert('請輸入考勤組名稱');
+      return;
+    }
+    if (currentGroupMembers.length === 0) {
+      alert('請至少添加一位人員');
+      return;
+    }
+    if (currentGroupScheduleType === 'auto') {
+      const weekly = calcWeeklyHours(currentGroupWeekdayShifts);
+      if (weekly > MAX_WEEKLY_HOURS) {
+        alert(`每週總工時 ${weekly}h 已超過上限 ${MAX_WEEKLY_HOURS}h，請調整班別設定。`);
+        return;
+      }
+    }
+
+    const payload = {
+      name: groupName,
+      members: [...currentGroupMembers],
+      scheduleType: currentGroupScheduleType,
+      weekdayShifts: { ...currentGroupWeekdayShifts },
+      punchLocations: [...currentGroupPunchLocations],
+      workOnHoliday: !!currentGroupWorkOnHoliday
+    };
+
+    if (Number.isInteger(editingGroupIndex) && editingGroupIndex >= 0 && editingGroupIndex < attendanceGroups.length) {
+      attendanceGroups[editingGroupIndex] = payload;
+      sched.selectedAttendanceGroupIndex = editingGroupIndex;
+    } else {
+      attendanceGroups.push(payload);
+      sched.selectedAttendanceGroupIndex = attendanceGroups.length - 1;
+    }
+
+    persistAndBack();
+  }
+
+  function goBack() {
+    window.location.href = `shift-setting.html?index=${currentScheduleIndex}`;
+  }
+
+  initPage();
+  window.searchPersonForGroup = searchPersonForGroup;
+  window.addPersonToGroup = addPersonToGroup;
+  window.toggleWeekdayShift = toggleWeekdayShift;
+  window.togglePunchLocation = togglePunchLocation;
+  window.updateScheduleTypeUI = updateScheduleTypeUI;
+  window.syncAssigneeList = syncAssigneeList;
+  window.saveGroup = saveGroup;
+  window.goBack = goBack;
+  </script>
+ </body>
+</html>
