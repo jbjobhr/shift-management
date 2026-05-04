@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="zh-TW" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>假別組設定</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Noto Sans TC', sans-serif; }
+    html, body { height: 100%; width: 100%; }
+    .tag-item { display: inline-flex; align-items: center; gap: 6px; background: #fee2e2; color: #b91c1c; padding: 4px 10px; border-radius: 4px; font-size: 13px; margin: 3px; }
+  </style>
+ </head>
+ <body class="h-full bg-slate-50 w-full">
+  <div class="h-full w-full flex flex-col overflow-auto">
+   <header class="bg-[#1e3a5f] text-white px-6 py-4 flex items-center justify-between shrink-0">
+    <h1 id="pageTitle" class="text-xl font-bold tracking-wide">新增假別組</h1>
+    <button onclick="goBack()" class="px-4 py-1.5 rounded-md text-sm font-medium transition hover:bg-white/10">返回班表設定</button>
+   </header>
+
+   <main class="flex-1 overflow-auto p-6">
+    <div class="max-w-3xl mx-auto">
+      <section class="bg-white rounded-xl shadow-sm p-5 space-y-4">
+        <h2 class="font-bold text-lg text-slate-800 flex items-center gap-2"><i data-lucide="calendar-off" class="w-5 h-5 text-red-500"></i>假別組資訊</h2>
+
+        <div>
+          <label class="block text-sm font-medium text-slate-600 mb-1">假別組名稱</label>
+          <input type="text" id="holidayGroupName" placeholder="如：台灣國定假日" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm">
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-slate-600 mb-2">假日日期</label>
+          <div class="flex gap-2 mb-2">
+            <input type="date" id="addHolidayDateInput" class="flex-1 border border-slate-300 rounded-md px-3 py-2 text-sm">
+            <button onclick="addHolidayDate()" class="px-3 py-1.5 bg-red-50 text-red-600 rounded-md text-sm font-medium hover:bg-red-100 transition">新增</button>
+          </div>
+          <div id="holidayDateList" class="flex flex-wrap gap-1 bg-slate-50 border border-slate-200 rounded-md p-2 min-h-[44px]"></div>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2">
+          <button onclick="goBack()" class="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-md">取消</button>
+          <button onclick="saveHolidayGroup()" class="px-4 py-2 text-sm bg-[#1e3a5f] text-white rounded-md hover:bg-[#2a4f7f]">儲存</button>
+        </div>
+      </section>
+    </div>
+   </main>
+  </div>
+
+  <script>
+  const FALLBACK = {
+    schedules: [
+      {
+        holidayGroups: {
+          '台灣國定假日': ['2026-01-01']
+        },
+        selectedHolidayGroups: ['台灣國定假日']
+      }
+    ]
+  };
+
+  let G = FALLBACK;
+  try {
+    const raw = localStorage.getItem('shiftMgmt:global');
+    if (raw) G = Object.assign({}, FALLBACK, JSON.parse(raw));
+  } catch (e) { console.warn('load global failed', e); }
+
+  const params = new URLSearchParams(location.search);
+  let currentScheduleIndex = parseInt(params.get('index'), 10);
+  if (Number.isNaN(currentScheduleIndex)) currentScheduleIndex = 0;
+  const editingGroupName = params.get('groupName') || '';
+
+  let schedules = Array.isArray(G.schedules) && G.schedules.length ? G.schedules : FALLBACK.schedules;
+  if (currentScheduleIndex < 0 || currentScheduleIndex >= schedules.length) currentScheduleIndex = 0;
+
+  const sched = schedules[currentScheduleIndex] || FALLBACK.schedules[0];
+  let holidayGroups = (sched.holidayGroups && typeof sched.holidayGroups === 'object') ? { ...sched.holidayGroups } : {};
+  let selectedHolidayGroups = Array.isArray(sched.selectedHolidayGroups) ? [...sched.selectedHolidayGroups] : [];
+  let editingHolidayDates = [];
+
+  function initPage() {
+    const isEdit = !!editingGroupName && !!holidayGroups[editingGroupName];
+    document.getElementById('pageTitle').textContent = isEdit ? '編輯假別組' : '新增假別組';
+
+    if (isEdit) {
+      document.getElementById('holidayGroupName').value = editingGroupName;
+      editingHolidayDates = Array.isArray(holidayGroups[editingGroupName]) ? [...holidayGroups[editingGroupName]] : [];
+      editingHolidayDates.sort();
+    }
+
+    renderHolidayDateList();
+    lucide.createIcons();
+  }
+
+  function addHolidayDate() {
+    const date = document.getElementById('addHolidayDateInput').value;
+    if (!date) return;
+    if (!editingHolidayDates.includes(date)) {
+      editingHolidayDates.push(date);
+      editingHolidayDates.sort();
+      renderHolidayDateList();
+    }
+    document.getElementById('addHolidayDateInput').value = '';
+  }
+
+  function removeHolidayDate(index) {
+    if (index < 0 || index >= editingHolidayDates.length) return;
+    editingHolidayDates.splice(index, 1);
+    renderHolidayDateList();
+  }
+
+  function renderHolidayDateList() {
+    const container = document.getElementById('holidayDateList');
+    if (!editingHolidayDates.length) {
+      container.innerHTML = '<div class="text-sm text-slate-500 py-1">尚未新增假日日期</div>';
+      return;
+    }
+    container.innerHTML = editingHolidayDates.map((date, idx) =>
+      `<span class="tag-item">${date}<button onclick="removeHolidayDate(${idx})" class="ml-1 text-red-400 hover:text-red-600">×</button></span>`
+    ).join('');
+  }
+
+  function saveHolidayGroup() {
+    const groupName = document.getElementById('holidayGroupName').value.trim();
+    if (!groupName) {
+      alert('請輸入假別組名稱');
+      return;
+    }
+    if (editingHolidayDates.length === 0) {
+      alert('請至少新增一個假日日期');
+      return;
+    }
+
+    const oldName = editingGroupName;
+    const isRename = !!oldName && oldName !== groupName && !!holidayGroups[oldName];
+
+    if (isRename) {
+      delete holidayGroups[oldName];
+      const selectedIdx = selectedHolidayGroups.indexOf(oldName);
+      if (selectedIdx > -1) selectedHolidayGroups[selectedIdx] = groupName;
+    }
+
+    holidayGroups[groupName] = [...editingHolidayDates];
+    sched.holidayGroups = holidayGroups;
+    sched.selectedHolidayGroups = selectedHolidayGroups;
+
+    schedules[currentScheduleIndex] = sched;
+    G.schedules = schedules;
+    localStorage.setItem('shiftMgmt:global', JSON.stringify(G));
+    goBack();
+  }
+
+  function goBack() {
+    window.location.href = `shift-setting.html?index=${currentScheduleIndex}`;
+  }
+
+  window.addHolidayDate = addHolidayDate;
+  window.removeHolidayDate = removeHolidayDate;
+  window.saveHolidayGroup = saveHolidayGroup;
+  window.goBack = goBack;
+  initPage();
+  </script>
+ </body>
+</html>

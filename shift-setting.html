@@ -69,7 +69,7 @@
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
        <div>
         <label class="block text-sm font-medium text-slate-600 mb-2">假別組管理</label>
-        <div id="holidayGroupList" class="space-y-2"></div><button onclick="showAddHolidayGroup()" class="mt-3 px-3 py-1.5 bg-red-50 text-red-600 rounded-md text-sm font-medium hover:bg-red-100 transition flex items-center gap-1"><i data-lucide="plus" class="w-4 h-4"></i>新增假別組</button>
+        <div id="holidayGroupList" class="space-y-2"></div><button onclick="openHolidayGroupPage()" class="mt-3 px-3 py-1.5 bg-red-50 text-red-600 rounded-md text-sm font-medium hover:bg-red-100 transition flex items-center gap-1"><i data-lucide="plus" class="w-4 h-4"></i>新增假別組</button>
        </div>
        <div>
         <label class="block text-sm font-medium text-slate-600 mb-2">彈性假期</label>
@@ -519,10 +519,18 @@
           <div class="font-medium text-sm">${groupName}</div>
           <div class="text-xs text-slate-500">${dates.length} 個假日</div>
         </div>
-        <button onclick="editHolidayGroup('${groupName}')" class="text-blue-400 hover:text-blue-600 text-sm px-2">編輯</button>
+        <button onclick="openHolidayGroupPage('${groupName.replace(/'/g, "\\'")}')" class="text-blue-400 hover:text-blue-600 text-sm px-2">編輯</button>
         <button onclick="deleteHolidayGroup('${groupName}')" class="text-red-400 hover:text-red-600 text-sm">刪除</button>
       </div>`;
     }).join('');
+  }
+
+  function openHolidayGroupPage(groupName = '') {
+    syncGlobalData();
+    const params = new URLSearchParams();
+    params.set('index', String(currentScheduleIndex));
+    if (groupName) params.set('groupName', groupName);
+    window.location.href = `holiday-group.html?${params.toString()}`;
   }
 
   function toggleHolidayGroupSelection(name, checked) {
