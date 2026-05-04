@@ -42,7 +42,7 @@
       <h2 class="font-bold text-lg text-slate-800 flex items-center gap-2"><i data-lucide="clipboard-list" class="w-5 h-5 text-blue-600"></i>基本資訊</h2>
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
        <div>
-        <label class="block text-sm font-medium text-slate-600 mb-1">班表名稱 <span class="text-red-500">*</span></label> <input type="text" id="scheduleName" value="2026年1月排班" class="w-full">
+        <label class="block text-sm font-medium text-slate-600 mb-1">班表名稱 <span class="text-red-500">*</span></label> <input type="text" id="scheduleName" value="2026年1月倉儲班表" class="w-full">
        </div>
        <div>
         <label class="block text-sm font-medium text-slate-600 mb-1">起始日期 <span class="text-red-500">*</span></label> <input type="date" id="startDate" value="2026-01-01" class="w-full">
@@ -159,7 +159,7 @@
   <div id="newScheduleModal" class="modal-overlay hidden">
    <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-md space-y-4">
     <h3 class="font-bold text-lg">複製班表</h3>
-    <div><label class="block text-sm font-medium text-slate-600 mb-1">班表名稱</label><input type="text" id="newScheduleName" placeholder="如：2026年2月排班" class="w-full">
+    <div><label class="block text-sm font-medium text-slate-600 mb-1">班表名稱</label><input type="text" id="newScheduleName" placeholder="如：2026年2月物流班表" class="w-full">
     </div>
     <div><label class="block text-sm font-medium text-slate-600 mb-1">分公司/分店/案場 <span class="text-red-500">*</span></label><select id="newScheduleBranch" class="w-full"></select>
     </div>
@@ -290,7 +290,7 @@
   const _SCHED_FALLBACK = [
     {
       // 班表 0 — 2026年1月：預設選 A組，預設勾選台灣國定假日
-      name: '2026年1月排班', start: '2026-01-01', end: '2026-01-31', branch: '總公司',
+      name: '2026年1月倉儲班表', start: '2026-01-01', end: '2026-01-31', branch: '總公司',
       selectedAttendanceGroupIndex: 0,
       selectedHolidayGroups: ['台灣國定假日'],
       shifts: JSON.parse(JSON.stringify(_ALL_SHIFTS)),
@@ -303,7 +303,7 @@
     },
     {
       // 班表 1 — 2026年2月：預設選 B組，預設勾選一例一休
-      name: '2026年2月排班', start: '2026-02-01', end: '2026-02-28', branch: '北區分店',
+      name: '2026年2月物流班表', start: '2026-02-01', end: '2026-02-28', branch: '北區分店',
       selectedAttendanceGroupIndex: 1,
       selectedHolidayGroups: ['一例一休'],
       shifts: JSON.parse(JSON.stringify(_ALL_SHIFTS)),
@@ -316,7 +316,7 @@
     },
     {
       // 班表 2 — 2026年3月：預設選 C組，預設勾選台灣國定假日+一例一休
-      name: '2026年3月排班', start: '2026-03-01', end: '2026-03-31', branch: '中區分店',
+      name: '2026年3月客服班表', start: '2026-03-01', end: '2026-03-31', branch: '中區分店',
       selectedAttendanceGroupIndex: 2,
       selectedHolidayGroups: ['台灣國定假日', '一例一休'],
       shifts: JSON.parse(JSON.stringify(_ALL_SHIFTS)),
