@@ -365,13 +365,24 @@
     if (viewOverride) return viewOverride;
     return schedules[currentScheduleIndex] || { name: '', start: '2026-01-01', end: '2026-01-31' };
   }
+  function _buildOverrideName(year, month /* 0-based */) {
+    const normalized = new Date(year, month, 1);
+    const normalizedYear = normalized.getFullYear();
+    const normalizedMonth = normalized.getMonth() + 1;
+    const selectedName = (schedules[currentScheduleIndex] && schedules[currentScheduleIndex].name) || '';
+    const fallbackName = getCurrentRange().name || '';
+    const sourceName = selectedName || fallbackName;
+    const m = sourceName.match(/^\s*\d{4}年\d{1,2}月(.*)$/);
+    const suffix = m ? (m[1] || '') : sourceName;
+    return `${normalizedYear}年${normalizedMonth}月${suffix || '排班'}`;
+  }
   function setMonthOverride(year, month /* 0-based */) {
     const start = new Date(year, month, 1);
     const end = new Date(year, month + 1, 0);
     viewOverride = {
       start: _fmtDate(start),
       end: _fmtDate(end),
-      name: `${year}年${month + 1}月排班`
+      name: _buildOverrideName(year, month)
     };
   }
   function schedulePrevMonth() {
