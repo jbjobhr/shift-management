@@ -263,6 +263,13 @@
       weekdayShifts: { mon:['早班'], tue:['午班','晚班'], wed:['早班'], thu:['午班','晚班'], fri:['早班'], sat:[], sun:[] } }
   ];
 
+  // 全部班表共用的班別清單
+  const _ALL_SHIFTS = [
+    { name: '早班', shortName: '早', start: '08:00', end: '17:00', hours: 8, rest: 1, otStart: '', otEnd: '' },
+    { name: '午班', shortName: '午', start: '13:00', end: '17:00', hours: 4, rest: 0, otStart: '', otEnd: '' },
+    { name: '晚班', shortName: '晚', start: '18:00', end: '22:00', hours: 4, rest: 0, otStart: '22:00', otEnd: '23:00' }
+  ];
+
   // 全部班表共用的假別組清單
   const _ALL_HOLIDAY_GROUPS = {
     '台灣國定假日': [
@@ -286,10 +293,7 @@
       name: '2026年1月排班', start: '2026-01-01', end: '2026-01-31', branch: '總公司',
       selectedAttendanceGroupIndex: 0,
       selectedHolidayGroups: ['台灣國定假日'],
-      shifts: [
-        { name: '早班', shortName: '早', start: '08:00', end: '17:00', hours: 8, rest: 1, otStart: '', otEnd: '' },
-        { name: '午班', shortName: '午', start: '13:00', end: '17:00', hours: 4, rest: 0, otStart: '', otEnd: '' }
-      ],
+      shifts: JSON.parse(JSON.stringify(_ALL_SHIFTS)),
       attendanceGroups: JSON.parse(JSON.stringify(_ALL_ATTENDANCE_GROUPS)),
       holidayGroups: JSON.parse(JSON.stringify(_ALL_HOLIDAY_GROUPS)),
       individualHolidays: ['2026-01-20'],
@@ -302,10 +306,7 @@
       name: '2026年2月排班', start: '2026-02-01', end: '2026-02-28', branch: '北區分店',
       selectedAttendanceGroupIndex: 1,
       selectedHolidayGroups: ['一例一休'],
-      shifts: [
-        { name: '早班', shortName: '早', start: '08:00', end: '17:00', hours: 8, rest: 1, otStart: '', otEnd: '' },
-        { name: '晚班', shortName: '晚', start: '18:00', end: '22:00', hours: 4, rest: 0, otStart: '22:00', otEnd: '23:00' }
-      ],
+      shifts: JSON.parse(JSON.stringify(_ALL_SHIFTS)),
       attendanceGroups: JSON.parse(JSON.stringify(_ALL_ATTENDANCE_GROUPS)),
       holidayGroups: JSON.parse(JSON.stringify(_ALL_HOLIDAY_GROUPS)),
       individualHolidays: ['2026-02-20'],
@@ -318,11 +319,7 @@
       name: '2026年3月排班', start: '2026-03-01', end: '2026-03-31', branch: '中區分店',
       selectedAttendanceGroupIndex: 2,
       selectedHolidayGroups: ['台灣國定假日', '一例一休'],
-      shifts: [
-        { name: '早班', shortName: '早', start: '08:00', end: '17:00', hours: 8, rest: 1, otStart: '', otEnd: '' },
-        { name: '午班', shortName: '午', start: '13:00', end: '17:00', hours: 4, rest: 0, otStart: '', otEnd: '' },
-        { name: '晚班', shortName: '晚', start: '18:00', end: '22:00', hours: 4, rest: 0, otStart: '22:00', otEnd: '23:00' }
-      ],
+      shifts: JSON.parse(JSON.stringify(_ALL_SHIFTS)),
       attendanceGroups: JSON.parse(JSON.stringify(_ALL_ATTENDANCE_GROUPS)),
       holidayGroups: JSON.parse(JSON.stringify(_ALL_HOLIDAY_GROUPS)),
       individualHolidays: [],
@@ -363,7 +360,7 @@
   }
   // ── 對所有班表補齊 per-schedule 預設欄位（舊資料遷移）──────────────
   // 版本號升高時強制重置各班表至各自的 FALLBACK（保留 name/start/end/branch）
-  const _SCHED_CONFIG_VERSION = 4;
+  const _SCHED_CONFIG_VERSION = 5;
   schedules.forEach((s, i) => {
     const fb = _SCHED_FALLBACK[i] || _SCHED_FALLBACK[0];
     if ((s._schedConfigVersion || 0) >= _SCHED_CONFIG_VERSION) return; // 已是最新，不重置
