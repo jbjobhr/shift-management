@@ -476,10 +476,11 @@
   // ── 取得目前班表物件 ────────────────────────────────────────────────
   function _sfb(idx) { return _SCHED_FALLBACK[idx] || _SCHED_FALLBACK[0]; }
   const _cs = schedules[currentScheduleIndex] || _sfb(currentScheduleIndex);
+  const _hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj || {}, key);
 
   // ── Per-schedule 變數（每個班表各自獨立） ─────────────────────────────
-  let holidayGroups     = (_cs.holidayGroups && Object.keys(_cs.holidayGroups).length)
-                            ? JSON.parse(JSON.stringify(_cs.holidayGroups))
+  let holidayGroups     = _hasOwn(_cs, 'holidayGroups')
+                            ? JSON.parse(JSON.stringify(_cs.holidayGroups || {}))
                             : JSON.parse(JSON.stringify(_sfb(currentScheduleIndex).holidayGroups));
   let individualHolidays = Array.isArray(_cs.individualHolidays)
                             ? [..._cs.individualHolidays]
@@ -498,8 +499,8 @@
   let persons           = Array.isArray(G.persons)   ? G.persons   : _GLOBAL_FALLBACK.persons;
 
   // UI 狀態
-  let selectedHolidayGroups = Array.isArray(_cs.selectedHolidayGroups) && _cs.selectedHolidayGroups.length
-    ? [..._cs.selectedHolidayGroups]
+  let selectedHolidayGroups = _hasOwn(_cs, 'selectedHolidayGroups')
+    ? (Array.isArray(_cs.selectedHolidayGroups) ? [..._cs.selectedHolidayGroups] : [])
     : (_sfb(currentScheduleIndex).selectedHolidayGroups
         ? [..._sfb(currentScheduleIndex).selectedHolidayGroups]
         : Object.keys(holidayGroups).slice(0, 1));

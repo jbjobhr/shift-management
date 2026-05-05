@@ -189,9 +189,10 @@
   buildGlobalTemplates();
 
   function getDefaultAllowed() {
+    const fallbackHolidayNames = Object.keys(globalHolidayGroupTemplates || {});
     return {
       shiftNames: (Array.isArray(schedule.shifts) ? schedule.shifts : []).map(s => s.name).filter(Boolean),
-      holidayGroupNames: Object.keys(schedule.holidayGroups || {}),
+      holidayGroupNames: Object.keys(schedule.holidayGroups || {}).length ? Object.keys(schedule.holidayGroups || {}) : fallbackHolidayNames,
       attendanceGroupNames: (Array.isArray(schedule.attendanceGroups) ? schedule.attendanceGroups : []).map(g => g.name).filter(Boolean)
     };
   }
@@ -312,10 +313,27 @@
 
   function saveAndBack() {
     const sched = schedules[currentScheduleIndex] || {};
+    const selectedShiftNames = [...allowedPickerState.shifts.selected];
+    const selectedHolidayNames = [...allowedPickerState.holidayGroups.selected];
+    const selectedAttendanceNames = [...allowedPickerState.attendanceGroups.selected];
+
+    sched.shifts = selectedShiftNames.map(name => cloneDeep(globalShiftTemplates[name])).filter(Boolean);
+    sched.holidayGroups = selectedHolidayNames.reduce((acc, name) => {
+      if (globalHolidayGroupTemplates[name]) acc[name] = cloneDeep(globalHolidayGroupTemplates[name]);
+      return acc;
+    }, {});
+    sched.attendanceGroups = selectedAttendanceNames.map(name => cloneDeep(globalAttendanceGroupTemplates[name])).filter(Boolean);
+
+    const prevSelectedHolidayGroups = Array.isArray(sched.selectedHolidayGroups) ? sched.selectedHolidayGroups : [];
+    sched.selectedHolidayGroups = prevSelectedHolidayGroups.filter(name => selectedHolidayNames.includes(name));
+    if (!sched.selectedHolidayGroups.length && selectedHolidayNames.length) {
+      sched.selectedHolidayGroups = [selectedHolidayNames[0]];
+    }
+
     sched.allowedScopeCustomized = true;
-    sched.allowedShiftNames = [...allowedPickerState.shifts.selected];
-    sched.allowedHolidayGroupNames = [...allowedPickerState.holidayGroups.selected];
-    sched.allowedAttendanceGroupNames = [...allowedPickerState.attendanceGroups.selected];
+    sched.allowedShiftNames = selectedShiftNames;
+    sched.allowedHolidayGroupNames = selectedHolidayNames;
+    sched.allowedAttendanceGroupNames = selectedAttendanceNames;
     schedules[currentScheduleIndex] = sched;
     G.schedules = schedules;
     localStorage.setItem('shiftMgmt:global', JSON.stringify(G));
