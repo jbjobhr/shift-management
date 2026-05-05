@@ -334,6 +334,14 @@ docker compose up -d           # 啟動 sqlserver (port 1433)
 連線字串範例：
 `Server=localhost,1433;Database=ShiftManagement;User Id=sa;Password=Shift@Pass2026;TrustServerCertificate=True;`
 
+### 目前狀態（2026-05-05）
+
+1. MSSQL 容器可正常啟動，`db/init.sh` 可完整執行成功。
+2. `schema.sql`、`seed.sql`、`procedures.sql` 已驗證可落地。
+3. `dbo.usp_SyncGlobal`、`dbo.usp_SyncPersonal` 已建立且最小 payload 測試成功。
+4. 前端頁面目前仍以 `localStorage` 為主要資料來源，尚未全面改為直接呼叫後端 API。
+5. 結論：資料庫與同步程序已可用；若要完全脫離 `localStorage`，仍需把前端讀寫流程改接 API。
+
 ### 對應關係
 
 | 前端 (localStorage) | 資料表 |
