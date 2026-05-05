@@ -18,6 +18,9 @@
     .calendar-cell.holiday { background: #fef2f2; color: #dc2626; }
     .calendar-cell.assigned { background: #dbeafe; color: #1e40af; font-weight: 500; }
     .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 50; }
+    .picker-row { padding: 6px 8px; border-bottom: 1px solid #e2e8f0; cursor: pointer; font-size: 14px; }
+    .picker-row:hover { background: #f8fafc; }
+    .picker-row.active { background: #dbeafe; color: #1e40af; }
     .tag-item { display: inline-flex; align-items: center; gap: 6px; background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 4px; font-size: 13px; margin: 3px; }
     input[type="date"], input[type="time"], input[type="text"], select { border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 10px; font-size: 14px; }
     input:focus, select:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.1); }
@@ -57,6 +60,10 @@
       <div>
        <label class="block text-sm font-medium text-slate-600 mb-1">部門/工作地 <span class="text-red-500">*</span></label>
        <select id="departmentSelect" class="w-full"></select>
+      </div>
+      <div>
+       <label class="block text-sm font-medium text-slate-600 mb-1">選取此班表會用到的 班別/假別組/考勤組</label>
+        <button type="button" onclick="openAllowedPicker()" class="w-full text-left px-3 py-2 border border-slate-300 rounded-md bg-white hover:bg-slate-50 text-slate-700">請選擇</button>
       </div>
       </div>
      </section>
@@ -229,6 +236,95 @@
     </div>
     <div class="flex justify-end gap-2 pt-2">
      <button onclick="closeHolidayGroupModal()" class="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-md">取消</button> <button onclick="confirmAddHolidayGroup()" class="px-4 py-2 text-sm bg-[#1e3a5f] text-white rounded-md hover:bg-[#2a4f7f]">確認</button>
+    </div>
+   </div>
+  </div>
+  <div id="allowedPickerModal" class="modal-overlay hidden">
+   <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-6xl space-y-4 max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between">
+      <h3 id="allowedPickerTitle" class="font-bold text-lg">選擇此班表會用到的項目</h3>
+      <button onclick="closeAllowedPicker()" class="text-slate-500 hover:text-slate-700 text-xl leading-none">×</button>
+    </div>
+    <div class="space-y-5">
+      <section class="border border-slate-200 rounded-xl p-4 space-y-3">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <h4 class="font-semibold text-slate-800">班別</h4>
+            <p class="text-xs text-slate-500">設定此班表允許使用的班別。</p>
+          </div>
+          <button type="button" onclick="selectAllAllowedAvailable('shifts')" class="px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm">全部加入</button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-4 items-start">
+          <div>
+            <input id="allowedPickerAvailableSearch-shifts" type="text" placeholder="搜尋" class="w-full mb-2" oninput="renderAllowedPickerSection('shifts')">
+            <div id="allowedPickerAvailableList-shifts" class="border border-slate-200 rounded-md bg-white max-h-56 overflow-y-auto"></div>
+            <div class="text-center text-sm text-slate-600 mt-1">可選擇的項目</div>
+          </div>
+          <div class="flex md:flex-col gap-2 justify-center items-center pt-8">
+            <button type="button" onclick="moveAllowedToSelected('shifts')" class="px-2 py-1 border rounded-md bg-white">→</button>
+            <button type="button" onclick="moveAllowedToAvailable('shifts')" class="px-2 py-1 border rounded-md bg-white">←</button>
+          </div>
+          <div>
+            <input id="allowedPickerSelectedSearch-shifts" type="text" placeholder="搜尋" class="w-full mb-2" oninput="renderAllowedPickerSection('shifts')">
+            <div id="allowedPickerSelectedList-shifts" class="border border-slate-200 rounded-md bg-white max-h-56 overflow-y-auto"></div>
+            <div class="text-center text-sm text-slate-600 mt-1">已選擇的項目</div>
+          </div>
+        </div>
+      </section>
+      <section class="border border-slate-200 rounded-xl p-4 space-y-3">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <h4 class="font-semibold text-slate-800">假別組</h4>
+            <p class="text-xs text-slate-500">設定此班表允許使用的假別組。</p>
+          </div>
+          <button type="button" onclick="selectAllAllowedAvailable('holidayGroups')" class="px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm">全部加入</button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-4 items-start">
+          <div>
+            <input id="allowedPickerAvailableSearch-holidayGroups" type="text" placeholder="搜尋" class="w-full mb-2" oninput="renderAllowedPickerSection('holidayGroups')">
+            <div id="allowedPickerAvailableList-holidayGroups" class="border border-slate-200 rounded-md bg-white max-h-56 overflow-y-auto"></div>
+            <div class="text-center text-sm text-slate-600 mt-1">可選擇的項目</div>
+          </div>
+          <div class="flex md:flex-col gap-2 justify-center items-center pt-8">
+            <button type="button" onclick="moveAllowedToSelected('holidayGroups')" class="px-2 py-1 border rounded-md bg-white">→</button>
+            <button type="button" onclick="moveAllowedToAvailable('holidayGroups')" class="px-2 py-1 border rounded-md bg-white">←</button>
+          </div>
+          <div>
+            <input id="allowedPickerSelectedSearch-holidayGroups" type="text" placeholder="搜尋" class="w-full mb-2" oninput="renderAllowedPickerSection('holidayGroups')">
+            <div id="allowedPickerSelectedList-holidayGroups" class="border border-slate-200 rounded-md bg-white max-h-56 overflow-y-auto"></div>
+            <div class="text-center text-sm text-slate-600 mt-1">已選擇的項目</div>
+          </div>
+        </div>
+      </section>
+      <section class="border border-slate-200 rounded-xl p-4 space-y-3">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <h4 class="font-semibold text-slate-800">考勤組</h4>
+            <p class="text-xs text-slate-500">設定此班表允許使用的考勤組。</p>
+          </div>
+          <button type="button" onclick="selectAllAllowedAvailable('attendanceGroups')" class="px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm">全部加入</button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-4 items-start">
+          <div>
+            <input id="allowedPickerAvailableSearch-attendanceGroups" type="text" placeholder="搜尋" class="w-full mb-2" oninput="renderAllowedPickerSection('attendanceGroups')">
+            <div id="allowedPickerAvailableList-attendanceGroups" class="border border-slate-200 rounded-md bg-white max-h-56 overflow-y-auto"></div>
+            <div class="text-center text-sm text-slate-600 mt-1">可選擇的項目</div>
+          </div>
+          <div class="flex md:flex-col gap-2 justify-center items-center pt-8">
+            <button type="button" onclick="moveAllowedToSelected('attendanceGroups')" class="px-2 py-1 border rounded-md bg-white">→</button>
+            <button type="button" onclick="moveAllowedToAvailable('attendanceGroups')" class="px-2 py-1 border rounded-md bg-white">←</button>
+          </div>
+          <div>
+            <input id="allowedPickerSelectedSearch-attendanceGroups" type="text" placeholder="搜尋" class="w-full mb-2" oninput="renderAllowedPickerSection('attendanceGroups')">
+            <div id="allowedPickerSelectedList-attendanceGroups" class="border border-slate-200 rounded-md bg-white max-h-56 overflow-y-auto"></div>
+            <div class="text-center text-sm text-slate-600 mt-1">已選擇的項目</div>
+          </div>
+        </div>
+      </section>
+    </div>
+    <div class="flex justify-end gap-2 pt-2">
+      <button onclick="closeAllowedPicker()" class="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-md">取消</button>
+      <button onclick="confirmAllowedPicker()" class="px-4 py-2 text-sm bg-[#1e3a5f] text-white rounded-md hover:bg-[#2a4f7f]">確定</button>
     </div>
    </div>
   </div>
@@ -440,6 +536,19 @@
                     ? [..._cs.positions] : [..._sfb(currentScheduleIndex).positions];
   let tags = Array.isArray(_cs.tags) && _cs.tags.length
                ? [..._cs.tags] : [..._sfb(currentScheduleIndex).tags];
+  let allowedScopeCustomized = !!_cs.allowedScopeCustomized;
+  let allowedShiftNames = Array.isArray(_cs.allowedShiftNames) ? [..._cs.allowedShiftNames] : [];
+  let allowedHolidayGroupNames = Array.isArray(_cs.allowedHolidayGroupNames) ? [..._cs.allowedHolidayGroupNames] : [];
+  let allowedAttendanceGroupNames = Array.isArray(_cs.allowedAttendanceGroupNames) ? [..._cs.allowedAttendanceGroupNames] : [];
+  let globalShiftTemplates = {};
+  let globalHolidayGroupTemplates = {};
+  let globalAttendanceGroupTemplates = {};
+  const ALLOWED_PICKER_TYPES = ['shifts', 'holidayGroups', 'attendanceGroups'];
+  const allowedPickerState = {
+    shifts: { available: [], selected: [], activeAvailable: [], activeSelected: [] },
+    holidayGroups: { available: [], selected: [], activeAvailable: [], activeSelected: [] },
+    attendanceGroups: { available: [], selected: [], activeAvailable: [], activeSelected: [] }
+  };
 
   let selectedPositions = [];
   let selectedShifts = [];
@@ -516,6 +625,7 @@
         <button onclick="deleteHolidayGroup('${groupName}')" class="text-red-400 hover:text-red-600 text-sm">刪除</button>
       </div>`;
     }).join('');
+    renderAllowedOptions();
   }
 
   function openHolidayGroupPage(groupName = '') {
@@ -597,6 +707,8 @@
   function deleteHolidayGroup(groupName) {
     if (confirm(`確定要刪除「${groupName}」嗎？`)) {
       delete holidayGroups[groupName];
+      allowedScopeCustomized = true;
+      allowedHolidayGroupNames = allowedHolidayGroupNames.filter(name => name !== groupName);
       renderHolidays();
     }
   }
@@ -639,7 +751,9 @@
     }
 
     holidayGroups[groupName] = [...editingHolidayDates];
+    if (!allowedHolidayGroupNames.includes(groupName)) allowedHolidayGroupNames.push(groupName);
     renderHolidays();
+    renderAllowedOptions();
     closeHolidayGroupModal();
   }
 
@@ -679,6 +793,215 @@
 
   function renderSupervisors() {
     document.getElementById('supervisorList').innerHTML = supervisors.map(s => `<span class="tag-item bg-purple-50 text-purple-700">${s}<button onclick="supervisors.splice(supervisors.indexOf('${s}'),1);renderSupervisors()" class="ml-1 text-red-400 hover:text-red-600">×</button></span>`).join('');
+  }
+
+  function cloneDeep(v) {
+    return JSON.parse(JSON.stringify(v));
+  }
+
+  function buildGlobalTemplates() {
+    globalShiftTemplates = {};
+    globalHolidayGroupTemplates = {};
+    globalAttendanceGroupTemplates = {};
+
+    const collectShift = (s) => {
+      if (!s || !s.name || globalShiftTemplates[s.name]) return;
+      globalShiftTemplates[s.name] = cloneDeep(s);
+    };
+    const collectHoliday = (obj) => {
+      if (!obj || typeof obj !== 'object') return;
+      Object.keys(obj).forEach((k) => {
+        if (!globalHolidayGroupTemplates[k]) globalHolidayGroupTemplates[k] = cloneDeep(obj[k]);
+      });
+    };
+    const collectAttendance = (g) => {
+      if (!g || !g.name || globalAttendanceGroupTemplates[g.name]) return;
+      globalAttendanceGroupTemplates[g.name] = cloneDeep(g);
+    };
+
+    (Array.isArray(G.shifts) ? G.shifts : []).forEach(collectShift);
+    collectHoliday(G.holidayGroups);
+    (Array.isArray(G.attendanceGroups) ? G.attendanceGroups : []).forEach(collectAttendance);
+
+    (Array.isArray(schedules) ? schedules : []).forEach((sched) => {
+      (Array.isArray(sched.shifts) ? sched.shifts : []).forEach(collectShift);
+      collectHoliday(sched.holidayGroups);
+      (Array.isArray(sched.attendanceGroups) ? sched.attendanceGroups : []).forEach(collectAttendance);
+    });
+
+    (shifts || []).forEach(collectShift);
+    collectHoliday(holidayGroups);
+    (attendanceGroups || []).forEach(collectAttendance);
+  }
+
+  function syncCollectionsByAllowed() {
+    const shiftMap = {};
+    (shifts || []).forEach((s) => { if (s && s.name) shiftMap[s.name] = s; });
+    shifts = allowedShiftNames.map((name) => shiftMap[name] || cloneDeep(globalShiftTemplates[name])).filter(Boolean);
+
+    const nextHolidayGroups = {};
+    allowedHolidayGroupNames.forEach((name) => {
+      if (holidayGroups[name]) nextHolidayGroups[name] = holidayGroups[name];
+      else if (globalHolidayGroupTemplates[name]) nextHolidayGroups[name] = cloneDeep(globalHolidayGroupTemplates[name]);
+    });
+    holidayGroups = nextHolidayGroups;
+    selectedHolidayGroups = selectedHolidayGroups.filter(name => Object.prototype.hasOwnProperty.call(holidayGroups, name));
+    if (!selectedHolidayGroups.length && Object.keys(holidayGroups).length) {
+      selectedHolidayGroups = [Object.keys(holidayGroups)[0]];
+    }
+
+    const attendanceMap = {};
+    (attendanceGroups || []).forEach((g) => { if (g && g.name) attendanceMap[g.name] = g; });
+    attendanceGroups = allowedAttendanceGroupNames.map((name) => attendanceMap[name] || cloneDeep(globalAttendanceGroupTemplates[name])).filter(Boolean);
+    if (selectedAttendanceGroupIndex >= attendanceGroups.length) {
+      selectedAttendanceGroupIndex = attendanceGroups.length ? 0 : -1;
+    }
+  }
+
+  function ensureAllowedDefaults() {
+    buildGlobalTemplates();
+    if (!allowedScopeCustomized) {
+      allowedShiftNames = (shifts || []).map(s => s.name).filter(Boolean);
+      allowedHolidayGroupNames = Object.keys(holidayGroups || {});
+      allowedAttendanceGroupNames = (attendanceGroups || []).map(g => g.name).filter(Boolean);
+      return;
+    }
+    const shiftSet = new Set(Object.keys(globalShiftTemplates));
+    const holidaySet = new Set(Object.keys(globalHolidayGroupTemplates));
+    const attendanceSet = new Set(Object.keys(globalAttendanceGroupTemplates));
+    allowedShiftNames = allowedShiftNames.filter(name => shiftSet.has(name));
+    allowedHolidayGroupNames = allowedHolidayGroupNames.filter(name => holidaySet.has(name));
+    allowedAttendanceGroupNames = allowedAttendanceGroupNames.filter(name => attendanceSet.has(name));
+    syncCollectionsByAllowed();
+  }
+
+  function renderAllowedOptions() {
+    ensureAllowedDefaults();
+    const setSummary = (id, values) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = values.length ? values.join('、') : '未選擇';
+    };
+    setSummary('allowedShiftsSummary', allowedShiftNames);
+    setSummary('allowedHolidayGroupsSummary', allowedHolidayGroupNames);
+    setSummary('allowedAttendanceGroupsSummary', allowedAttendanceGroupNames);
+  }
+
+  function getAllowedPickerConfig(type) {
+    if (type === 'holidayGroups') {
+      return { title: '選擇此班表會用到假別組', all: Object.keys(globalHolidayGroupTemplates), selected: allowedHolidayGroupNames };
+    }
+    if (type === 'attendanceGroups') {
+      return { title: '選擇此班表會用到考勤組', all: Object.keys(globalAttendanceGroupTemplates), selected: allowedAttendanceGroupNames };
+    }
+    return { title: '選擇此班表會用到班別', all: Object.keys(globalShiftTemplates), selected: allowedShiftNames };
+  }
+
+  function getAllowedPickerState(type) {
+    return allowedPickerState[type];
+  }
+
+  function setAllowedPickerActive(type, side, name) {
+    const state = getAllowedPickerState(type);
+    if (!state) return;
+    if (side === 'available') {
+      state.activeAvailable = state.activeAvailable.includes(name)
+        ? state.activeAvailable.filter(item => item !== name)
+        : [...state.activeAvailable, name];
+      state.activeSelected = [];
+    } else {
+      state.activeSelected = state.activeSelected.includes(name)
+        ? state.activeSelected.filter(item => item !== name)
+        : [...state.activeSelected, name];
+      state.activeAvailable = [];
+    }
+    renderAllowedPickerSection(type);
+  }
+
+  function openAllowedPicker() {
+    ensureAllowedDefaults();
+    document.getElementById('allowedPickerTitle').textContent = '選擇此班表會用到的項目';
+    ALLOWED_PICKER_TYPES.forEach((type) => {
+      const cfg = getAllowedPickerConfig(type);
+      const state = getAllowedPickerState(type);
+      state.selected = [...cfg.selected];
+      state.available = cfg.all.filter(name => !state.selected.includes(name));
+      state.activeAvailable = [];
+      state.activeSelected = [];
+      const availableSearch = document.getElementById(`allowedPickerAvailableSearch-${type}`);
+      const selectedSearch = document.getElementById(`allowedPickerSelectedSearch-${type}`);
+      if (availableSearch) availableSearch.value = '';
+      if (selectedSearch) selectedSearch.value = '';
+    });
+    renderAllowedPicker();
+    document.getElementById('allowedPickerModal').classList.remove('hidden');
+  }
+
+  function closeAllowedPicker() {
+    document.getElementById('allowedPickerModal').classList.add('hidden');
+  }
+
+  function renderAllowedPicker() {
+    ALLOWED_PICKER_TYPES.forEach(renderAllowedPickerSection);
+  }
+
+  function renderAllowedPickerSection(type) {
+    const state = getAllowedPickerState(type);
+    const availableSearch = document.getElementById(`allowedPickerAvailableSearch-${type}`);
+    const selectedSearch = document.getElementById(`allowedPickerSelectedSearch-${type}`);
+    const leftQ = availableSearch ? availableSearch.value.toLowerCase().trim() : '';
+    const rightQ = selectedSearch ? selectedSearch.value.toLowerCase().trim() : '';
+    const left = state.available.filter(name => name.toLowerCase().includes(leftQ));
+    const right = state.selected.filter(name => name.toLowerCase().includes(rightQ));
+    const leftBox = document.getElementById(`allowedPickerAvailableList-${type}`);
+    const rightBox = document.getElementById(`allowedPickerSelectedList-${type}`);
+    if (leftBox) {
+      leftBox.innerHTML = left.map(name => `<div class="picker-row ${state.activeAvailable.includes(name)?'active':''}" onclick='setAllowedPickerActive(${JSON.stringify(type)}, "available", ${JSON.stringify(name)})'>${name}</div>`).join('') || '<div class="p-2 text-sm text-slate-500">無可選項目</div>';
+    }
+    if (rightBox) {
+      rightBox.innerHTML = right.map(name => `<div class="picker-row ${state.activeSelected.includes(name)?'active':''}" onclick='setAllowedPickerActive(${JSON.stringify(type)}, "selected", ${JSON.stringify(name)})'>${name}</div>`).join('') || '<div class="p-2 text-sm text-slate-500">尚未選擇</div>';
+    }
+  }
+
+  function moveAllowedToSelected(type) {
+    const state = getAllowedPickerState(type);
+    if (!state || state.activeAvailable.length === 0) return;
+    state.selected = Array.from(new Set([...state.selected, ...state.activeAvailable]));
+    state.available = state.available.filter(name => !state.activeAvailable.includes(name));
+    state.activeAvailable = [];
+    renderAllowedPickerSection(type);
+  }
+
+  function moveAllowedToAvailable(type) {
+    const state = getAllowedPickerState(type);
+    if (!state || state.activeSelected.length === 0) return;
+    state.available = Array.from(new Set([...state.available, ...state.activeSelected]));
+    state.selected = state.selected.filter(name => !state.activeSelected.includes(name));
+    state.activeSelected = [];
+    renderAllowedPickerSection(type);
+  }
+
+  function selectAllAllowedAvailable(type) {
+    const state = getAllowedPickerState(type);
+    if (!state) return;
+    state.selected = Array.from(new Set([...state.selected, ...state.available]));
+    state.available = [];
+    state.activeAvailable = [];
+    renderAllowedPickerSection(type);
+  }
+
+  function confirmAllowedPicker() {
+    allowedScopeCustomized = true;
+    allowedShiftNames = [...allowedPickerState.shifts.selected];
+    allowedHolidayGroupNames = [...allowedPickerState.holidayGroups.selected];
+    allowedAttendanceGroupNames = [...allowedPickerState.attendanceGroups.selected];
+    syncCollectionsByAllowed();
+    renderAllowedOptions();
+    renderShifts();
+    renderHolidays();
+    renderAttendanceGroups();
+    syncGlobalData();
+    closeAllowedPicker();
   }
 
   function filterTagDropdown() {
@@ -815,6 +1138,7 @@
         <button onclick="deleteShift(${i})" class="text-red-400 hover:text-red-600 text-sm">刪除</button>
       </div>`;
     }).join('');
+    renderAllowedOptions();
     lucide.createIcons();
   }
 
@@ -825,6 +1149,8 @@
     if (!s) return;
     if (confirm(`確定要刪除「${s.name}」嗎？`)) {
       shifts.splice(i, 1);
+      allowedScopeCustomized = true;
+      allowedShiftNames = allowedShiftNames.filter(name => name !== s.name);
       renderShifts();
     }
   }
@@ -885,9 +1211,10 @@
         ${weekdayHtml}
       </div>
       <button onclick="openShiftGroupPage(${i})" class="text-blue-400 hover:text-blue-600 text-sm px-2">編輯</button>
-      <button onclick="attendanceGroups.splice(${i},1);if(selectedAttendanceGroupIndex>=attendanceGroups.length)selectedAttendanceGroupIndex=attendanceGroups.length-1;renderAttendanceGroups()" class="text-red-400 hover:text-red-600 text-sm">刪除</button>
+      <button onclick="allowedScopeCustomized=true;allowedAttendanceGroupNames=allowedAttendanceGroupNames.filter(name=>name!=='${g.name.replace(/'/g, "\\'")}');attendanceGroups.splice(${i},1);if(selectedAttendanceGroupIndex>=attendanceGroups.length)selectedAttendanceGroupIndex=attendanceGroups.length-1;renderAttendanceGroups()" class="text-red-400 hover:text-red-600 text-sm">刪除</button>
     </div>`;
     }).join('');
+    renderAllowedOptions();
   }
 
   function openShiftGroupPage(groupIndex = -1) {
@@ -1140,9 +1467,11 @@
       attendanceGroups.push(payload);
       selectedAttendanceGroupIndex = attendanceGroups.length - 1;
     }
+    if (!allowedAttendanceGroupNames.includes(payload.name)) allowedAttendanceGroupNames.push(payload.name);
     if (selectedAttendanceGroupIndex < 0 && attendanceGroups.length > 0) selectedAttendanceGroupIndex = 0;
     editingGroupIndex = -1;
     renderAttendanceGroups();
+    renderAllowedOptions();
     closeAttendanceGroupModal();
   }
 
@@ -1284,7 +1613,9 @@
     } else {
       shifts.push({ name, shortName, start, end, hours, rest, otStart, otEnd });
     }
+    if (!allowedShiftNames.includes(name)) allowedShiftNames.push(name);
     renderShifts();
+    renderAllowedOptions();
     closeShiftModal();
   }
 
@@ -1298,6 +1629,7 @@
   renderPositions();
   renderTags();
   renderBranchAndDepartment();
+  renderAllowedOptions();
   // 初始化基本資訊欄位（依目前班表 index）
   document.getElementById('scheduleName').value = schedules[currentScheduleIndex].name || '';
   document.getElementById('startDate').value    = schedules[currentScheduleIndex].start || '';
@@ -1337,6 +1669,10 @@
       sched.supervisors                  = supervisors;
       sched.positions                    = positions;
       sched.tags                         = tags;
+      sched.allowedScopeCustomized       = allowedScopeCustomized;
+      sched.allowedShiftNames            = allowedShiftNames;
+      sched.allowedHolidayGroupNames     = allowedHolidayGroupNames;
+      sched.allowedAttendanceGroupNames  = allowedAttendanceGroupNames;
       schedules[currentScheduleIndex] = sched;
 
       // 寫回 G（保留全域欄位向後相容）
@@ -1354,12 +1690,25 @@
       G.supervisors        = supervisors;
       G.positions          = positions;
       G.tags               = tags;
+      G.allowedScopeCustomized      = allowedScopeCustomized;
+      G.allowedShiftNames           = allowedShiftNames;
+      G.allowedHolidayGroupNames    = allowedHolidayGroupNames;
+      G.allowedAttendanceGroupNames = allowedAttendanceGroupNames;
       G.selectedBranch     = selectedBranch;
       G.selectedDepartment = selectedDepartment;
       localStorage.setItem('shiftMgmt:global', JSON.stringify(G));
     } catch (e) { console.warn('syncGlobalData failed', e); }
   }
   window.syncGlobalData = syncGlobalData;
+  window.openAllowedPicker = openAllowedPicker;
+  window.closeAllowedPicker = closeAllowedPicker;
+  window.renderAllowedPicker = renderAllowedPicker;
+  window.renderAllowedPickerSection = renderAllowedPickerSection;
+  window.setAllowedPickerActive = setAllowedPickerActive;
+  window.moveAllowedToSelected = moveAllowedToSelected;
+  window.moveAllowedToAvailable = moveAllowedToAvailable;
+  window.selectAllAllowedAvailable = selectAllAllowedAvailable;
+  window.confirmAllowedPicker = confirmAllowedPicker;
 
   function validateAndSave() {
     const name = document.getElementById('scheduleName').value.trim();
