@@ -157,7 +157,8 @@ CREATE TABLE dbo.SchedulePosition (
     CONSTRAINT PK_SchedulePosition PRIMARY KEY (ScheduleId, PositionId)
 );
 
-/* 班表可用範圍（對應 allowedShiftNames / allowedHolidayGroupNames / allowedAttendanceGroupNames） */
+/* 班表可用範圍（對應 allowedShiftNames / allowedHolidayGroupNames / allowedAttendanceGroupNames）
+    可為空：若尚未完成可用項目選取，三張關聯表允許 0 筆資料。 */
 CREATE TABLE dbo.ScheduleAllowedShift (
     ScheduleId  INT NOT NULL REFERENCES dbo.Schedule(ScheduleId) ON DELETE CASCADE,
     ShiftId     INT NOT NULL REFERENCES dbo.Shift(ShiftId) ON DELETE CASCADE,

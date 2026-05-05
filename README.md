@@ -80,6 +80,15 @@ index.html               班表總覽（主視圖，橫向日曆表格）
 
 `shift-setting.html` 額外有「**複製班表**」功能，將目前設定複製為新班表（只複製結構，不含個人指派）。
 
+#### 可用項目選取（班別 / 假別組 / 考勤組）
+
+- 兩頁皆透過 `shift-choose.html` 進行「此班表會用到的班別/假別組/考勤組」選取。
+- 新增班表（`shift-setting-new.html`）在尚未選取前，三類預設皆為空，不會自動帶入「台灣國定假日」。
+- 新增班表進入選取頁時使用 `index=-1`，回存資料寫入 `localStorage['shiftMgmt:newScheduleDraft']`，不會覆蓋既有班表。
+- 選取按鈕文案規則：
+  - 無任何選取：顯示「請選擇」
+  - 有選取：顯示「已選擇 ...」，且僅列出非空類別（例如：`已選擇 班別 / 考勤組`）
+
 ### index.html — 班表總覽
 
 橫向日曆表格，每列為一名員工，每欄為一天。
@@ -370,6 +379,8 @@ docker compose up -d           # 啟動 sqlserver (port 1433)
 | `shiftMgmt:global.schedules[].allowedShiftNames[]` | `Shift.Name` -> `ScheduleAllowedShift(ScheduleId, ShiftId)` | 班表可用班別 |
 | `shiftMgmt:global.schedules[].allowedHolidayGroupNames[]` | `HolidayGroup.Name` -> `ScheduleAllowedHolidayGroup(ScheduleId, HolidayGroupId)` | 班表可用假別組 |
 | `shiftMgmt:global.schedules[].allowedAttendanceGroupNames[]` | `AttendanceGroup.Name` -> `ScheduleAllowedAttendanceGroup(ScheduleId, AttendanceGroupId)` | 班表可用考勤組 |
+
+> 若班表尚未設定可用項目，上述三組陣列可以為空；對應 DB 也可為 0 筆關聯資料（屬合法狀態）。
 | `shiftMgmt:global.shifts[].name` | `Shift.Name` | 班別名稱（唯一） |
 | `shiftMgmt:global.shifts[].shortName` | `Shift.ShortName` | 班別簡稱 |
 | `shiftMgmt:global.shifts[].start` | `Shift.StartTime` | 時間字串轉 `TIME(0)` |
