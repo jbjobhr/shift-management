@@ -135,6 +135,10 @@
      <div><label class="block text-sm font-medium text-slate-600 mb-1">結束</label><input type="time" id="shiftEnd" value="12:00" class="w-full" oninput="onShiftTimeChange()">
      </div>
     </div>
+    <label class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+      <input type="checkbox" id="shiftCrossDay" onchange="onShiftTimeChange()">
+      <span>允許跨天（例如：22:00 ~ 06:00）</span>
+    </label>
     <div><label class="block text-sm font-medium text-slate-600 mb-1">休息時數（小時）</label><input type="number" id="shiftRest" min="0" step="0.5" placeholder="0" class="w-full" oninput="updateShiftHoursPreview()">
      <p class="text-xs text-slate-500 mt-1">勞基法：每繼續工作 4 小時至少休息 30 分鐘（僅工作 4 小時可免）。預設依時段自動帶入，可手動調高。</p>
      <p class="text-xs text-slate-500 mt-1">總工時 = 結束 - 起始 - 休息；預览：<span id="shiftHoursPreview" class="font-medium text-amber-700">0h</span>、最低法定休息：<span id="shiftMinRest" class="font-medium text-orange-700">0h</span></p>
@@ -911,14 +915,16 @@
     }
   }
 
-  function calcDurationHours(start, end) {
+  function calcDurationHours(start, end, crossDay = false) {
     if (!start || !end) return 0;
     const [sh, sm] = start.split(':').map(Number);
     const [eh, em] = end.split(':').map(Number);
-    return Math.max(0, ((eh * 60 + em) - (sh * 60 + sm)) / 60);
+    let diffMinutes = (eh * 60 + em) - (sh * 60 + sm);
+    if (crossDay && diffMinutes <= 0) diffMinutes += 24 * 60;
+    return Math.max(0, diffMinutes / 60);
   }
-  function calcWorkHours(start, end, rest) {
-    return Math.max(0, calcDurationHours(start, end) - (Number(rest) || 0));
+  function calcWorkHours(start, end, rest, crossDay = false) {
+    return Math.max(0, calcDurationHours(start, end, crossDay) - (Number(rest) || 0));
   }
   // 勞基法 §35：繼續工作 4 小時至少休息 30 分鐘；僅工作 4 小時可免。
   function minRequiredRest(durationHours) {
@@ -928,7 +934,8 @@
   function onShiftTimeChange() {
     const start = document.getElementById('shiftStart').value;
     const end = document.getElementById('shiftEnd').value;
-    const duration = calcDurationHours(start, end);
+    const crossDay = !!document.getElementById('shiftCrossDay')?.checked;
+    const duration = calcDurationHours(start, end, crossDay);
     const minRest = minRequiredRest(duration);
     const restEl = document.getElementById('shiftRest');
     const cur = parseFloat(restEl.value) || 0;
@@ -939,9 +946,10 @@
   function updateShiftHoursPreview() {
     const start = document.getElementById('shiftStart').value;
     const end = document.getElementById('shiftEnd').value;
+    const crossDay = !!document.getElementById('shiftCrossDay')?.checked;
     const rest = parseFloat(document.getElementById('shiftRest').value) || 0;
-    const hours = calcWorkHours(start, end, rest);
-    const minRest = minRequiredRest(calcDurationHours(start, end));
+    const hours = calcWorkHours(start, end, rest, crossDay);
+    const minRest = minRequiredRest(calcDurationHours(start, end, crossDay));
     const hoursEl = document.getElementById('shiftHoursPreview');
     const minEl = document.getElementById('shiftMinRest');
     if (hoursEl) hoursEl.textContent = `${hours}h`;
@@ -962,6 +970,7 @@
           <span class="text-xs text-slate-500 ml-2">簡稱：${s.shortName}</span>
         </div>
         <span class="text-xs text-slate-500">${s.start} - ${s.end}</span>
+        ${s.crossDay ? '<span class="chip bg-indigo-100 text-indigo-700">跨天</span>' : ''}
         <span class="chip bg-amber-100 text-amber-800">工時 ${s.hours}h</span>
         <span class="chip bg-orange-100 text-orange-800">休息 ${rest.toFixed(1)}h</span>
         <button onclick="editShift(${i})" class="ml-auto text-blue-400 hover:text-blue-600 text-sm">編輯</button>
@@ -995,6 +1004,10 @@
     document.getElementById('shiftShortName').value = s.shortName || '';
     document.getElementById('shiftStart').value = s.start || '08:00';
     document.getElementById('shiftEnd').value = s.end || '12:00';
+    const inferredCrossDay = (typeof s.crossDay === 'boolean')
+      ? s.crossDay
+      : ((s.start || '') && (s.end || '') && (s.end < s.start));
+    document.getElementById('shiftCrossDay').checked = !!inferredCrossDay;
     document.getElementById('shiftRest').value = (s.rest != null ? s.rest : 0);
     document.getElementById('shiftOtStart').value = s.otStart || '';
     document.getElementById('shiftOtEnd').value = s.otEnd || '';
@@ -1316,6 +1329,7 @@
     document.getElementById('shiftShortName').value = '';
     document.getElementById('shiftStart').value = '08:00';
     document.getElementById('shiftEnd').value = '12:00';
+    document.getElementById('shiftCrossDay').checked = false;
     document.getElementById('shiftRest').value = '0';
     document.getElementById('shiftOtStart').value = '';
     document.getElementById('shiftOtEnd').value = '';
@@ -1412,10 +1426,12 @@
     const shortName = document.getElementById('shiftShortName').value.trim();
     const start = document.getElementById('shiftStart').value;
     const end = document.getElementById('shiftEnd').value;
+    const crossDay = !!document.getElementById('shiftCrossDay').checked;
     const rest = parseFloat(document.getElementById('shiftRest').value) || 0;
     const otStart = document.getElementById('shiftOtStart').value || '';
     const otEnd = document.getElementById('shiftOtEnd').value || '';
-    const hours = calcWorkHours(start, end, rest);
+    const duration = calcDurationHours(start, end, crossDay);
+    const hours = calcWorkHours(start, end, rest, crossDay);
 
     if (!name) {
       alert('請輸入班別名稱');
@@ -1425,15 +1441,19 @@
       alert('請輸入班別簡稱');
       return;
     }
-    if (calcDurationHours(start, end) <= 0) {
-      alert('結束時間必須晚於起始時間');
+    if (crossDay && start === end) {
+      alert('跨天班別的起始與結束時間不可相同');
+      return;
+    }
+    if (duration <= 0) {
+      alert('結束時間必須晚於起始時間；若為跨天班別請勾選「允許跨天」');
       return;
     }
     if (rest < 0) {
       alert('休息時數不可為負數');
       return;
     }
-    const minRest = minRequiredRest(calcDurationHours(start, end));
+    const minRest = minRequiredRest(duration);
     if (rest < minRest) {
       alert(`依勞基法，此時段至少需休息 ${minRest}h（現設 ${rest}h）。`);
       return;
@@ -1445,7 +1465,7 @@
 
     if (editingShiftIndex >= 0 && shifts[editingShiftIndex]) {
       const oldName = shifts[editingShiftIndex].name;
-      shifts[editingShiftIndex] = { name, shortName, start, end, hours, rest, otStart, otEnd };
+      shifts[editingShiftIndex] = { name, shortName, start, end, crossDay, hours, rest, otStart, otEnd };
       // 同步更新考勤組中引用此班別名稱
       if (oldName !== name) {
         attendanceGroups.forEach(g => {
@@ -1460,7 +1480,7 @@
         renderAttendanceGroups();
       }
     } else {
-      shifts.push({ name, shortName, start, end, hours, rest, otStart, otEnd });
+      shifts.push({ name, shortName, start, end, crossDay, hours, rest, otStart, otEnd });
     }
     if (!allowedShiftNames.includes(name)) allowedShiftNames.push(name);
     renderShifts();
