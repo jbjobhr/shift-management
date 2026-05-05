@@ -28,4 +28,8 @@ echo "==> 執行 seed.sql"
 docker exec -e PW="$PASSWORD" "$CONTAINER" \
   bash -c "$SQLCMD -S localhost -U sa -P \"\$PW\" -No -b -i /db/seed.sql"
 
+echo "==> 執行 procedures.sql"
+docker exec -e PW="$PASSWORD" "$CONTAINER" \
+  bash -c "$SQLCMD -S localhost -U sa -P \"\$PW\" -No -b -i /db/procedures.sql"
+
 echo "==> 完成"

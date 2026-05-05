@@ -24,6 +24,11 @@ GO
 IF OBJECT_ID(N'dbo.PersonalAssignment','U')      IS NOT NULL DROP TABLE dbo.PersonalAssignment;
 IF OBJECT_ID(N'dbo.PersonalShiftConfig','U')     IS NOT NULL DROP TABLE dbo.PersonalShiftConfig;
 IF OBJECT_ID(N'dbo.PersonalSetting','U')         IS NOT NULL DROP TABLE dbo.PersonalSetting;
+IF OBJECT_ID(N'dbo.ScheduleTag','U')             IS NOT NULL DROP TABLE dbo.ScheduleTag;
+IF OBJECT_ID(N'dbo.ScheduleSupervisor','U')      IS NOT NULL DROP TABLE dbo.ScheduleSupervisor;
+IF OBJECT_ID(N'dbo.ScheduleAllowedAttendanceGroup','U') IS NOT NULL DROP TABLE dbo.ScheduleAllowedAttendanceGroup;
+IF OBJECT_ID(N'dbo.ScheduleAllowedHolidayGroup','U') IS NOT NULL DROP TABLE dbo.ScheduleAllowedHolidayGroup;
+IF OBJECT_ID(N'dbo.ScheduleAllowedShift','U')    IS NOT NULL DROP TABLE dbo.ScheduleAllowedShift;
 IF OBJECT_ID(N'dbo.AttendanceGroupWeekday','U')  IS NOT NULL DROP TABLE dbo.AttendanceGroupWeekday;
 IF OBJECT_ID(N'dbo.AttendanceGroupPunchLoc','U') IS NOT NULL DROP TABLE dbo.AttendanceGroupPunchLoc;
 IF OBJECT_ID(N'dbo.AttendanceGroupMember','U')   IS NOT NULL DROP TABLE dbo.AttendanceGroupMember;
@@ -141,6 +146,7 @@ CREATE TABLE dbo.Schedule (
     StartDate   DATE          NOT NULL,
     EndDate     DATE          NOT NULL,
     BranchId    INT NULL REFERENCES dbo.Branch(BranchId),
+    DepartmentId INT NULL REFERENCES dbo.Department(DepartmentId),
     CreatedAt   DATETIME2 NOT NULL CONSTRAINT DF_Schedule_CreatedAt DEFAULT (SYSUTCDATETIME()),
     CONSTRAINT CK_Schedule_DateRange CHECK (EndDate >= StartDate)
 );
@@ -149,6 +155,32 @@ CREATE TABLE dbo.SchedulePosition (
     ScheduleId  INT NOT NULL REFERENCES dbo.Schedule(ScheduleId) ON DELETE CASCADE,
     PositionId  INT NOT NULL REFERENCES dbo.Position(PositionId) ON DELETE CASCADE,
     CONSTRAINT PK_SchedulePosition PRIMARY KEY (ScheduleId, PositionId)
+);
+
+/* 班表可用範圍（對應 allowedShiftNames / allowedHolidayGroupNames / allowedAttendanceGroupNames） */
+CREATE TABLE dbo.ScheduleAllowedShift (
+    ScheduleId  INT NOT NULL REFERENCES dbo.Schedule(ScheduleId) ON DELETE CASCADE,
+    ShiftId     INT NOT NULL REFERENCES dbo.Shift(ShiftId) ON DELETE CASCADE,
+    CONSTRAINT PK_ScheduleAllowedShift PRIMARY KEY (ScheduleId, ShiftId)
+);
+
+CREATE TABLE dbo.ScheduleAllowedHolidayGroup (
+    ScheduleId      INT NOT NULL REFERENCES dbo.Schedule(ScheduleId) ON DELETE CASCADE,
+    HolidayGroupId  INT NOT NULL REFERENCES dbo.HolidayGroup(HolidayGroupId) ON DELETE CASCADE,
+    CONSTRAINT PK_ScheduleAllowedHolidayGroup PRIMARY KEY (ScheduleId, HolidayGroupId)
+);
+
+/* 班表層級主管 / 標籤 */
+CREATE TABLE dbo.ScheduleSupervisor (
+    ScheduleId    INT NOT NULL REFERENCES dbo.Schedule(ScheduleId) ON DELETE CASCADE,
+    SupervisorId  INT NOT NULL REFERENCES dbo.Supervisor(SupervisorId) ON DELETE CASCADE,
+    CONSTRAINT PK_ScheduleSupervisor PRIMARY KEY (ScheduleId, SupervisorId)
+);
+
+CREATE TABLE dbo.ScheduleTag (
+    ScheduleId  INT NOT NULL REFERENCES dbo.Schedule(ScheduleId) ON DELETE CASCADE,
+    TagId       INT NOT NULL REFERENCES dbo.Tag(TagId) ON DELETE CASCADE,
+    CONSTRAINT PK_ScheduleTag PRIMARY KEY (ScheduleId, TagId)
 );
 GO
 
@@ -181,6 +213,12 @@ CREATE TABLE dbo.AttendanceGroupWeekday (
     SortOrder         INT         NOT NULL CONSTRAINT DF_AGW_Sort DEFAULT (0),
     CONSTRAINT PK_AGW PRIMARY KEY (AttendanceGroupId, DayOfWeek, ShiftId),
     CONSTRAINT CK_AGW_DOW CHECK (DayOfWeek IN ('sun','mon','tue','wed','thu','fri','sat'))
+);
+
+CREATE TABLE dbo.ScheduleAllowedAttendanceGroup (
+    ScheduleId          INT NOT NULL REFERENCES dbo.Schedule(ScheduleId) ON DELETE CASCADE,
+    AttendanceGroupId   INT NOT NULL REFERENCES dbo.AttendanceGroup(AttendanceGroupId) ON DELETE CASCADE,
+    CONSTRAINT PK_ScheduleAllowedAttendanceGroup PRIMARY KEY (ScheduleId, AttendanceGroupId)
 );
 GO
 
@@ -228,7 +266,7 @@ GO
 
 /* ---------- 寫入版本 ---------- */
 MERGE dbo.AppMeta AS t
-USING (VALUES (N'DataVersion', N'13')) AS s([Key],[Value])
+USING (VALUES (N'DataVersion', N'14')) AS s([Key],[Value])
 ON t.[Key] = s.[Key]
 WHEN MATCHED THEN UPDATE SET [Value] = s.[Value], UpdatedAt = SYSUTCDATETIME()
 WHEN NOT MATCHED THEN INSERT([Key],[Value]) VALUES (s.[Key], s.[Value]);

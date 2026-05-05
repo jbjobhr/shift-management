@@ -55,10 +55,13 @@ INSERT INTO dbo.IndividualHoliday([Date], Note) VALUES
     ('2026-02-20', N'彈性假期');
 
 /* ---- 班表 ---- */
-INSERT INTO dbo.Schedule(Name, StartDate, EndDate, BranchId) VALUES
-    (N'2026年1月排班', '2026-01-01', '2026-01-31', @HQ),
-    (N'2026年2月排班', '2026-02-01', '2026-02-28', @HQ),
-    (N'2026年3月排班', '2026-03-01', '2026-03-31', @HQ);
+DECLARE @DeptWH INT = (SELECT DepartmentId FROM dbo.Department WHERE Name=N'倉儲部');
+DECLARE @DeptOps INT = (SELECT DepartmentId FROM dbo.Department WHERE Name=N'營運部');
+
+INSERT INTO dbo.Schedule(Name, StartDate, EndDate, BranchId, DepartmentId) VALUES
+    (N'2026年1月排班', '2026-01-01', '2026-01-31', @HQ, @DeptWH),
+    (N'2026年2月排班', '2026-02-01', '2026-02-28', @HQ, @DeptWH),
+    (N'2026年3月排班', '2026-03-01', '2026-03-31', @HQ, @DeptOps);
 
 /* ---- 考勤組 ---- */
 INSERT INTO dbo.AttendanceGroup(Name, ScheduleType, WorkOnHoliday) VALUES
@@ -95,6 +98,60 @@ INSERT INTO dbo.AttendanceGroupWeekday(AttendanceGroupId, DayOfWeek, ShiftId) VA
     (@C,'mon',@sMorning),(@C,'wed',@sMorning),(@C,'fri',@sMorning),
     (@C,'tue',@sNoon),(@C,'tue',@sNight),
     (@C,'thu',@sNoon),(@C,'thu',@sNight);
+
+/* ---- 班表層級可用範圍 / 主管 / 標籤 ---- */
+DECLARE @SchJan INT = (SELECT ScheduleId FROM dbo.Schedule WHERE Name = N'2026年1月排班');
+DECLARE @SchFeb INT = (SELECT ScheduleId FROM dbo.Schedule WHERE Name = N'2026年2月排班');
+DECLARE @SchMar INT = (SELECT ScheduleId FROM dbo.Schedule WHERE Name = N'2026年3月排班');
+DECLARE @SupLiu INT = (SELECT SupervisorId FROM dbo.Supervisor WHERE Name = N'劉經理');
+DECLARE @TagOT INT = (SELECT TagId FROM dbo.Tag WHERE Name = N'可加班');
+DECLARE @TagNew INT = (SELECT TagId FROM dbo.Tag WHERE Name = N'新人');
+
+INSERT INTO dbo.ScheduleAllowedShift(ScheduleId, ShiftId)
+SELECT @SchJan, s.ShiftId FROM dbo.Shift s WHERE s.Name IN (N'早班', N'午班', N'晚班');
+
+INSERT INTO dbo.ScheduleAllowedShift(ScheduleId, ShiftId)
+SELECT @SchFeb, s.ShiftId FROM dbo.Shift s WHERE s.Name IN (N'早班', N'午班');
+
+INSERT INTO dbo.ScheduleAllowedShift(ScheduleId, ShiftId)
+SELECT @SchMar, s.ShiftId FROM dbo.Shift s WHERE s.Name IN (N'早班', N'晚班');
+
+INSERT INTO dbo.ScheduleAllowedHolidayGroup(ScheduleId, HolidayGroupId)
+SELECT @SchJan, hg.HolidayGroupId FROM dbo.HolidayGroup hg WHERE hg.Name IN (N'台灣國定假日', N'一例一休');
+
+INSERT INTO dbo.ScheduleAllowedHolidayGroup(ScheduleId, HolidayGroupId)
+SELECT @SchFeb, hg.HolidayGroupId FROM dbo.HolidayGroup hg WHERE hg.Name IN (N'台灣國定假日');
+
+INSERT INTO dbo.ScheduleAllowedHolidayGroup(ScheduleId, HolidayGroupId)
+SELECT @SchMar, hg.HolidayGroupId FROM dbo.HolidayGroup hg WHERE hg.Name IN (N'台灣國定假日', N'一例一休');
+
+INSERT INTO dbo.ScheduleAllowedAttendanceGroup(ScheduleId, AttendanceGroupId)
+SELECT @SchJan, ag.AttendanceGroupId FROM dbo.AttendanceGroup ag WHERE ag.Name IN (N'A組 - 倉儲', N'B組 - 物流');
+
+INSERT INTO dbo.ScheduleAllowedAttendanceGroup(ScheduleId, AttendanceGroupId)
+SELECT @SchFeb, ag.AttendanceGroupId FROM dbo.AttendanceGroup ag WHERE ag.Name IN (N'A組 - 倉儲');
+
+INSERT INTO dbo.ScheduleAllowedAttendanceGroup(ScheduleId, AttendanceGroupId)
+SELECT @SchMar, ag.AttendanceGroupId FROM dbo.AttendanceGroup ag WHERE ag.Name IN (N'B組 - 物流', N'C組 - 客服');
+
+INSERT INTO dbo.SchedulePosition(ScheduleId, PositionId)
+SELECT @SchJan, p.PositionId FROM dbo.Position p WHERE p.Name IN (N'揀貨員', N'理貨員', N'包裝員');
+
+INSERT INTO dbo.SchedulePosition(ScheduleId, PositionId)
+SELECT @SchFeb, p.PositionId FROM dbo.Position p WHERE p.Name IN (N'揀貨員', N'包裝員');
+
+INSERT INTO dbo.SchedulePosition(ScheduleId, PositionId)
+SELECT @SchMar, p.PositionId FROM dbo.Position p WHERE p.Name IN (N'司機', N'分類員');
+
+INSERT INTO dbo.ScheduleSupervisor(ScheduleId, SupervisorId) VALUES
+    (@SchJan, @SupLiu),
+    (@SchFeb, @SupLiu),
+    (@SchMar, @SupLiu);
+
+INSERT INTO dbo.ScheduleTag(ScheduleId, TagId) VALUES
+    (@SchJan, @TagOT),
+    (@SchJan, @TagNew),
+    (@SchFeb, @TagOT);
 
 PRINT 'Seed data 完成';
 GO

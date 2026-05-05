@@ -107,7 +107,7 @@ index.html               班表總覽（主視圖，橫向日曆表格）
 
 ```jsonc
 {
-  "__version": 13,           // 資料版本號，低於此版本時重置部分欄位
+  "__version": 14,           // 資料版本號，低於此版本時重置部分欄位
 
   // ── 班表列表 ──────────────────────────────────────────────
   "schedules": [
@@ -312,7 +312,7 @@ index.html               班表總覽（主視圖，橫向日曆表格）
 | `shiftMgmt:global` | 班表設定儲存、總覽頁切換班表、個人排班返回前 | 全域設定（班表、班別、假日、人員、考勤組等） |
 | `shiftMgmt:personal:{empId}` | 個人排班頁點「儲存」 | 單一員工的個人指派記錄 |
 
-**版本控制**：`__version` 欄位目前為 `13`。載入時若儲存版本低於此值，自動重置 `attendanceGroups`、`holidayGroups`、`shifts` 為 Fallback 預設值，避免舊結構導致顯示錯誤。
+**版本控制**：`__version` 欄位目前為 `14`。載入時若儲存版本低於此值，自動重置 `attendanceGroups`、`holidayGroups`、`shifts` 為 Fallback 預設值，避免舊結構導致顯示錯誤。
 
 **跨頁同步**：從個人排班返回總覽時，總覽頁監聽 `pageshow` 事件，若為 bfcache 恢復（`e.persisted`）則重新執行 `renderSchedule()`，確保個人排班變更即時反映。
 ---
@@ -327,6 +327,8 @@ index.html               班表總覽（主視圖，橫向日曆表格）
 docker compose up -d           # 啟動 sqlserver (port 1433)
 ./db/init.sh                   # 等待就緒並建立 schema + seed 資料
 ```
+
+`./db/init.sh` 會依序執行：`schema.sql` -> `seed.sql` -> `procedures.sql`。
 
 預設 SA 密碼：`Shift@Pass2026`（可由環境變數 `MSSQL_SA_PASSWORD` 覆寫）。
 連線字串範例：
@@ -344,5 +346,294 @@ docker compose up -d           # 啟動 sqlserver (port 1433)
 | `branches/departments/allPositions/tags/supervisors` | `Branch` / `Department` / `Position` / `Tag` / `Supervisor` |
 | `shiftMgmt:personal:{empId}` | `PersonalShiftConfig` + `PersonalAssignment` + `PersonalSetting` |
 | `__version` | `AppMeta` (Key=`DataVersion`) |
+
+### 前端 localStorage 欄位 -> 各資料表欄位（明細）
+
+| localStorage 路徑 | DB 資料表.欄位 | 備註 |
+|---|---|---|
+| `shiftMgmt:global.schedules[].name` | `Schedule.Name` | 班表名稱 |
+| `shiftMgmt:global.schedules[].start` | `Schedule.StartDate` | 日期字串轉 `DATE` |
+| `shiftMgmt:global.schedules[].end` | `Schedule.EndDate` | 日期字串轉 `DATE` |
+| `shiftMgmt:global.schedules[].branch` | `Branch.Name` -> `Schedule.BranchId` | 先以名稱對到 `Branch` 再存 FK |
+| `shiftMgmt:global.schedules[].department` | `Department.Name` -> `Schedule.DepartmentId` | 先以名稱對到 `Department` 再存 FK |
+| `shiftMgmt:global.schedules[].positions[]` | `Position.Name` -> `SchedulePosition(ScheduleId, PositionId)` | 班表啟用崗位 |
+| `shiftMgmt:global.schedules[].supervisors[]` | `Supervisor.Name` -> `ScheduleSupervisor(ScheduleId, SupervisorId)` | 班表可編輯主管 |
+| `shiftMgmt:global.schedules[].tags[]` | `Tag.Name` -> `ScheduleTag(ScheduleId, TagId)` | 班表標籤 |
+| `shiftMgmt:global.schedules[].allowedShiftNames[]` | `Shift.Name` -> `ScheduleAllowedShift(ScheduleId, ShiftId)` | 班表可用班別 |
+| `shiftMgmt:global.schedules[].allowedHolidayGroupNames[]` | `HolidayGroup.Name` -> `ScheduleAllowedHolidayGroup(ScheduleId, HolidayGroupId)` | 班表可用假別組 |
+| `shiftMgmt:global.schedules[].allowedAttendanceGroupNames[]` | `AttendanceGroup.Name` -> `ScheduleAllowedAttendanceGroup(ScheduleId, AttendanceGroupId)` | 班表可用考勤組 |
+| `shiftMgmt:global.shifts[].name` | `Shift.Name` | 班別名稱（唯一） |
+| `shiftMgmt:global.shifts[].shortName` | `Shift.ShortName` | 班別簡稱 |
+| `shiftMgmt:global.shifts[].start` | `Shift.StartTime` | 時間字串轉 `TIME(0)` |
+| `shiftMgmt:global.shifts[].end` | `Shift.EndTime` | 時間字串轉 `TIME(0)` |
+| `shiftMgmt:global.shifts[].hours` | `Shift.Hours` | 計薪工時 |
+| `shiftMgmt:global.shifts[].rest` | `Shift.Rest` | 休息時數 |
+| `shiftMgmt:global.shifts[].otStart` | `Shift.OtStart` | 可為 `NULL` |
+| `shiftMgmt:global.shifts[].otEnd` | `Shift.OtEnd` | 可為 `NULL` |
+| `shiftMgmt:global.holidayGroups{groupName}` | `HolidayGroup.Name` | 物件 key 對應假別組名稱 |
+| `shiftMgmt:global.holidayGroups{groupName}[]` | `HolidayGroupDate(HolidayGroupId, Date)` | 每個日期一列 |
+| `shiftMgmt:global.individualHolidays[]` | `IndividualHoliday.Date` | 彈性假期 |
+| `shiftMgmt:global.persons[].id` | `Employee.EmployeeId` | 員工編號（PK） |
+| `shiftMgmt:global.persons[].name` | `Employee.Name` | 員工姓名 |
+| `shiftMgmt:global.persons[].branch` | `Branch.Name` -> `Employee.BranchId` | 若有帶 branch 時對應 |
+| `shiftMgmt:global.persons[].department` | `Department.Name` -> `Employee.DepartmentId` | 若有帶 department 時對應 |
+| `shiftMgmt:global.tags[]` | `Tag.Name` | 字典資料 |
+| `shiftMgmt:global.supervisors[]` | `Supervisor.Name` | 字典資料 |
+| `shiftMgmt:global.branches[]` | `Branch.Name` | 字典資料 |
+| `shiftMgmt:global.departments[]` | `Department.Name` | 字典資料 |
+| `shiftMgmt:global.allPositions[]` | `Position.Name` | 字典資料 |
+| `shiftMgmt:global.attendanceGroups[].name` | `AttendanceGroup.Name` | 考勤組名稱（唯一） |
+| `shiftMgmt:global.attendanceGroups[].scheduleType` | `AttendanceGroup.ScheduleType` | `auto` 或 `manual` |
+| `shiftMgmt:global.attendanceGroups[].workOnHoliday` | `AttendanceGroup.WorkOnHoliday` | 布林轉 `BIT` |
+| `shiftMgmt:global.attendanceGroups[].members[]` | `AttendanceGroupMember(AttendanceGroupId, EmployeeId)` | 成員對應 |
+| `shiftMgmt:global.attendanceGroups[].punchLocations[]` | `PunchLocation.Name` -> `AttendanceGroupPunchLoc(AttendanceGroupId, PunchLocationId)` | 打卡地對應 |
+| `shiftMgmt:global.attendanceGroups[].weekdayShifts.{dow}[]` | `Shift.Name` -> `AttendanceGroupWeekday(AttendanceGroupId, DayOfWeek, ShiftId)` | `dow`: `sun..sat` |
+| `shiftMgmt:personal:{empId}.rangeStart` | `PersonalShiftConfig.RangeStart` | 個人班表起始 |
+| `shiftMgmt:personal:{empId}.rangeEnd` | `PersonalShiftConfig.RangeEnd` | 個人班表結束 |
+| `shiftMgmt:personal:{empId}.assignments.{date}.type` | `PersonalAssignment.AssignType` | `work` 或 `off` |
+| `shiftMgmt:personal:{empId}.assignments.{date}.shiftNames[]` | `Shift.Name` -> `PersonalAssignment.ShiftId` | `work` 時每班別一列 |
+| `shiftMgmt:personal:{empId}.assignments.{date}.source` | `PersonalAssignment.Source` | `manual` 或 `NULL` |
+| `shiftMgmt:personal:{empId}.holidayGroups[]` | `PersonalSetting(EmployeeId, Category='holidayGroup', RefId=HolidayGroupId)` | 個人套用假別組 |
+| `shiftMgmt:personal:{empId}.attendanceGroups[]` | `PersonalSetting(EmployeeId, Category='attendanceGroup', RefId=AttendanceGroupId)` | 個人套用考勤組 |
+| `shiftMgmt:personal:{empId}.shifts[]` | `PersonalSetting(EmployeeId, Category='shift', RefId=ShiftId)` | 個人套用班別 |
+| `shiftMgmt:personal:{empId}.positions[]` | `PersonalSetting(EmployeeId, Category='position', RefId=PositionId)` | 個人套用崗位 |
+| `shiftMgmt:personal:{empId}.tags[]` | `PersonalSetting(EmployeeId, Category='tag', RefId=TagId)` | 個人套用標籤 |
+| `shiftMgmt:global.__version` | `AppMeta(Key='DataVersion').Value` | 資料版本 |
+
+> `selectedBranch`、`selectedDepartment`、`selectedHolidayGroups`、`allowedScopeCustomized` 屬 UI/流程狀態欄位；通常不需要獨立落 DB 欄位。
+
+### API DTO 規格（前端 payload -> SQL upsert 順序）
+
+以下提供建議版 API 設計，目標是讓前端目前的 localStorage 結構可以無痛同步到 MSSQL。
+
+#### 1) 全域同步 API（對應 shiftMgmt:global）
+
+建議路由：`POST /api/v1/sync/global`
+
+Request DTO（建議）：
+
+```json
+{
+  "version": 14,
+  "dictionary": {
+    "branches": ["總公司"],
+    "departments": ["倉儲部"],
+    "positions": ["揀貨員", "理貨員"],
+    "tags": ["可加班"],
+    "supervisors": ["劉經理"],
+    "punchLocations": ["總公司", "倉儲中心"]
+  },
+  "persons": [
+    { "id": "EMP001", "name": "王小明", "branch": "總公司", "department": "倉儲部", "isActive": true }
+  ],
+  "shifts": [
+    { "name": "早班", "shortName": "早", "start": "08:00", "end": "17:00", "hours": 8, "rest": 1, "otStart": "17:00", "otEnd": "20:00" }
+  ],
+  "holidayGroups": [
+    { "name": "台灣國定假日", "dates": ["2026-01-01", "2026-02-28"] },
+    { "name": "一例一休", "dates": ["2026-01-03", "2026-01-04"] }
+  ],
+  "individualHolidays": ["2026-01-20"],
+  "attendanceGroups": [
+    {
+      "name": "A組 - 倉儲",
+      "scheduleType": "auto",
+      "workOnHoliday": false,
+      "members": ["EMP001"],
+      "punchLocations": ["倉儲中心"],
+      "weekdayShifts": {
+        "mon": ["早班"],
+        "tue": ["早班"],
+        "wed": ["早班"],
+        "thu": ["早班"],
+        "fri": ["早班"],
+        "sat": [],
+        "sun": []
+      }
+    }
+  ],
+  "schedules": [
+    {
+      "name": "2026年1月排班",
+      "start": "2026-01-01",
+      "end": "2026-01-31",
+      "branch": "總公司",
+      "department": "倉儲部",
+      "positions": ["揀貨員", "理貨員"],
+      "supervisors": ["劉經理"],
+      "tags": ["可加班"],
+      "allowedShiftNames": ["早班"],
+      "allowedHolidayGroupNames": ["台灣國定假日", "一例一休"],
+      "allowedAttendanceGroupNames": ["A組 - 倉儲"]
+    }
+  ]
+}
+```
+
+SQL upsert 順序（同一 transaction 內）：
+
+1. Upsert 字典表：`Branch`、`Department`、`Position`、`Tag`、`Supervisor`、`PunchLocation`。
+2. Upsert `Employee`，名稱/狀態更新，並以字典表名稱解析 `BranchId`、`DepartmentId`。
+3. Upsert `Shift`（以 `Name` 為自然鍵）。
+4. Upsert `HolidayGroup`，再以刪除重建方式同步 `HolidayGroupDate`。
+5. Upsert `IndividualHoliday`（建議以 date 為 key，刪除不在 payload 的日期）。
+6. Upsert `AttendanceGroup`（以 `Name` 為自然鍵）。
+7. 同步 `AttendanceGroupMember`、`AttendanceGroupPunchLoc`、`AttendanceGroupWeekday`（建議各組刪除重建）。
+8. Upsert `Schedule`（建議以 `Name + StartDate + EndDate` 或前端提供 `clientScheduleKey` 當自然鍵）。
+9. 同步 `SchedulePosition`、`ScheduleSupervisor`、`ScheduleTag`（各班表刪除重建）。
+10. 同步 `ScheduleAllowedShift`、`ScheduleAllowedHolidayGroup`、`ScheduleAllowedAttendanceGroup`（各班表刪除重建）。
+11. Upsert `AppMeta`：`DataVersion` = request.version。
+
+建議 Response DTO：
+
+```json
+{
+  "ok": true,
+  "version": 14,
+  "updatedAt": "2026-05-05T09:30:00Z",
+  "stats": {
+    "employees": 5,
+    "shifts": 3,
+    "attendanceGroups": 3,
+    "schedules": 3
+  }
+}
+```
+
+#### 2) 個人同步 API（對應 shiftMgmt:personal:{empId}）
+
+建議路由：`POST /api/v1/sync/personal`
+
+Request DTO（建議）：
+
+```json
+{
+  "employeeId": "EMP001",
+  "rangeStart": "2026-01-01",
+  "rangeEnd": "2026-01-31",
+  "assignments": [
+    { "date": "2026-01-05", "type": "work", "shiftNames": ["早班"], "source": "manual" },
+    { "date": "2026-01-06", "type": "off", "shiftNames": [], "source": "manual" }
+  ],
+  "settings": {
+    "holidayGroups": ["台灣國定假日"],
+    "attendanceGroups": ["A組 - 倉儲"],
+    "shifts": ["早班"],
+    "positions": ["理貨員"],
+    "tags": ["可加班"]
+  }
+}
+```
+
+SQL upsert 順序（同一 transaction 內）：
+
+1. 驗證 `Employee` 存在，不存在則回傳 400/404。
+2. Upsert `PersonalShiftConfig(EmployeeId, RangeStart, RangeEnd)`。
+3. 刪除該員工在區間內舊的 `PersonalAssignment`。
+4. 寫入新的 `PersonalAssignment`：
+   - `type=work`：每個 `shiftName` 寫一列（需解析 `ShiftId`）。
+   - `type=off`：寫一列且 `ShiftId = NULL`。
+5. 刪除該員工舊的 `PersonalSetting`。
+6. 依 `settings` 寫回 `PersonalSetting` 五種 category：
+   - holidayGroup / attendanceGroup / shift / position / tag。
+
+建議 Response DTO：
+
+```json
+{
+  "ok": true,
+  "employeeId": "EMP001",
+  "updatedAt": "2026-05-05T09:35:00Z",
+  "assignmentCount": 2
+}
+```
+
+#### 3) 實作注意事項
+
+1. 由於前端多為「名稱」參照，後端需先做名稱去重與 FK 解析。
+2. 關聯表（如 `ScheduleAllowed*`、`AttendanceGroup*`、`PersonalSetting`）建議採「刪除重建」策略，可降低同步差異計算複雜度。
+3. 全域同步與個人同步都建議使用 transaction，避免部分成功造成資料不一致。
+4. 可在 DTO 增加 `clientUpdatedAt`，後端配合 optimistic lock（例如比對伺服器 `UpdatedAt`）避免覆蓋衝突。
+
+### Stored Procedure 範本（可直接執行）
+
+已提供可執行範本：
+
+- [db/procedures.sql](db/procedures.sql)
+  - `dbo.usp_SyncGlobal(@Payload NVARCHAR(MAX))`
+  - `dbo.usp_SyncPersonal(@Payload NVARCHAR(MAX))`
+
+手動重建 SP：
+
+```bash
+docker exec -e PW="Shift@Pass2026" shift-mssql \
+  bash -c '/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$PW" -No -b -i /db/procedures.sql'
+```
+
+呼叫範例（全域同步）：
+
+```sql
+DECLARE @payload NVARCHAR(MAX) = N'{
+  "version": 14,
+  "dictionary": {
+    "branches": ["總公司"],
+    "departments": ["倉儲部"],
+    "positions": ["揀貨員"],
+    "tags": ["可加班"],
+    "supervisors": ["劉經理"],
+    "punchLocations": ["倉儲中心"]
+  },
+  "persons": [{"id":"EMP001","name":"王小明","branch":"總公司","department":"倉儲部","isActive":true}],
+  "shifts": [{"name":"早班","shortName":"早","start":"08:00","end":"17:00","hours":8,"rest":1,"otStart":"17:00","otEnd":"20:00"}],
+  "holidayGroups": [{"name":"台灣國定假日","dates":["2026-01-01"]}],
+  "individualHolidays": ["2026-01-20"],
+  "attendanceGroups": [{
+    "name":"A組 - 倉儲",
+    "scheduleType":"auto",
+    "workOnHoliday":false,
+    "members":["EMP001"],
+    "punchLocations":["倉儲中心"],
+    "weekdayShifts":{"mon":["早班"],"tue":["早班"],"wed":["早班"],"thu":["早班"],"fri":["早班"],"sat":[],"sun":[]}
+  }],
+  "schedules": [{
+    "name":"2026年1月排班",
+    "start":"2026-01-01",
+    "end":"2026-01-31",
+    "branch":"總公司",
+    "department":"倉儲部",
+    "positions":["揀貨員"],
+    "supervisors":["劉經理"],
+    "tags":["可加班"],
+    "allowedShiftNames":["早班"],
+    "allowedHolidayGroupNames":["台灣國定假日"],
+    "allowedAttendanceGroupNames":["A組 - 倉儲"]
+  }]
+}';
+
+EXEC dbo.usp_SyncGlobal @Payload = @payload;
+```
+
+呼叫範例（個人同步）：
+
+```sql
+DECLARE @payload NVARCHAR(MAX) = N'{
+  "employeeId":"EMP001",
+  "rangeStart":"2026-01-01",
+  "rangeEnd":"2026-01-31",
+  "assignments":[
+    {"date":"2026-01-05","type":"work","shiftNames":["早班"],"source":"manual"},
+    {"date":"2026-01-06","type":"off","shiftNames":[],"source":"manual"}
+  ],
+  "settings":{
+    "holidayGroups":["台灣國定假日"],
+    "attendanceGroups":["A組 - 倉儲"],
+    "shifts":["早班"],
+    "positions":["揀貨員"],
+    "tags":["可加班"]
+  }
+}';
+
+EXEC dbo.usp_SyncPersonal @Payload = @payload;
+```
 
 詳細 DDL 請見 [db/schema.sql](db/schema.sql)、種子資料 [db/seed.sql](db/seed.sql)。
