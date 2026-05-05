@@ -4,6 +4,27 @@
 
 ---
 
+## 近期更新（最近 12 次 Push）
+
+以下整理目前 `main` 分支最近 12 筆已推送提交（`origin/main`）的重點改動：
+
+| Commit | 類型 | 主要變更 | 影響檔案 |
+|---|---|---|---|
+| `ab19489` | fix | 修正假別組與假別選取空值邏輯，避免錯誤回填 | `shift-choose.html`, `shift-setting.html` |
+| `2c7bfc2` | feat | 新增班表可用項目選取頁（班別/假別組/考勤組） | `shift-choose.html`, `shift-setting.html` |
+| `8551338` | ui | 調整總覽圖例欄的邊距、邊框、陰影 | `index.html` |
+| `2ac2696` | feat | 新增 allowed picker（班別/假別組/考勤組） | `shift-setting-new.html`, `shift-setting.html` |
+| `6fce3e6` | ux | 更新部門/工作地標題，加入必填標記與驗證強化 | `shift-setting-new.html`, `shift-setting.html` |
+| `4d0c3fc` | ui | 調整主管標題與標籤邏輯，提升介面一致性 | `index.html`, `shift-setting-new.html`, `shift-setting.html` |
+| `4cf5f6f` | feat | 新增假別組/考勤組頁面的草稿保存與編輯流程 | `holiday-group.html`, `shift-group.html`, `shift-setting-new.html` |
+| `90b51d7` | feat | 新增假別組設定頁（新增、編輯、日期管理） | `holiday-group.html`, `shift-setting.html` |
+| `d7d6507` | feat | 新增考勤組設定頁（新增、編輯、人員管理） | `shift-group.html`, `shift-setting.html` |
+| `b38b384` | ui | 調整班表標題顯示，新增「全部班表」選項 | `index.html` |
+| `ce84e6c` | feat | 新增排班名稱自動生成功能（依年月） | `index.html` |
+| `65500ba` | fix/refactor | 返回頁面時重讀 localStorage，並重構班表設定即時保存 | `index.html`, `shift-list.html`, `shift-setting.html` |
+
+---
+
 ## 目錄
 
 1. [頁面結構與導航](#頁面結構與導航)
@@ -17,6 +38,7 @@
 4. [色彩語義](#色彩語義)
 5. [篩選器](#篩選器)
 6. [資料持久化](#資料持久化)
+7. [資料庫（MSSQL）](#資料庫mssql)
 
 ---
 

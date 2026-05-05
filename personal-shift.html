@@ -438,6 +438,39 @@
     return Array.isArray(arr) ? arr.filter(n => n) : [];
   }
 
+  // ===== 取得時間區間對應的班表可選項目（聯集） =====
+  function getSchedulesForDateRange(startDate, endDate) {
+    // 找出該時間區間內所有重疊的班表
+    return (G.schedules || []).filter(sched => 
+      sched && sched.start && sched.end &&
+      sched.start <= endDate && startDate <= sched.end
+    );
+  }
+
+  function getAllowedHolidayGroupNamesForRange(startDate, endDate) {
+    // 合併所有重疊班表的允許假別組名稱（聯集）
+    const schedules = getSchedulesForDateRange(startDate, endDate);
+    const nameSet = new Set();
+    schedules.forEach(sched => {
+      const names = sched.allowedHolidayGroupNames || [];
+      names.forEach(n => nameSet.add(n));
+    });
+    return Array.from(nameSet).filter(n => (G.holidayGroups || {})[n]); // 過濾掉已刪除的假別組
+  }
+
+  function getAllowedAttendanceGroupNamesForRange(startDate, endDate) {
+    // 合併所有重疊班表的允許考勤組名稱（聯集）
+    const schedules = getSchedulesForDateRange(startDate, endDate);
+    const nameSet = new Set();
+    schedules.forEach(sched => {
+      const names = sched.allowedAttendanceGroupNames || [];
+      names.forEach(n => nameSet.add(n));
+    });
+    return Array.from(nameSet).filter(n => 
+      (G.attendanceGroups || []).some(g => g.name === n)
+    ); // 過濾掉已刪除的考勤組
+  }
+
   // ===== 渲染：頂部資訊 =====
   function renderHeader(){
     document.getElementById('pageTitle').textContent = `個人排班 - ${employee.name}`;
@@ -709,9 +742,9 @@
     document.getElementById('rangeEnd').value   = personal.rangeEnd;
     persistPersonal();
   }
-  function prevMonth(){ viewMonth.setMonth(viewMonth.getMonth()-1); syncRangeToViewMonth(); renderCalendar(); }
-  function nextMonth(){ viewMonth.setMonth(viewMonth.getMonth()+1); syncRangeToViewMonth(); renderCalendar(); }
-  function goToday(){ viewMonth = new Date(); viewMonth.setDate(1); syncRangeToViewMonth(); renderCalendar(); }
+  function prevMonth(){ viewMonth.setMonth(viewMonth.getMonth()-1); syncRangeToViewMonth(); renderCalendar(); renderHolidayGroupsPanel(); renderAttendanceGroupsPanel(); }
+  function nextMonth(){ viewMonth.setMonth(viewMonth.getMonth()+1); syncRangeToViewMonth(); renderCalendar(); renderHolidayGroupsPanel(); renderAttendanceGroupsPanel(); }
+  function goToday(){ viewMonth = new Date(); viewMonth.setDate(1); syncRangeToViewMonth(); renderCalendar(); renderHolidayGroupsPanel(); renderAttendanceGroupsPanel(); }
 
   // ===== 指派 modal =====
   let assigningDate = null;
@@ -840,13 +873,25 @@
   // ===== 個人化分組設定 =====
   function renderHolidayGroupsPanel(){
     const c = document.getElementById('personalHolidayGroups');
-    const names = Object.keys(G.holidayGroups || {});
-    if (!names.length) { c.innerHTML = '<div class="text-sm text-slate-400">尚未建立任何假別組</div>'; return; }
+     const startDate = personal.rangeStart;
+     const endDate = personal.rangeEnd;
+   
+     // 取得時間區間內班表的允許假別組名稱
+     const allowedNames = getAllowedHolidayGroupNamesForRange(startDate, endDate);
+   
+     // 如果班表沒有設定允許名單，則使用全局所有假別組
+     let names = allowedNames.length > 0 
+       ? allowedNames 
+       : Object.keys(G.holidayGroups || {});
+    if (!names.length) {
+      c.innerHTML = '<div class="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-500">尚未指派假別組</div>';
+      return;
+    }
     c.innerHTML = names.map(n => `
-      <label class="flex items-center gap-3 p-2 bg-red-50 rounded-lg cursor-pointer">
+      <label class="flex items-center gap-3 p-3 bg-red-50 rounded-lg border ${draft.holidayGroups.includes(n) ? 'border-red-300 ring-1 ring-red-200' : 'border-red-100'} cursor-pointer">
         <input type="checkbox" ${draft.holidayGroups.includes(n)?'checked':''} onclick="toggleDraftHolidayGroup('${n.replace(/'/g,"\\'")}')">
         <div class="flex-1">
-          <div class="text-sm font-medium">${n}</div>
+          <div class="text-sm font-medium text-slate-800">${n}</div>
           <div class="text-xs text-slate-500">${(G.holidayGroups[n]||[]).length} 個假日</div>
         </div>
       </label>
@@ -861,13 +906,25 @@
   }
   function renderAttendanceGroupsPanel(){
     const c = document.getElementById('personalAttendanceGroups');
-    const list = G.attendanceGroups || [];
-    if (!list.length) { c.innerHTML = '<div class="text-sm text-slate-400">尚未建立任何考勤組</div>'; return; }
+     const startDate = personal.rangeStart;
+     const endDate = personal.rangeEnd;
+   
+     // 取得時間區間內班表的允許考勤組名稱
+     const allowedNames = getAllowedAttendanceGroupNamesForRange(startDate, endDate);
+   
+     // 如果班表沒有設定允許名單，則使用全局所有考勤組
+     const list = allowedNames.length > 0
+       ? (G.attendanceGroups || []).filter(g => allowedNames.includes(g.name))
+       : (G.attendanceGroups || []);
+    if (!list.length) {
+      c.innerHTML = '<div class="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-500">尚未指派考勤組</div>';
+      return;
+    }
     const DOW_LABELS = [['mon','一'],['tue','二'],['wed','三'],['thu','四'],['fri','五'],['sat','六'],['sun','日']];
     const noneSelected = !draft.attendanceGroups.length;
     const noneOption = `
-      <label class="flex items-center gap-3 p-2 bg-slate-50 rounded-lg cursor-pointer border ${noneSelected?'border-slate-400':'border-transparent'}">
-        <input type="radio" name="personalAttendanceGroup" ${noneSelected?'checked':''} onclick="clearDraftAttendanceGroup()">
+      <label class="flex items-center gap-3 p-3 bg-slate-50 rounded-lg cursor-pointer border ${noneSelected ? 'border-slate-400 ring-1 ring-slate-200' : 'border-transparent'}">
+        <input type="radio" name="personalAttendanceGroup" ${noneSelected ? 'checked' : ''} onclick="clearDraftAttendanceGroup()">
         <div class="flex-1 min-w-0">
           <div class="text-sm font-medium text-slate-600">不套用考勤組</div>
           <div class="text-xs text-slate-500">僅依「適用班別」與假別組規則處理</div>
@@ -900,10 +957,10 @@
         weekdayHtml = `<div class="mt-2 text-xs text-slate-500">手動排班</div>`;
       }
       return `
-      <label class="flex items-start gap-3 p-2 bg-green-50 rounded-lg cursor-pointer">
+      <label class="flex items-start gap-3 p-3 bg-green-50 rounded-lg border ${draft.attendanceGroups.includes(g.name) ? 'border-green-300 ring-1 ring-green-200' : 'border-green-100'} cursor-pointer">
         <input type="radio" name="personalAttendanceGroup" class="mt-1" ${draft.attendanceGroups.includes(g.name)?'checked':''} onclick="selectDraftSingle('attendanceGroups','${g.name.replace(/'/g,"\\'")}')">
         <div class="flex-1 min-w-0">
-          <div class="text-sm font-medium">${g.name}</div>
+          <div class="text-sm font-medium text-slate-800">${g.name}</div>
           <div class="text-xs text-slate-500">${(g.members||[]).length} 人</div>
           ${weekdayHtml}
         </div>
@@ -1166,10 +1223,14 @@
     personal.rangeStart = e.target.value; persistPersonal();
     if (personal.rangeStart) { viewMonth = new Date(personal.rangeStart); viewMonth.setDate(1); }
     renderCalendar();
+     renderHolidayGroupsPanel();
+     renderAttendanceGroupsPanel();
   });
   document.getElementById('rangeEnd').addEventListener('change', e => {
     personal.rangeEnd = e.target.value; persistPersonal();
     renderCalendar();
+     renderHolidayGroupsPanel();
+     renderAttendanceGroupsPanel();
   });
 
   // ===== 初始化 =====
