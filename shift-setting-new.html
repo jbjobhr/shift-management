@@ -61,15 +61,8 @@
        <select id="departmentSelect" class="w-full"></select>
       </div>
       <div>
-       <label class="block text-sm font-medium text-slate-600 mb-1">可選用（全局）班別 / 假別組 / 考勤組</label>
-       <div class="grid grid-cols-1 gap-2">
-        <button type="button" onclick="openAllowedPicker('shifts')" class="w-full text-left px-3 py-2 border border-slate-300 rounded-md bg-white hover:bg-slate-50">選取班別</button>
-        <div id="allowedShiftsSummary" class="text-xs text-slate-500">全部可用</div>
-        <button type="button" onclick="openAllowedPicker('holidayGroups')" class="w-full text-left px-3 py-2 border border-slate-300 rounded-md bg-white hover:bg-slate-50">選取假別組</button>
-        <div id="allowedHolidayGroupsSummary" class="text-xs text-slate-500">全部可用</div>
-        <button type="button" onclick="openAllowedPicker('attendanceGroups')" class="w-full text-left px-3 py-2 border border-slate-300 rounded-md bg-white hover:bg-slate-50">選取考勤組</button>
-        <div id="allowedAttendanceGroupsSummary" class="text-xs text-slate-500">全部可用</div>
-       </div>
+       <label class="block text-sm font-medium text-slate-600 mb-1">選取此班表會用到的 班別/假別組/考勤組</label>
+        <button type="button" id="shiftChooseBtn" onclick="goShiftChoosePage()" class="w-full text-left px-3 py-2 border border-slate-300 rounded-md bg-white hover:bg-slate-50 text-slate-700">請選擇</button>
       </div>
       </div>
      </section>
@@ -283,11 +276,9 @@
     }
     return out;
   }
-  let holidayGroups = {
-    '台灣國定假日': Array.from(new Set([..._genWeekendsOfYear(2026), '2026-01-01', '2026-02-28', '2026-04-04', '2026-06-10'])).sort()
-  };
+  let holidayGroups = {};
   let individualHolidays = [];
-  let selectedHolidayGroups = ['台灣國定假日'];
+  let selectedHolidayGroups = [];
   let holidays = [];
   let editingHolidayGroup = null;
   let editingHolidayDates = [];
@@ -1478,6 +1469,7 @@
   renderTags();
   renderBranchAndDepartment();
   renderAllowedOptions();
+  renderAllowedSummary();
   document.getElementById('scheduleName').value = document.getElementById('scheduleName').value || '';
   document.getElementById('startDate').value = document.getElementById('startDate').value || '';
   document.getElementById('endDate').value = document.getElementById('endDate').value || '';
@@ -1548,6 +1540,34 @@
       }));
     } catch (e) { console.warn('syncGlobalData failed', e); }
   }
+  function renderAllowedSummary() {
+    const btn = document.getElementById('shiftChooseBtn');
+    if (!btn) return;
+    const selectedTypes = [];
+    if (allowedShiftNames.length) selectedTypes.push('班別');
+    if (allowedHolidayGroupNames.length) selectedTypes.push('假別組');
+    if (allowedAttendanceGroupNames.length) selectedTypes.push('考勤組');
+
+    if (allowedScopeCustomized && selectedTypes.length) {
+      btn.textContent = `已選擇 ${selectedTypes.join(' / ')}`;
+      btn.classList.remove('text-blue-600', 'font-medium');
+      btn.classList.add('text-slate-700');
+    } else {
+      btn.textContent = '請選擇';
+      btn.classList.remove('text-blue-600', 'font-medium');
+      btn.classList.add('text-slate-700');
+    }
+  }
+  window.renderAllowedSummary = renderAllowedSummary;
+
+  function goShiftChoosePage() {
+    syncGlobalData();
+    const params = new URLSearchParams();
+    params.set('index', '-1');
+    params.set('returnTo', 'shift-setting-new.html');
+    window.location.href = `shift-choose.html?${params.toString()}`;
+  }
+  window.goShiftChoosePage = goShiftChoosePage;
   window.syncGlobalData = syncGlobalData;
   window.onAllowedSelectionChange = onAllowedSelectionChange;
   window.openAllowedPicker = openAllowedPicker;

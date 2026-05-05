@@ -133,7 +133,9 @@
   }
 
   const params = new URLSearchParams(location.search);
-  const currentScheduleIndex = Math.max(0, parseInt(params.get('index') || '0', 10) || 0);
+  const _rawIndex = parseInt(params.get('index') || '0', 10);
+  const isNewSchedule = _rawIndex === -1;
+  const currentScheduleIndex = isNewSchedule ? -1 : Math.max(0, _rawIndex || 0);
   const returnTo = params.get('returnTo') || 'shift-setting.html';
 
   function getReturnUrl() {
@@ -145,7 +147,15 @@
   document.getElementById('backLinkTop').href = getReturnUrl();
 
   const schedules = Array.isArray(G.schedules) ? G.schedules : [];
-  const schedule = schedules[currentScheduleIndex] || {};
+  const NEW_SCHEDULE_DRAFT_KEY = 'shiftMgmt:newScheduleDraft';
+  let newScheduleDraft = {};
+  if (isNewSchedule) {
+    try {
+      const rawDraft = localStorage.getItem(NEW_SCHEDULE_DRAFT_KEY);
+      if (rawDraft) newScheduleDraft = JSON.parse(rawDraft) || {};
+    } catch (e) {}
+  }
+  const schedule = isNewSchedule ? newScheduleDraft : (schedules[currentScheduleIndex] || {});
 
   function cloneDeep(v) {
     return JSON.parse(JSON.stringify(v));
@@ -189,6 +199,14 @@
   buildGlobalTemplates();
 
   function getDefaultAllowed() {
+    if (isNewSchedule) {
+      // 新班表：已選從 draft 讀，若無則為空
+      return {
+        shiftNames: Array.isArray(schedule.allowedShiftNames) ? [...schedule.allowedShiftNames] : [],
+        holidayGroupNames: Array.isArray(schedule.allowedHolidayGroupNames) ? [...schedule.allowedHolidayGroupNames] : [],
+        attendanceGroupNames: Array.isArray(schedule.allowedAttendanceGroupNames) ? [...schedule.allowedAttendanceGroupNames] : []
+      };
+    }
     const fallbackHolidayNames = Object.keys(globalHolidayGroupTemplates || {});
     return {
       shiftNames: (Array.isArray(schedule.shifts) ? schedule.shifts : []).map(s => s.name).filter(Boolean),
@@ -198,14 +216,15 @@
   }
 
   const defaults = getDefaultAllowed();
-  let allowedShiftNames = Array.isArray(schedule.allowedShiftNames) ? [...schedule.allowedShiftNames] : [...defaults.shiftNames];
-  let allowedHolidayGroupNames = Array.isArray(schedule.allowedHolidayGroupNames) ? [...schedule.allowedHolidayGroupNames] : [...defaults.holidayGroupNames];
-  let allowedAttendanceGroupNames = Array.isArray(schedule.allowedAttendanceGroupNames) ? [...schedule.allowedAttendanceGroupNames] : [...defaults.attendanceGroupNames];
+  let allowedShiftNames = [...defaults.shiftNames];
+  let allowedHolidayGroupNames = [...defaults.holidayGroupNames];
+  let allowedAttendanceGroupNames = [...defaults.attendanceGroupNames];
 
-  if (!schedule.allowedScopeCustomized) {
-    allowedShiftNames = [...defaults.shiftNames];
-    allowedHolidayGroupNames = [...defaults.holidayGroupNames];
-    allowedAttendanceGroupNames = [...defaults.attendanceGroupNames];
+  if (!isNewSchedule && !schedule.allowedScopeCustomized) {
+    const fallbackHolidayNames = Object.keys(globalHolidayGroupTemplates || {});
+    allowedShiftNames = (Array.isArray(schedule.shifts) ? schedule.shifts : []).map(s => s.name).filter(Boolean);
+    allowedHolidayGroupNames = Object.keys(schedule.holidayGroups || {}).length ? Object.keys(schedule.holidayGroups || {}) : fallbackHolidayNames;
+    allowedAttendanceGroupNames = (Array.isArray(schedule.attendanceGroups) ? schedule.attendanceGroups : []).map(g => g.name).filter(Boolean);
   }
 
   allowedShiftNames = allowedShiftNames.filter(name => Object.prototype.hasOwnProperty.call(globalShiftTemplates, name));
@@ -312,31 +331,49 @@
   }
 
   function saveAndBack() {
-    const sched = schedules[currentScheduleIndex] || {};
     const selectedShiftNames = [...allowedPickerState.shifts.selected];
     const selectedHolidayNames = [...allowedPickerState.holidayGroups.selected];
     const selectedAttendanceNames = [...allowedPickerState.attendanceGroups.selected];
 
-    sched.shifts = selectedShiftNames.map(name => cloneDeep(globalShiftTemplates[name])).filter(Boolean);
-    sched.holidayGroups = selectedHolidayNames.reduce((acc, name) => {
-      if (globalHolidayGroupTemplates[name]) acc[name] = cloneDeep(globalHolidayGroupTemplates[name]);
-      return acc;
-    }, {});
-    sched.attendanceGroups = selectedAttendanceNames.map(name => cloneDeep(globalAttendanceGroupTemplates[name])).filter(Boolean);
-
-    const prevSelectedHolidayGroups = Array.isArray(sched.selectedHolidayGroups) ? sched.selectedHolidayGroups : [];
-    sched.selectedHolidayGroups = prevSelectedHolidayGroups.filter(name => selectedHolidayNames.includes(name));
-    if (!sched.selectedHolidayGroups.length && selectedHolidayNames.length) {
-      sched.selectedHolidayGroups = [selectedHolidayNames[0]];
+    if (isNewSchedule) {
+      // 新班表：把選擇結果寫回 draft
+      newScheduleDraft.allowedScopeCustomized = true;
+      newScheduleDraft.allowedShiftNames = selectedShiftNames;
+      newScheduleDraft.allowedHolidayGroupNames = selectedHolidayNames;
+      newScheduleDraft.allowedAttendanceGroupNames = selectedAttendanceNames;
+      newScheduleDraft.shifts = selectedShiftNames.map(name => cloneDeep(globalShiftTemplates[name])).filter(Boolean);
+      newScheduleDraft.holidayGroups = selectedHolidayNames.reduce((acc, name) => {
+        if (globalHolidayGroupTemplates[name]) acc[name] = cloneDeep(globalHolidayGroupTemplates[name]);
+        return acc;
+      }, {});
+      newScheduleDraft.attendanceGroups = selectedAttendanceNames.map(name => cloneDeep(globalAttendanceGroupTemplates[name])).filter(Boolean);
+      const prevSel = Array.isArray(newScheduleDraft.selectedHolidayGroups) ? newScheduleDraft.selectedHolidayGroups : [];
+      newScheduleDraft.selectedHolidayGroups = prevSel.filter(n => selectedHolidayNames.includes(n));
+      if (!newScheduleDraft.selectedHolidayGroups.length && selectedHolidayNames.length) {
+        newScheduleDraft.selectedHolidayGroups = [selectedHolidayNames[0]];
+      }
+      try { localStorage.setItem(NEW_SCHEDULE_DRAFT_KEY, JSON.stringify(newScheduleDraft)); } catch (e) {}
+    } else {
+      const sched = schedules[currentScheduleIndex] || {};
+      sched.shifts = selectedShiftNames.map(name => cloneDeep(globalShiftTemplates[name])).filter(Boolean);
+      sched.holidayGroups = selectedHolidayNames.reduce((acc, name) => {
+        if (globalHolidayGroupTemplates[name]) acc[name] = cloneDeep(globalHolidayGroupTemplates[name]);
+        return acc;
+      }, {});
+      sched.attendanceGroups = selectedAttendanceNames.map(name => cloneDeep(globalAttendanceGroupTemplates[name])).filter(Boolean);
+      const prevSelectedHolidayGroups = Array.isArray(sched.selectedHolidayGroups) ? sched.selectedHolidayGroups : [];
+      sched.selectedHolidayGroups = prevSelectedHolidayGroups.filter(name => selectedHolidayNames.includes(name));
+      if (!sched.selectedHolidayGroups.length && selectedHolidayNames.length) {
+        sched.selectedHolidayGroups = [selectedHolidayNames[0]];
+      }
+      sched.allowedScopeCustomized = true;
+      sched.allowedShiftNames = selectedShiftNames;
+      sched.allowedHolidayGroupNames = selectedHolidayNames;
+      sched.allowedAttendanceGroupNames = selectedAttendanceNames;
+      schedules[currentScheduleIndex] = sched;
+      G.schedules = schedules;
+      localStorage.setItem('shiftMgmt:global', JSON.stringify(G));
     }
-
-    sched.allowedScopeCustomized = true;
-    sched.allowedShiftNames = selectedShiftNames;
-    sched.allowedHolidayGroupNames = selectedHolidayNames;
-    sched.allowedAttendanceGroupNames = selectedAttendanceNames;
-    schedules[currentScheduleIndex] = sched;
-    G.schedules = schedules;
-    localStorage.setItem('shiftMgmt:global', JSON.stringify(G));
     window.location.href = getReturnUrl();
   }
 

@@ -63,7 +63,7 @@
       </div>
       <div>
        <label class="block text-sm font-medium text-slate-600 mb-1">選取此班表會用到的 班別/假別組/考勤組</label>
-        <button type="button" onclick="goShiftChoosePage()" class="w-full text-left px-3 py-2 border border-slate-300 rounded-md bg-white hover:bg-slate-50 text-slate-700">請選擇</button>
+        <button type="button" id="shiftChooseBtn" onclick="goShiftChoosePage()" class="w-full text-left px-3 py-2 border border-slate-300 rounded-md bg-white hover:bg-slate-50 text-slate-700">請選擇</button>
       </div>
       </div>
      </section>
@@ -878,14 +878,23 @@
 
   function renderAllowedOptions() {
     ensureAllowedDefaults();
-    const setSummary = (id, values) => {
-      const el = document.getElementById(id);
-      if (!el) return;
-      el.textContent = values.length ? values.join('、') : '未選擇';
-    };
-    setSummary('allowedShiftsSummary', allowedShiftNames);
-    setSummary('allowedHolidayGroupsSummary', allowedHolidayGroupNames);
-    setSummary('allowedAttendanceGroupsSummary', allowedAttendanceGroupNames);
+    const btn = document.getElementById('shiftChooseBtn');
+    if (!btn) return;
+
+    const selectedTypes = [];
+    if (allowedShiftNames.length) selectedTypes.push('班別');
+    if (allowedHolidayGroupNames.length) selectedTypes.push('假別組');
+    if (allowedAttendanceGroupNames.length) selectedTypes.push('考勤組');
+
+    if (allowedScopeCustomized && selectedTypes.length) {
+      btn.textContent = `已選擇 ${selectedTypes.join(' / ')}`;
+      btn.classList.remove('text-blue-600', 'font-medium');
+      btn.classList.add('text-slate-700');
+    } else {
+      btn.textContent = '請選擇';
+      btn.classList.remove('text-blue-600', 'font-medium');
+      btn.classList.add('text-slate-700');
+    }
   }
 
   function getAllowedPickerConfig(type) {
