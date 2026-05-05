@@ -340,6 +340,14 @@
   let selectedTags = [];
 
   const NEW_SCHEDULE_DRAFT_KEY = 'shiftMgmt:newScheduleDraft';
+  const _newPageParams = new URLSearchParams(window.location.search);
+  const _isReturnFromShiftChoose = _newPageParams.get('index') === '-1';
+
+  // 一般開啟「新增班表」頁時，清除舊草稿，避免帶入上次新增資料。
+  // 只有從 shift-choose 返回（index=-1）才保留並載入草稿。
+  if (!_isReturnFromShiftChoose) {
+    try { localStorage.removeItem(NEW_SCHEDULE_DRAFT_KEY); } catch (e) {}
+  }
 
   // 載入既有班表列表
   let schedules = [];
@@ -352,36 +360,38 @@
     }
   } catch (e) { console.warn('load schedules failed', e); }
 
-  try {
-    const rawDraft = localStorage.getItem(NEW_SCHEDULE_DRAFT_KEY);
-    if (rawDraft) {
-      const draft = JSON.parse(rawDraft);
-      if (draft && typeof draft === 'object') {
-        if (typeof draft.name === 'string') document.getElementById('scheduleName').value = draft.name;
-        if (typeof draft.start === 'string') document.getElementById('startDate').value = draft.start;
-        if (typeof draft.end === 'string') document.getElementById('endDate').value = draft.end;
-        if (Array.isArray(draft.holidayGroups) || typeof draft.holidayGroups === 'object') holidayGroups = draft.holidayGroups || holidayGroups;
-        if (Array.isArray(draft.individualHolidays)) individualHolidays = [...draft.individualHolidays];
-        if (Array.isArray(draft.selectedHolidayGroups)) selectedHolidayGroups = [...draft.selectedHolidayGroups];
-        if (Array.isArray(draft.persons)) persons = [...draft.persons];
-        if (Array.isArray(draft.shifts)) shifts = [...draft.shifts];
-        if (Array.isArray(draft.attendanceGroups)) attendanceGroups = [...draft.attendanceGroups];
-        if (Array.isArray(draft.allPunchLocations)) allPunchLocations = [...draft.allPunchLocations];
-        if (Array.isArray(draft.branches)) branches = [...draft.branches];
-        if (Array.isArray(draft.departments)) departments = [...draft.departments];
-        if (typeof draft.selectedBranch === 'string') selectedBranch = draft.selectedBranch;
-        if (typeof draft.selectedDepartment === 'string') selectedDepartment = draft.selectedDepartment;
-        if (Array.isArray(draft.allPositions)) allPositions = [...draft.allPositions];
-        if (Array.isArray(draft.positions)) positions = [...draft.positions];
-        if (Array.isArray(draft.tags)) tags = [...draft.tags];
-        if (Array.isArray(draft.supervisors)) supervisors = [...draft.supervisors];
-        allowedScopeCustomized = !!draft.allowedScopeCustomized;
-        if (Array.isArray(draft.allowedShiftNames)) allowedShiftNames = [...draft.allowedShiftNames];
-        if (Array.isArray(draft.allowedHolidayGroupNames)) allowedHolidayGroupNames = [...draft.allowedHolidayGroupNames];
-        if (Array.isArray(draft.allowedAttendanceGroupNames)) allowedAttendanceGroupNames = [...draft.allowedAttendanceGroupNames];
+  if (_isReturnFromShiftChoose) {
+    try {
+      const rawDraft = localStorage.getItem(NEW_SCHEDULE_DRAFT_KEY);
+      if (rawDraft) {
+        const draft = JSON.parse(rawDraft);
+        if (draft && typeof draft === 'object') {
+          if (typeof draft.name === 'string') document.getElementById('scheduleName').value = draft.name;
+          if (typeof draft.start === 'string') document.getElementById('startDate').value = draft.start;
+          if (typeof draft.end === 'string') document.getElementById('endDate').value = draft.end;
+          if (Array.isArray(draft.holidayGroups) || typeof draft.holidayGroups === 'object') holidayGroups = draft.holidayGroups || holidayGroups;
+          if (Array.isArray(draft.individualHolidays)) individualHolidays = [...draft.individualHolidays];
+          if (Array.isArray(draft.selectedHolidayGroups)) selectedHolidayGroups = [...draft.selectedHolidayGroups];
+          if (Array.isArray(draft.persons)) persons = [...draft.persons];
+          if (Array.isArray(draft.shifts)) shifts = [...draft.shifts];
+          if (Array.isArray(draft.attendanceGroups)) attendanceGroups = [...draft.attendanceGroups];
+          if (Array.isArray(draft.allPunchLocations)) allPunchLocations = [...draft.allPunchLocations];
+          if (Array.isArray(draft.branches)) branches = [...draft.branches];
+          if (Array.isArray(draft.departments)) departments = [...draft.departments];
+          if (typeof draft.selectedBranch === 'string') selectedBranch = draft.selectedBranch;
+          if (typeof draft.selectedDepartment === 'string') selectedDepartment = draft.selectedDepartment;
+          if (Array.isArray(draft.allPositions)) allPositions = [...draft.allPositions];
+          if (Array.isArray(draft.positions)) positions = [...draft.positions];
+          if (Array.isArray(draft.tags)) tags = [...draft.tags];
+          if (Array.isArray(draft.supervisors)) supervisors = [...draft.supervisors];
+          allowedScopeCustomized = !!draft.allowedScopeCustomized;
+          if (Array.isArray(draft.allowedShiftNames)) allowedShiftNames = [...draft.allowedShiftNames];
+          if (Array.isArray(draft.allowedHolidayGroupNames)) allowedHolidayGroupNames = [...draft.allowedHolidayGroupNames];
+          if (Array.isArray(draft.allowedAttendanceGroupNames)) allowedAttendanceGroupNames = [...draft.allowedAttendanceGroupNames];
+        }
       }
-    }
-  } catch (e) { console.warn('load draft failed', e); }
+    } catch (e) { console.warn('load draft failed', e); }
+  }
 
   const defaultConfig = {
     app_title: '新增班表設定',
