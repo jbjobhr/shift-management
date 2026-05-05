@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="zh-TW" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>選取班表可用項目</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Noto Sans TC', sans-serif; }
+    html, body { height: 100%; width: 100%; }
+    .picker-row { padding: 6px 8px; border-bottom: 1px solid #e2e8f0; cursor: pointer; font-size: 14px; }
+    .picker-row:hover { background: #f8fafc; }
+    .picker-row.active { background: #dbeafe; color: #1e40af; }
+    input[type="text"] { border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 10px; font-size: 14px; }
+    input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.1); }
+  </style>
+ </head>
+ <body class="h-full bg-slate-50 w-full">
+  <div class="min-h-full w-full flex flex-col">
+   <header class="bg-[#1e3a5f] text-white px-6 py-4 flex items-center justify-between">
+    <h1 class="text-xl font-bold tracking-wide">班表可用項目設定</h1>
+    <a id="backLinkTop" href="shift-setting.html" class="px-4 py-1.5 rounded-md text-sm font-medium bg-white/10 hover:bg-white/20">返回</a>
+   </header>
+   <main class="flex-1 p-6 overflow-auto">
+    <div class="max-w-6xl mx-auto space-y-5">
+      <div class="bg-white rounded-xl shadow-sm p-4">
+        <h2 class="text-lg font-bold text-slate-800">選擇此班表會用到的項目</h2>
+        <p class="text-sm text-slate-500 mt-1">可複選多筆，再用左右箭頭移動。</p>
+      </div>
+
+      <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 space-y-3">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <h3 class="font-semibold text-slate-800">班別</h3>
+            <p class="text-xs text-slate-500">設定此班表允許使用的班別。</p>
+          </div>
+          <button type="button" onclick="selectAllAllowedAvailable('shifts')" class="px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm">全部加入</button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-4 items-start">
+          <div>
+            <input id="allowedPickerAvailableSearch-shifts" type="text" placeholder="搜尋" class="w-full mb-2" oninput="renderAllowedPickerSection('shifts')">
+            <div id="allowedPickerAvailableList-shifts" class="border border-slate-200 rounded-md bg-white max-h-56 overflow-y-auto"></div>
+            <div class="text-center text-sm text-slate-600 mt-1">可選擇的項目</div>
+          </div>
+          <div class="flex md:flex-col gap-2 justify-center items-center pt-8">
+            <button type="button" onclick="moveAllowedToSelected('shifts')" class="px-2 py-1 border rounded-md bg-white">→</button>
+            <button type="button" onclick="moveAllowedToAvailable('shifts')" class="px-2 py-1 border rounded-md bg-white">←</button>
+          </div>
+          <div>
+            <input id="allowedPickerSelectedSearch-shifts" type="text" placeholder="搜尋" class="w-full mb-2" oninput="renderAllowedPickerSection('shifts')">
+            <div id="allowedPickerSelectedList-shifts" class="border border-slate-200 rounded-md bg-white max-h-56 overflow-y-auto"></div>
+            <div class="text-center text-sm text-slate-600 mt-1">已選擇的項目</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 space-y-3">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <h3 class="font-semibold text-slate-800">假別組</h3>
+            <p class="text-xs text-slate-500">設定此班表允許使用的假別組。</p>
+          </div>
+          <button type="button" onclick="selectAllAllowedAvailable('holidayGroups')" class="px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm">全部加入</button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-4 items-start">
+          <div>
+            <input id="allowedPickerAvailableSearch-holidayGroups" type="text" placeholder="搜尋" class="w-full mb-2" oninput="renderAllowedPickerSection('holidayGroups')">
+            <div id="allowedPickerAvailableList-holidayGroups" class="border border-slate-200 rounded-md bg-white max-h-56 overflow-y-auto"></div>
+            <div class="text-center text-sm text-slate-600 mt-1">可選擇的項目</div>
+          </div>
+          <div class="flex md:flex-col gap-2 justify-center items-center pt-8">
+            <button type="button" onclick="moveAllowedToSelected('holidayGroups')" class="px-2 py-1 border rounded-md bg-white">→</button>
+            <button type="button" onclick="moveAllowedToAvailable('holidayGroups')" class="px-2 py-1 border rounded-md bg-white">←</button>
+          </div>
+          <div>
+            <input id="allowedPickerSelectedSearch-holidayGroups" type="text" placeholder="搜尋" class="w-full mb-2" oninput="renderAllowedPickerSection('holidayGroups')">
+            <div id="allowedPickerSelectedList-holidayGroups" class="border border-slate-200 rounded-md bg-white max-h-56 overflow-y-auto"></div>
+            <div class="text-center text-sm text-slate-600 mt-1">已選擇的項目</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 space-y-3">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <h3 class="font-semibold text-slate-800">考勤組</h3>
+            <p class="text-xs text-slate-500">設定此班表允許使用的考勤組。</p>
+          </div>
+          <button type="button" onclick="selectAllAllowedAvailable('attendanceGroups')" class="px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm">全部加入</button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-4 items-start">
+          <div>
+            <input id="allowedPickerAvailableSearch-attendanceGroups" type="text" placeholder="搜尋" class="w-full mb-2" oninput="renderAllowedPickerSection('attendanceGroups')">
+            <div id="allowedPickerAvailableList-attendanceGroups" class="border border-slate-200 rounded-md bg-white max-h-56 overflow-y-auto"></div>
+            <div class="text-center text-sm text-slate-600 mt-1">可選擇的項目</div>
+          </div>
+          <div class="flex md:flex-col gap-2 justify-center items-center pt-8">
+            <button type="button" onclick="moveAllowedToSelected('attendanceGroups')" class="px-2 py-1 border rounded-md bg-white">→</button>
+            <button type="button" onclick="moveAllowedToAvailable('attendanceGroups')" class="px-2 py-1 border rounded-md bg-white">←</button>
+          </div>
+          <div>
+            <input id="allowedPickerSelectedSearch-attendanceGroups" type="text" placeholder="搜尋" class="w-full mb-2" oninput="renderAllowedPickerSection('attendanceGroups')">
+            <div id="allowedPickerSelectedList-attendanceGroups" class="border border-slate-200 rounded-md bg-white max-h-56 overflow-y-auto"></div>
+            <div class="text-center text-sm text-slate-600 mt-1">已選擇的項目</div>
+          </div>
+        </div>
+      </section>
+
+      <div class="bg-white rounded-xl shadow-sm p-4 flex justify-end gap-2">
+        <button onclick="goBackWithoutSave()" class="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-md">取消</button>
+        <button onclick="saveAndBack()" class="px-4 py-2 text-sm bg-[#1e3a5f] text-white rounded-md hover:bg-[#2a4f7f]">儲存</button>
+      </div>
+    </div>
+   </main>
+  </div>
+
+  <script>
+  const ALLOWED_PICKER_TYPES = ['shifts', 'holidayGroups', 'attendanceGroups'];
+  const fallbackGlobal = {
+    schedules: [],
+    shifts: [],
+    holidayGroups: {},
+    attendanceGroups: []
+  };
+
+  let G = fallbackGlobal;
+  try {
+    const raw = localStorage.getItem('shiftMgmt:global');
+    if (raw) G = Object.assign({}, fallbackGlobal, JSON.parse(raw));
+  } catch (e) {
+    console.warn('load global failed', e);
+  }
+
+  const params = new URLSearchParams(location.search);
+  const currentScheduleIndex = Math.max(0, parseInt(params.get('index') || '0', 10) || 0);
+  const returnTo = params.get('returnTo') || 'shift-setting.html';
+
+  function getReturnUrl() {
+    const p = new URLSearchParams();
+    p.set('index', String(currentScheduleIndex));
+    return `${returnTo}?${p.toString()}`;
+  }
+
+  document.getElementById('backLinkTop').href = getReturnUrl();
+
+  const schedules = Array.isArray(G.schedules) ? G.schedules : [];
+  const schedule = schedules[currentScheduleIndex] || {};
+
+  function cloneDeep(v) {
+    return JSON.parse(JSON.stringify(v));
+  }
+
+  let globalShiftTemplates = {};
+  let globalHolidayGroupTemplates = {};
+  let globalAttendanceGroupTemplates = {};
+
+  function buildGlobalTemplates() {
+    globalShiftTemplates = {};
+    globalHolidayGroupTemplates = {};
+    globalAttendanceGroupTemplates = {};
+
+    const collectShift = (s) => {
+      if (!s || !s.name || globalShiftTemplates[s.name]) return;
+      globalShiftTemplates[s.name] = cloneDeep(s);
+    };
+    const collectHoliday = (obj) => {
+      if (!obj || typeof obj !== 'object') return;
+      Object.keys(obj).forEach((k) => {
+        if (!globalHolidayGroupTemplates[k]) globalHolidayGroupTemplates[k] = cloneDeep(obj[k]);
+      });
+    };
+    const collectAttendance = (g) => {
+      if (!g || !g.name || globalAttendanceGroupTemplates[g.name]) return;
+      globalAttendanceGroupTemplates[g.name] = cloneDeep(g);
+    };
+
+    (Array.isArray(G.shifts) ? G.shifts : []).forEach(collectShift);
+    collectHoliday(G.holidayGroups);
+    (Array.isArray(G.attendanceGroups) ? G.attendanceGroups : []).forEach(collectAttendance);
+
+    schedules.forEach((sched) => {
+      (Array.isArray(sched.shifts) ? sched.shifts : []).forEach(collectShift);
+      collectHoliday(sched.holidayGroups);
+      (Array.isArray(sched.attendanceGroups) ? sched.attendanceGroups : []).forEach(collectAttendance);
+    });
+  }
+
+  buildGlobalTemplates();
+
+  function getDefaultAllowed() {
+    return {
+      shiftNames: (Array.isArray(schedule.shifts) ? schedule.shifts : []).map(s => s.name).filter(Boolean),
+      holidayGroupNames: Object.keys(schedule.holidayGroups || {}),
+      attendanceGroupNames: (Array.isArray(schedule.attendanceGroups) ? schedule.attendanceGroups : []).map(g => g.name).filter(Boolean)
+    };
+  }
+
+  const defaults = getDefaultAllowed();
+  let allowedShiftNames = Array.isArray(schedule.allowedShiftNames) ? [...schedule.allowedShiftNames] : [...defaults.shiftNames];
+  let allowedHolidayGroupNames = Array.isArray(schedule.allowedHolidayGroupNames) ? [...schedule.allowedHolidayGroupNames] : [...defaults.holidayGroupNames];
+  let allowedAttendanceGroupNames = Array.isArray(schedule.allowedAttendanceGroupNames) ? [...schedule.allowedAttendanceGroupNames] : [...defaults.attendanceGroupNames];
+
+  if (!schedule.allowedScopeCustomized) {
+    allowedShiftNames = [...defaults.shiftNames];
+    allowedHolidayGroupNames = [...defaults.holidayGroupNames];
+    allowedAttendanceGroupNames = [...defaults.attendanceGroupNames];
+  }
+
+  allowedShiftNames = allowedShiftNames.filter(name => Object.prototype.hasOwnProperty.call(globalShiftTemplates, name));
+  allowedHolidayGroupNames = allowedHolidayGroupNames.filter(name => Object.prototype.hasOwnProperty.call(globalHolidayGroupTemplates, name));
+  allowedAttendanceGroupNames = allowedAttendanceGroupNames.filter(name => Object.prototype.hasOwnProperty.call(globalAttendanceGroupTemplates, name));
+
+  const allowedPickerState = {
+    shifts: { available: [], selected: [], activeAvailable: [], activeSelected: [] },
+    holidayGroups: { available: [], selected: [], activeAvailable: [], activeSelected: [] },
+    attendanceGroups: { available: [], selected: [], activeAvailable: [], activeSelected: [] }
+  };
+
+  function getAllowedPickerConfig(type) {
+    if (type === 'holidayGroups') {
+      return { all: Object.keys(globalHolidayGroupTemplates), selected: allowedHolidayGroupNames };
+    }
+    if (type === 'attendanceGroups') {
+      return { all: Object.keys(globalAttendanceGroupTemplates), selected: allowedAttendanceGroupNames };
+    }
+    return { all: Object.keys(globalShiftTemplates), selected: allowedShiftNames };
+  }
+
+  function getAllowedPickerState(type) {
+    return allowedPickerState[type];
+  }
+
+  function setAllowedPickerActive(type, side, name) {
+    const state = getAllowedPickerState(type);
+    if (!state) return;
+    if (side === 'available') {
+      state.activeAvailable = state.activeAvailable.includes(name)
+        ? state.activeAvailable.filter(item => item !== name)
+        : [...state.activeAvailable, name];
+      state.activeSelected = [];
+    } else {
+      state.activeSelected = state.activeSelected.includes(name)
+        ? state.activeSelected.filter(item => item !== name)
+        : [...state.activeSelected, name];
+      state.activeAvailable = [];
+    }
+    renderAllowedPickerSection(type);
+  }
+
+  function renderAllowedPickerSection(type) {
+    const state = getAllowedPickerState(type);
+    const availableSearch = document.getElementById(`allowedPickerAvailableSearch-${type}`);
+    const selectedSearch = document.getElementById(`allowedPickerSelectedSearch-${type}`);
+    const leftQ = availableSearch ? availableSearch.value.toLowerCase().trim() : '';
+    const rightQ = selectedSearch ? selectedSearch.value.toLowerCase().trim() : '';
+    const left = state.available.filter(name => name.toLowerCase().includes(leftQ));
+    const right = state.selected.filter(name => name.toLowerCase().includes(rightQ));
+    const leftBox = document.getElementById(`allowedPickerAvailableList-${type}`);
+    const rightBox = document.getElementById(`allowedPickerSelectedList-${type}`);
+
+    if (leftBox) {
+      leftBox.innerHTML = left.map(name => `<div class="picker-row ${state.activeAvailable.includes(name) ? 'active' : ''}" onclick='setAllowedPickerActive(${JSON.stringify(type)}, "available", ${JSON.stringify(name)})'>${name}</div>`).join('') || '<div class="p-2 text-sm text-slate-500">無可選項目</div>';
+    }
+    if (rightBox) {
+      rightBox.innerHTML = right.map(name => `<div class="picker-row ${state.activeSelected.includes(name) ? 'active' : ''}" onclick='setAllowedPickerActive(${JSON.stringify(type)}, "selected", ${JSON.stringify(name)})'>${name}</div>`).join('') || '<div class="p-2 text-sm text-slate-500">尚未選擇</div>';
+    }
+  }
+
+  function renderAllowedPicker() {
+    ALLOWED_PICKER_TYPES.forEach(renderAllowedPickerSection);
+  }
+
+  function moveAllowedToSelected(type) {
+    const state = getAllowedPickerState(type);
+    if (!state || state.activeAvailable.length === 0) return;
+    state.selected = Array.from(new Set([...state.selected, ...state.activeAvailable]));
+    state.available = state.available.filter(name => !state.activeAvailable.includes(name));
+    state.activeAvailable = [];
+    renderAllowedPickerSection(type);
+  }
+
+  function moveAllowedToAvailable(type) {
+    const state = getAllowedPickerState(type);
+    if (!state || state.activeSelected.length === 0) return;
+    state.available = Array.from(new Set([...state.available, ...state.activeSelected]));
+    state.selected = state.selected.filter(name => !state.activeSelected.includes(name));
+    state.activeSelected = [];
+    renderAllowedPickerSection(type);
+  }
+
+  function selectAllAllowedAvailable(type) {
+    const state = getAllowedPickerState(type);
+    if (!state) return;
+    state.selected = Array.from(new Set([...state.selected, ...state.available]));
+    state.available = [];
+    state.activeAvailable = [];
+    renderAllowedPickerSection(type);
+  }
+
+  function initAllowedPicker() {
+    ALLOWED_PICKER_TYPES.forEach((type) => {
+      const cfg = getAllowedPickerConfig(type);
+      const state = getAllowedPickerState(type);
+      state.selected = [...cfg.selected];
+      state.available = cfg.all.filter(name => !state.selected.includes(name));
+      state.activeAvailable = [];
+      state.activeSelected = [];
+    });
+    renderAllowedPicker();
+  }
+
+  function saveAndBack() {
+    const sched = schedules[currentScheduleIndex] || {};
+    sched.allowedScopeCustomized = true;
+    sched.allowedShiftNames = [...allowedPickerState.shifts.selected];
+    sched.allowedHolidayGroupNames = [...allowedPickerState.holidayGroups.selected];
+    sched.allowedAttendanceGroupNames = [...allowedPickerState.attendanceGroups.selected];
+    schedules[currentScheduleIndex] = sched;
+    G.schedules = schedules;
+    localStorage.setItem('shiftMgmt:global', JSON.stringify(G));
+    window.location.href = getReturnUrl();
+  }
+
+  function goBackWithoutSave() {
+    window.location.href = getReturnUrl();
+  }
+
+  window.setAllowedPickerActive = setAllowedPickerActive;
+  window.renderAllowedPickerSection = renderAllowedPickerSection;
+  window.moveAllowedToSelected = moveAllowedToSelected;
+  window.moveAllowedToAvailable = moveAllowedToAvailable;
+  window.selectAllAllowedAvailable = selectAllAllowedAvailable;
+  window.saveAndBack = saveAndBack;
+  window.goBackWithoutSave = goBackWithoutSave;
+
+  initAllowedPicker();
+  </script>
+ </body>
+</html>

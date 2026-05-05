@@ -63,7 +63,7 @@
       </div>
       <div>
        <label class="block text-sm font-medium text-slate-600 mb-1">選取此班表會用到的 班別/假別組/考勤組</label>
-        <button type="button" onclick="openAllowedPicker()" class="w-full text-left px-3 py-2 border border-slate-300 rounded-md bg-white hover:bg-slate-50 text-slate-700">請選擇</button>
+        <button type="button" onclick="goShiftChoosePage()" class="w-full text-left px-3 py-2 border border-slate-300 rounded-md bg-white hover:bg-slate-50 text-slate-700">請選擇</button>
       </div>
       </div>
      </section>
@@ -935,6 +935,14 @@
     });
     renderAllowedPicker();
     document.getElementById('allowedPickerModal').classList.remove('hidden');
+  }
+
+  function goShiftChoosePage() {
+    syncGlobalData();
+    const params = new URLSearchParams();
+    params.set('index', String(currentScheduleIndex));
+    params.set('returnTo', 'shift-setting.html');
+    window.location.href = `shift-choose.html?${params.toString()}`;
   }
 
   function closeAllowedPicker() {
