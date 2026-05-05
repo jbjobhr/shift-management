@@ -364,21 +364,20 @@
 
   // ===== 班表切換 =====
   function _fmtDate(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+  function _getCurrentMonthAllRange() {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return {
+      name: `${now.getFullYear()}年${now.getMonth() + 1}月 全部班表`,
+      start: _fmtDate(start),
+      end: _fmtDate(end)
+    };
+  }
   function getCurrentRange() {
     if (viewOverride) return viewOverride;
     if (currentScheduleIndex < 0) {
-      const validSchedules = (schedules || []).filter(s => s && s.start && s.end);
-      if (validSchedules.length > 0) {
-        const starts = validSchedules.map(s => s.start).sort();
-        const ends = validSchedules.map(s => s.end).sort();
-        const first = new Date(starts[0]);
-        return {
-          name: `${first.getFullYear()}年${first.getMonth() + 1}月 全部班表`,
-          start: starts[0],
-          end: ends[ends.length - 1]
-        };
-      }
-      return { name: '2026年1月 全部班表', start: '2026-01-01', end: '2026-01-31' };
+      return _getCurrentMonthAllRange();
     }
     return schedules[currentScheduleIndex] || { name: '', start: '2026-01-01', end: '2026-01-31' };
   }
