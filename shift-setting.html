@@ -21,6 +21,8 @@
     .picker-row { padding: 6px 8px; border-bottom: 1px solid #e2e8f0; cursor: pointer; font-size: 14px; }
     .picker-row:hover { background: #f8fafc; }
     .picker-row.active { background: #dbeafe; color: #1e40af; }
+    .person-dropdown-row { padding: 8px 12px; font-size: 14px; border-bottom: 1px solid #e2e8f0; cursor: pointer; display: flex; align-items: center; justify-content: space-between; }
+    .person-dropdown-row:hover { background: #ffffff; }
     .tag-item { display: inline-flex; align-items: center; gap: 6px; background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 4px; font-size: 13px; margin: 3px; }
     input[type="date"], input[type="time"], input[type="text"], select { border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 10px; font-size: 14px; }
     input:focus, select:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.1); }
@@ -208,10 +210,12 @@
      <p class="text-xs text-slate-500 mt-1">可複選適用於本考勤組的打卡地點。</p>
     </div>
     <div><label class="block text-sm font-medium text-slate-600 mb-2">搜尋人員</label>
-     <div class="flex gap-2 mb-2">
-      <input type="text" id="searchPersonInput" placeholder="員工編號或身份證" class="flex-1"> <button onclick="searchPersonForGroup()" class="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-md text-sm font-medium hover:bg-blue-100 transition">搜尋</button>
+     <div class="relative">
+      <div class="flex gap-2 mb-2">
+       <input type="text" id="searchPersonInput" placeholder="員工編號或身份證" class="flex-1"> <button onclick="searchPersonForGroup()" class="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-md text-sm font-medium hover:bg-blue-100 transition">搜尋</button>
+      </div>
+      <div id="searchResultsList" class="hidden absolute top-full left-0 right-0 z-20 border border-slate-200 rounded-md max-h-40 overflow-y-auto bg-slate-50 shadow-sm"></div>
      </div>
-     <div id="searchResultsList" class="border border-slate-200 rounded-md max-h-40 overflow-y-auto bg-slate-50"></div>
     </div>
     <div>
      <div class="flex items-center justify-between mb-1">
@@ -1266,6 +1270,7 @@
     document.getElementById('groupName').value = '';
     document.getElementById('searchPersonInput').value = '';
     document.getElementById('searchResultsList').innerHTML = '';
+    document.getElementById('searchResultsList').classList.add('hidden');
     document.getElementById('selectedPersonsInGroup').innerHTML = '';
     document.querySelector('input[name="scheduleType"][value="auto"]').checked = true;
     document.getElementById('workOnHoliday').checked = false;
@@ -1301,34 +1306,76 @@
   }
 
   function syncAssigneeList() {
-    // TODO: 同步派任名單功能（暫無實作）
-    alert('同步派任名單功能尚未實作');
+    const pendingIds = persons
+      .map(p => p.id)
+      .filter(id => !currentGroupMembers.includes(id));
+
+    if (pendingIds.length === 0) {
+      alert('目前沒有可新增的人員');
+      return;
+    }
+
+    currentGroupMembers.push(...pendingIds);
+    renderSelectedPersonsInGroup();
+    const searchInput = document.getElementById('searchPersonInput');
+    if (searchInput) searchInput.value = '';
+    closeGroupPersonDropdown();
+    alert(`已同步新增 ${pendingIds.length} 位人員`);
+  }
+
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function getFilteredGroupPersons(query) {
+    const q = String(query || '').toLowerCase().trim();
+    return persons
+      .filter(p => !currentGroupMembers.includes(p.id))
+      .filter(p => !q || p.id.toLowerCase().includes(q) || p.name.toLowerCase().includes(q));
+  }
+
+  function renderGroupPersonDropdown(query = '') {
+    const resultsList = document.getElementById('searchResultsList');
+    if (!resultsList) return;
+
+    const filtered = getFilteredGroupPersons(query);
+    if (filtered.length === 0) {
+      resultsList.innerHTML = '<div class="px-3 py-2 text-sm text-slate-500">未找到符合的人員</div>';
+      resultsList.classList.remove('hidden');
+      return;
+    }
+
+    resultsList.innerHTML = filtered.map(p => {
+      const idArg = JSON.stringify(p.id).replace(/"/g, '&quot;');
+      const nameArg = JSON.stringify(p.name).replace(/"/g, '&quot;');
+      const safeId = escapeHtml(p.id);
+      const safeName = escapeHtml(p.name);
+      return `<div class="person-dropdown-row" onclick="addPersonToGroup(${idArg}, ${nameArg})">
+        <span>${safeName} (${safeId})</span>
+        <span class="text-blue-500 font-medium">+ 添加</span>
+      </div>`;
+    }).join('');
+    resultsList.classList.remove('hidden');
+  }
+
+  function openGroupPersonDropdown() {
+    const input = document.getElementById('searchPersonInput');
+    renderGroupPersonDropdown(input ? input.value : '');
+  }
+
+  function closeGroupPersonDropdown() {
+    const resultsList = document.getElementById('searchResultsList');
+    if (resultsList) resultsList.classList.add('hidden');
   }
 
   function searchPersonForGroup() {
-    const query = document.getElementById('searchPersonInput').value.toLowerCase().trim();
-    const resultsList = document.getElementById('searchResultsList');
-    
-    if (!query) {
-      resultsList.innerHTML = '';
-      return;
-    }
-
-    const filtered = persons.filter(p => 
-      p.id.toLowerCase().includes(query) || p.name.toLowerCase().includes(query)
-    ).filter(p => !currentGroupMembers.includes(p.id));
-
-    if (filtered.length === 0) {
-      resultsList.innerHTML = '<div class="px-3 py-2 text-sm text-slate-500">未找到符合的人員</div>';
-      return;
-    }
-
-    resultsList.innerHTML = filtered.map(p => `
-      <div class="px-3 py-2 text-sm hover:bg-white cursor-pointer border-b border-slate-200 flex items-center justify-between" onclick="addPersonToGroup('${p.id}', '${p.name}')">
-        <span>${p.name} (${p.id})</span>
-        <span class="text-blue-500 font-medium">+ 添加</span>
-      </div>
-    `).join('');
+    const input = document.getElementById('searchPersonInput');
+    renderGroupPersonDropdown(input ? input.value : '');
   }
 
   function addPersonToGroup(empId, name) {
@@ -1336,7 +1383,7 @@
       currentGroupMembers.push(empId);
       renderSelectedPersonsInGroup();
       document.getElementById('searchPersonInput').value = '';
-      document.getElementById('searchResultsList').innerHTML = '';
+      renderGroupPersonDropdown('');
     }
   }
 
@@ -1375,6 +1422,7 @@
     document.getElementById('groupName').value = group.name;
     document.getElementById('searchPersonInput').value = '';
     document.getElementById('searchResultsList').innerHTML = '';
+    document.getElementById('searchResultsList').classList.add('hidden');
     document.querySelector(`input[name="scheduleType"][value="${currentGroupScheduleType}"]`).checked = true;
     document.getElementById('workOnHoliday').checked = currentGroupWorkOnHoliday;
     renderWeekdayShifts();
@@ -1770,6 +1818,12 @@
   }
   window.validateAndSave = validateAndSave;
   syncGlobalData();
+  const groupPersonInput = document.getElementById('searchPersonInput');
+  if (groupPersonInput) {
+    groupPersonInput.addEventListener('focus', openGroupPersonDropdown);
+    groupPersonInput.addEventListener('click', openGroupPersonDropdown);
+    groupPersonInput.addEventListener('input', (e) => renderGroupPersonDropdown(e.target.value));
+  }
   // 即時保存基本資訊，避免快速切頁時名稱更新遺失
   ['scheduleName', 'startDate', 'endDate', 'branchSelect', 'departmentSelect'].forEach(id => {
     const el = document.getElementById(id);
@@ -1784,6 +1838,9 @@
     if (!e.target.closest('#tagInput') && !e.target.closest('#tagDropdown')) {
       const dropdown = document.getElementById('tagDropdown');
       if (dropdown) dropdown.classList.add('hidden');
+    }
+    if (!e.target.closest('#searchPersonInput') && !e.target.closest('#searchResultsList')) {
+      closeGroupPersonDropdown();
     }
   });
   </script>

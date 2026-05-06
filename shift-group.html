@@ -11,6 +11,8 @@
     * { font-family: 'Noto Sans TC', sans-serif; }
     html, body { height: 100%; width: 100%; }
     .chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 9999px; font-size: 12px; }
+    .person-dropdown-row { padding: 8px 12px; font-size: 14px; border-bottom: 1px solid #e2e8f0; cursor: pointer; display: flex; align-items: center; justify-content: space-between; }
+    .person-dropdown-row:hover { background: #ffffff; }
   </style>
  </head>
  <body class="h-full bg-slate-50 w-full">
@@ -62,11 +64,13 @@
 
         <div>
           <label class="block text-sm font-medium text-slate-600 mb-2">搜尋人員</label>
-          <div class="flex gap-2 mb-2">
-            <input type="text" id="searchPersonInput" placeholder="員工編號或身份證" class="flex-1 border border-slate-300 rounded-md px-3 py-2 text-sm">
-            <button onclick="searchPersonForGroup()" class="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-md text-sm font-medium hover:bg-blue-100 transition">搜尋</button>
+          <div class="relative">
+            <div class="flex gap-2 mb-2">
+              <input type="text" id="searchPersonInput" placeholder="員工編號或身份證" class="flex-1 border border-slate-300 rounded-md px-3 py-2 text-sm">
+              <button onclick="searchPersonForGroup()" class="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-md text-sm font-medium hover:bg-blue-100 transition">搜尋</button>
+            </div>
+            <div id="searchResultsList" class="hidden absolute top-full left-0 right-0 z-20 border border-slate-200 rounded-md max-h-40 overflow-y-auto bg-slate-50 shadow-sm"></div>
           </div>
-          <div id="searchResultsList" class="border border-slate-200 rounded-md max-h-40 overflow-y-auto bg-slate-50"></div>
         </div>
 
         <div>
@@ -220,30 +224,59 @@
     if (!checked && idx > -1) currentGroupPunchLocations.splice(idx, 1);
   }
 
-  function searchPersonForGroup() {
-    const query = document.getElementById('searchPersonInput').value.toLowerCase().trim();
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function getFilteredPersons(query) {
+    const q = String(query || '').toLowerCase().trim();
+    return persons
+      .filter(p => !currentGroupMembers.includes(p.id))
+      .filter(p => !q || p.id.toLowerCase().includes(q) || p.name.toLowerCase().includes(q));
+  }
+
+  function renderPersonDropdown(query = '') {
     const resultsList = document.getElementById('searchResultsList');
+    if (!resultsList) return;
 
-    if (!query) {
-      resultsList.innerHTML = '';
-      return;
-    }
-
-    const filtered = persons.filter(p =>
-      p.id.toLowerCase().includes(query) || p.name.toLowerCase().includes(query)
-    ).filter(p => !currentGroupMembers.includes(p.id));
-
+    const filtered = getFilteredPersons(query);
     if (filtered.length === 0) {
       resultsList.innerHTML = '<div class="px-3 py-2 text-sm text-slate-500">未找到符合的人員</div>';
+      resultsList.classList.remove('hidden');
       return;
     }
 
-    resultsList.innerHTML = filtered.map(p => `
-      <div class="px-3 py-2 text-sm hover:bg-white cursor-pointer border-b border-slate-200 flex items-center justify-between" onclick="addPersonToGroup('${p.id}', '${p.name}')">
-        <span>${p.name} (${p.id})</span>
+    resultsList.innerHTML = filtered.map(p => {
+      const idArg = JSON.stringify(p.id).replace(/"/g, '&quot;');
+      const nameArg = JSON.stringify(p.name).replace(/"/g, '&quot;');
+      const safeId = escapeHtml(p.id);
+      const safeName = escapeHtml(p.name);
+      return `<div class="person-dropdown-row" onclick="addPersonToGroup(${idArg}, ${nameArg})">
+        <span>${safeName} (${safeId})</span>
         <span class="text-blue-500 font-medium">+ 添加</span>
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
+    resultsList.classList.remove('hidden');
+  }
+
+  function openPersonDropdown() {
+    const input = document.getElementById('searchPersonInput');
+    renderPersonDropdown(input ? input.value : '');
+  }
+
+  function closePersonDropdown() {
+    const resultsList = document.getElementById('searchResultsList');
+    if (resultsList) resultsList.classList.add('hidden');
+  }
+
+  function searchPersonForGroup() {
+    const input = document.getElementById('searchPersonInput');
+    renderPersonDropdown(input ? input.value : '');
   }
 
   function addPersonToGroup(empId) {
@@ -251,7 +284,7 @@
       currentGroupMembers.push(empId);
       renderSelectedPersonsInGroup();
       document.getElementById('searchPersonInput').value = '';
-      document.getElementById('searchResultsList').innerHTML = '';
+      renderPersonDropdown('');
     }
   }
 
@@ -353,7 +386,21 @@
   }
 
   function syncAssigneeList() {
-    alert('同步派任名單功能尚未實作');
+    const pendingIds = persons
+      .map(p => p.id)
+      .filter(id => !currentGroupMembers.includes(id));
+
+    if (pendingIds.length === 0) {
+      alert('目前沒有可新增的人員');
+      return;
+    }
+
+    currentGroupMembers.push(...pendingIds);
+    renderSelectedPersonsInGroup();
+    const searchInput = document.getElementById('searchPersonInput');
+    if (searchInput) searchInput.value = '';
+    closePersonDropdown();
+    alert(`已同步新增 ${pendingIds.length} 位人員`);
   }
 
   function persistAndBack() {
@@ -422,6 +469,17 @@
   }
 
   initPage();
+  const personInput = document.getElementById('searchPersonInput');
+  if (personInput) {
+    personInput.addEventListener('focus', openPersonDropdown);
+    personInput.addEventListener('click', openPersonDropdown);
+    personInput.addEventListener('input', (e) => renderPersonDropdown(e.target.value));
+  }
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#searchPersonInput') && !e.target.closest('#searchResultsList')) {
+      closePersonDropdown();
+    }
+  });
   window.searchPersonForGroup = searchPersonForGroup;
   window.addPersonToGroup = addPersonToGroup;
   window.toggleWeekdayShift = toggleWeekdayShift;

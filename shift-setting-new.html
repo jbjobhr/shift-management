@@ -1112,8 +1112,22 @@
   }
 
   function syncAssigneeList() {
-    // TODO: 同步派任名單功能（暫無實作）
-    alert('同步派任名單功能尚未實作');
+    const pendingIds = persons
+      .map(p => p.id)
+      .filter(id => !currentGroupMembers.includes(id));
+
+    if (pendingIds.length === 0) {
+      alert('目前沒有可新增的人員');
+      return;
+    }
+
+    currentGroupMembers.push(...pendingIds);
+    renderSelectedPersonsInGroup();
+    const searchInput = document.getElementById('searchPersonInput');
+    const resultsList = document.getElementById('searchResultsList');
+    if (searchInput) searchInput.value = '';
+    if (resultsList) resultsList.innerHTML = '';
+    alert(`已同步新增 ${pendingIds.length} 位人員`);
   }
 
   function searchPersonForGroup() {
