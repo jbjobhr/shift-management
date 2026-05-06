@@ -63,6 +63,10 @@
         </div>
 
         <div>
+          <label class="block text-sm font-medium text-slate-600 mb-2">選擇派任名單</label>
+          <select id="assigneeListSelect" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm mb-2">
+            <option value="">請選擇派任名單</option>
+          </select>
           <label class="block text-sm font-medium text-slate-600 mb-2">搜尋人員</label>
           <div class="relative">
             <div class="flex gap-2 mb-2">
@@ -153,9 +157,23 @@
   let shifts = Array.isArray(sched.shifts) ? sched.shifts : FALLBACK.schedules[0].shifts;
   let attendanceGroups = Array.isArray(sched.attendanceGroups) ? sched.attendanceGroups : [];
   let persons = Array.isArray(G.persons) ? G.persons : FALLBACK.persons;
+  const ASSIGNEE_LIST_FALLBACK = [
+    {
+      id: 'AL001',
+      customerShortName: '蝦皮數位',
+      vacancy: '(珍)臨時工全倉別(11100)',
+      assignDate: '2026/05/05',
+      recruiter: '李秀珍 Jolie',
+      headcount: 3
+    }
+  ];
+  let assigneeLists = Array.isArray(G.assigneeLists) && G.assigneeLists.length
+    ? G.assigneeLists
+    : ASSIGNEE_LIST_FALLBACK;
   let allPunchLocations = Array.isArray(G.allPunchLocations) ? G.allPunchLocations : FALLBACK.allPunchLocations;
   if (source === 'new' && draft) {
     if (Array.isArray(draft.persons)) persons = draft.persons;
+    if (Array.isArray(draft.assigneeLists) && draft.assigneeLists.length) assigneeLists = draft.assigneeLists;
     if (Array.isArray(draft.allPunchLocations)) allPunchLocations = draft.allPunchLocations;
   }
 
@@ -198,10 +216,28 @@
 
     renderWeekdayShifts();
     renderPunchLocationOptions();
+    renderAssigneeListSelect();
     renderSelectedPersonsInGroup();
     updateScheduleTypeUI();
     updateWeeklyHoursIndicator();
     lucide.createIcons();
+  }
+
+  function formatAssigneeLabel(item) {
+    if (!item) return '';
+    return `${item.customerShortName || ''}-${item.vacancy || ''} / ${item.assignDate || ''} / ${item.recruiter || ''} / ${item.headcount || 0}`;
+  }
+
+  function renderAssigneeListSelect() {
+    const select = document.getElementById('assigneeListSelect');
+    if (!select) return;
+    select.innerHTML = '<option value="">請選擇派任名單</option>';
+    assigneeLists.forEach((item, idx) => {
+      const option = document.createElement('option');
+      option.value = item.id || `assignee-${idx}`;
+      option.textContent = formatAssigneeLabel(item);
+      select.appendChild(option);
+    });
   }
 
   function renderPunchLocationOptions() {
@@ -409,6 +445,7 @@
         shifts,
         attendanceGroups,
         persons,
+        assigneeLists,
         allPunchLocations
       });
       localStorage.setItem(DRAFT_KEY, JSON.stringify(nextDraft));
@@ -419,6 +456,7 @@
       }
       schedules[currentScheduleIndex] = sched;
       G.schedules = schedules;
+      G.assigneeLists = assigneeLists;
       localStorage.setItem('shiftMgmt:global', JSON.stringify(G));
     }
     goBack();
