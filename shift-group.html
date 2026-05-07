@@ -62,9 +62,20 @@
           <p class="text-xs text-slate-500 mt-1">可複選適用於本考勤組的打卡地點。</p>
         </div>
 
-          <div>
-            <label class="block text-sm font-medium text-slate-600 mb-2">搜尋人員</label>
-            <div class="relative">
+        <div>
+          <label class="block text-sm font-medium text-slate-600 mb-2">選擇報班名單</label>
+          <select id="reportListSelect" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm mb-2">
+            <option value="">請選擇報班名單</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-slate-600 mb-2">選擇派任名單</label>
+          <select id="assigneeListSelect" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm mb-2">
+            <option value="">請選擇派任名單</option>
+          </select>
+          <label class="block text-sm font-medium text-slate-600 mb-2">搜尋人員</label>
+          <div class="relative">
             <div class="flex gap-2 mb-2">
               <input type="text" id="searchPersonInput" placeholder="員工編號或身份證" class="flex-1 border border-slate-300 rounded-md px-3 py-2 text-sm">
               <button onclick="searchPersonForGroup()" class="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-md text-sm font-medium hover:bg-blue-100 transition">搜尋</button>
@@ -153,10 +164,89 @@
   let shifts = Array.isArray(sched.shifts) ? sched.shifts : FALLBACK.schedules[0].shifts;
   let attendanceGroups = Array.isArray(sched.attendanceGroups) ? sched.attendanceGroups : [];
   let persons = Array.isArray(G.persons) ? G.persons : FALLBACK.persons;
-    let assigneeLists = Array.isArray(G.assigneeLists) && G.assigneeLists.length ? G.assigneeLists : [];
+  const REPORT_LIST_FALLBACK = [
+    {
+      id: 'RL001',
+      jobId: '278',
+      locationName: '大園長榮早六班',
+      reportNo: '蝦皮北倉早六班臨時工',
+      timeRange: '06:00~15:00',
+      recruiter: '李秀珍'
+    },
+    {
+      id: 'RL002',
+      jobId: '279',
+      locationName: '中壢台積電中班',
+      reportNo: '台積電倉儲作業員',
+      timeRange: '14:00~23:00',
+      recruiter: '王美玲'
+    },
+    {
+      id: 'RL003',
+      jobId: '280',
+      locationName: '新竹英業達晚班',
+      reportNo: '英業達夜間包材工',
+      timeRange: '22:00~08:00',
+      recruiter: '陳建宏'
+    },
+    {
+      id: 'RL004',
+      jobId: '281',
+      locationName: '林口敦洋倉儲',
+      reportNo: '敦洋東京帽子全倉別',
+      timeRange: '08:00~17:00',
+      recruiter: '黃俊傑'
+    }
+  ];
+  let reportLists = Array.isArray(G.reportLists) && G.reportLists.length
+    ? G.reportLists
+    : REPORT_LIST_FALLBACK;
+  const ASSIGNEE_LIST_FALLBACK = [
+    {
+      id: 'AL001',
+      jobId: '312',
+      customerShortName: '蝦皮數位',
+      vacancy: '(珍)臨時工全倉別(11100)',
+      assignDate: '2026/05/05',
+      recruiter: '李秀珍 Jolie',
+      headcount: 3
+    },
+    {
+      id: 'AL002',
+      jobId: '313',
+      customerShortName: '台積電',
+      vacancy: '倉儲包材工(8800)',
+      assignDate: '2026/05/06',
+      recruiter: '王美玲 Amy',
+      headcount: 5
+    },
+    {
+      id: 'AL003',
+      jobId: '314',
+      customerShortName: '英業達',
+      vacancy: '夜班作業員(7700)',
+      assignDate: '2026/05/07',
+      recruiter: '陳建宏 David',
+      headcount: 4
+    },
+    {
+      id: 'AL004',
+      jobId: '315',
+      customerShortName: '敦洋東京帽子',
+      vacancy: '日班裝箱員(7200)',
+      assignDate: '2026/05/05',
+      recruiter: '黃俊傑 Jack',
+      headcount: 6
+    }
+  ];
+  let assigneeLists = Array.isArray(G.assigneeLists) && G.assigneeLists.length
+    ? G.assigneeLists
+    : ASSIGNEE_LIST_FALLBACK;
   let allPunchLocations = Array.isArray(G.allPunchLocations) ? G.allPunchLocations : FALLBACK.allPunchLocations;
   if (source === 'new' && draft) {
     if (Array.isArray(draft.persons)) persons = draft.persons;
+    if (Array.isArray(draft.reportLists) && draft.reportLists.length) reportLists = draft.reportLists;
+    if (Array.isArray(draft.assigneeLists) && draft.assigneeLists.length) assigneeLists = draft.assigneeLists;
     if (Array.isArray(draft.allPunchLocations)) allPunchLocations = draft.allPunchLocations;
   }
 
@@ -199,6 +289,8 @@
 
     renderWeekdayShifts();
     renderPunchLocationOptions();
+    renderReportListSelect();
+    renderAssigneeListSelect();
     renderSelectedPersonsInGroup();
     updateScheduleTypeUI();
     updateWeeklyHoursIndicator();
@@ -223,6 +315,40 @@
     const idx = currentGroupPunchLocations.indexOf(loc);
     if (checked && idx === -1) currentGroupPunchLocations.push(loc);
     if (!checked && idx > -1) currentGroupPunchLocations.splice(idx, 1);
+  }
+
+  function formatReportLabel(item) {
+    if (!item) return '';
+    return `${item.jobId || ''} / ${item.locationName || ''} - ${item.reportNo || ''} ${item.timeRange || ''} / ${item.recruiter || ''}`;
+  }
+
+  function renderReportListSelect() {
+    const select = document.getElementById('reportListSelect');
+    if (!select) return;
+    select.innerHTML = '<option value="">請選擇報班名單</option>';
+    reportLists.forEach((item, idx) => {
+      const option = document.createElement('option');
+      option.value = item.id || `report-${idx}`;
+      option.textContent = formatReportLabel(item);
+      select.appendChild(option);
+    });
+  }
+
+  function formatAssigneeLabel(item) {
+    if (!item) return '';
+    return `${item.jobId || ''} / ${item.customerShortName || ''}-${item.vacancy || ''} / ${item.recruiter || ''}`;
+  }
+
+  function renderAssigneeListSelect() {
+    const select = document.getElementById('assigneeListSelect');
+    if (!select) return;
+    select.innerHTML = '<option value="">請選擇派任名單</option>';
+    assigneeLists.forEach((item, idx) => {
+      const option = document.createElement('option');
+      option.value = item.id || `assignee-${idx}`;
+      option.textContent = formatAssigneeLabel(item);
+      select.appendChild(option);
+    });
   }
 
   function escapeHtml(str) {
@@ -410,6 +536,8 @@
         shifts,
         attendanceGroups,
         persons,
+        reportLists,
+        assigneeLists,
         allPunchLocations
       });
       localStorage.setItem(DRAFT_KEY, JSON.stringify(nextDraft));
@@ -420,6 +548,8 @@
       }
       schedules[currentScheduleIndex] = sched;
       G.schedules = schedules;
+      G.reportLists = reportLists;
+      G.assigneeLists = assigneeLists;
       localStorage.setItem('shiftMgmt:global', JSON.stringify(G));
     }
     goBack();
