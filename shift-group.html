@@ -285,6 +285,8 @@
       const radio = document.querySelector(`input[name="scheduleType"][value="${currentGroupScheduleType}"]`);
       if (radio) radio.checked = true;
       document.getElementById('workOnHoliday').checked = currentGroupWorkOnHoliday;
+    } else {
+      currentGroupPunchLocations = Array.isArray(allPunchLocations) ? [...allPunchLocations] : [];
     }
 
     renderWeekdayShifts();
