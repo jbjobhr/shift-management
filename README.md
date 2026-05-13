@@ -10,18 +10,18 @@
 
 | Commit | 類型 | 主要變更 | 影響檔案 |
 |---|---|---|---|
-| `ab19489` | fix | 修正假別組與假別選取空值邏輯，避免錯誤回填 | `shift-choose.html`, `shift-setting.html` |
-| `2c7bfc2` | feat | 新增班表可用項目選取頁（班別/假別組/考勤組） | `shift-choose.html`, `shift-setting.html` |
-| `8551338` | ui | 調整總覽圖例欄的邊距、邊框、陰影 | `index.html` |
-| `2ac2696` | feat | 新增 allowed picker（班別/假別組/考勤組） | `shift-setting-new.html`, `shift-setting.html` |
-| `6fce3e6` | ux | 更新部門/工作地標題，加入必填標記與驗證強化 | `shift-setting-new.html`, `shift-setting.html` |
-| `4d0c3fc` | ui | 調整主管標題與標籤邏輯，提升介面一致性 | `index.html`, `shift-setting-new.html`, `shift-setting.html` |
-| `4cf5f6f` | feat | 新增假別組/考勤組頁面的草稿保存與編輯流程 | `holiday-group.html`, `shift-group.html`, `shift-setting-new.html` |
-| `90b51d7` | feat | 新增假別組設定頁（新增、編輯、日期管理） | `holiday-group.html`, `shift-setting.html` |
-| `d7d6507` | feat | 新增考勤組設定頁（新增、編輯、人員管理） | `shift-group.html`, `shift-setting.html` |
-| `b38b384` | ui | 調整班表標題顯示，新增「全部班表」選項 | `index.html` |
-| `ce84e6c` | feat | 新增排班名稱自動生成功能（依年月） | `index.html` |
-| `65500ba` | fix/refactor | 返回頁面時重讀 localStorage，並重構班表設定即時保存 | `index.html`, `shift-list.html`, `shift-setting.html` |
+| `b298ca9` | feat | 修改「派任名單」文案為「退保名單」，更新相關選項文字 | `shift-group.html` |
+| `effa0d7` | feat | 修正假日工作選項邏輯，確保打卡地點初始化正確 | `shift-group.html`, `shift-setting.html`, `shift-setting-new.html` |
+| `86b4b52` | feat | 新增報班名單與派任名單選擇流程，優化人員搜尋邏輯 | `shift-group.html`, `shift-setting.html`, `shift-setting-new.html` |
+| `c631aaa` | feat | 移除派任名單選擇流程，簡化人員搜尋互動 | `shift-group.html` |
+| `8087ddb` | feat | 新增派任名單選擇功能，並支援草稿保存 | `shift-group.html`, `shift-setting-new.html` |
+| `9f2f48a` | feat | 強化人員搜尋下拉選單，加入同步派任名單邏輯 | `shift-group.html`, `shift-setting.html`, `shift-setting-new.html` |
+| `8d2ab39` | feat | 新增取得當月所有班表範圍邏輯，簡化範圍計算 | `index.html`, `personal-shift.html` |
+| `6a2eff5` | feat | 新增跨天班別選項，調整工時計算支援跨天 | `shift-setting.html`, `shift-setting-new.html` |
+| `8f01985` | feat | 從班表選取頁返回時保留新班表草稿，並清理舊草稿 | `shift-choose.html`, `shift-setting-new.html` |
+| `4a9d455` | docs/chore | 更新 README 與 schema 註解（允許可用範圍為空） | `README.md`, `db/schema.sql` |
+| `5a4e807` | feat | 增強班表選取功能，新增新班表草稿處理與選取狀態顯示 | `shift-choose.html`, `shift-setting-new.html`, `shift-setting.html` |
+| `e5c69f4` | docs | 更新 README，補充目前狀態與同步程序測試結果 | `README.md` |
 
 ---
 
@@ -116,7 +116,7 @@ index.html               班表總覽（主視圖，橫向日曆表格）
 
 ```jsonc
 {
-  "__version": 14,           // 資料版本號，低於此版本時重置部分欄位
+  "__version": 13,           // 資料版本號，低於此版本時重置部分欄位
 
   // ── 班表列表 ──────────────────────────────────────────────
   "schedules": [
@@ -135,6 +135,7 @@ index.html               班表總覽（主視圖，橫向日曆表格）
       "shortName": "早",     // 總覽表格中顯示的簡稱
       "start": "08:00",
       "end": "17:00",
+      "crossDay": false,      // 是否跨天班別（例如 22:00~06:00）
       "hours": 8,            // 實際計薪工時（扣除休息後）
       "rest": 1,             // 休息時數（小時）
       "otStart": "17:00",    // 可加班時段起始（選填）
@@ -320,10 +321,11 @@ index.html               班表總覽（主視圖，橫向日曆表格）
 |-------------------|----------|------|
 | `shiftMgmt:global` | 班表設定儲存、總覽頁切換班表、個人排班返回前 | 全域設定（班表、班別、假日、人員、考勤組等） |
 | `shiftMgmt:personal:{empId}` | 個人排班頁點「儲存」 | 單一員工的個人指派記錄 |
+| `shiftMgmt:newScheduleDraft` | 新增班表頁、假別組/考勤組子頁、可用項目選取頁切換時 | 新班表草稿（避免跨頁流程覆蓋正式班表） |
 
-**版本控制**：`__version` 欄位目前為 `14`。載入時若儲存版本低於此值，自動重置 `attendanceGroups`、`holidayGroups`、`shifts` 為 Fallback 預設值，避免舊結構導致顯示錯誤。
+**版本控制**：`__version` 欄位目前為 `13`。載入時若儲存版本低於此值，自動重置 `attendanceGroups`、`holidayGroups`、`shifts` 為 Fallback 預設值，避免舊結構導致顯示錯誤。
 
-**跨頁同步**：從個人排班返回總覽時，總覽頁監聽 `pageshow` 事件，若為 bfcache 恢復（`e.persisted`）則重新執行 `renderSchedule()`，確保個人排班變更即時反映。
+**跨頁同步**：從個人排班返回總覽時，總覽頁監聽 `pageshow` 事件後會重讀 `localStorage` 並重新執行 `renderSchedule()`，確保個人排班變更即時反映。
 ---
 
 ## 資料庫（MSSQL）
@@ -385,6 +387,7 @@ docker compose up -d           # 啟動 sqlserver (port 1433)
 | `shiftMgmt:global.shifts[].shortName` | `Shift.ShortName` | 班別簡稱 |
 | `shiftMgmt:global.shifts[].start` | `Shift.StartTime` | 時間字串轉 `TIME(0)` |
 | `shiftMgmt:global.shifts[].end` | `Shift.EndTime` | 時間字串轉 `TIME(0)` |
+| `shiftMgmt:global.shifts[].crossDay` | （目前未落 DB） | 前端排班計算欄位；如需持久化可於 `Shift` 擴充 `CrossDay BIT` |
 | `shiftMgmt:global.shifts[].hours` | `Shift.Hours` | 計薪工時 |
 | `shiftMgmt:global.shifts[].rest` | `Shift.Rest` | 休息時數 |
 | `shiftMgmt:global.shifts[].otStart` | `Shift.OtStart` | 可為 `NULL` |
@@ -433,7 +436,7 @@ Request DTO（建議）：
 
 ```json
 {
-  "version": 14,
+  "version": 13,
   "dictionary": {
     "branches": ["總公司"],
     "departments": ["倉儲部"],
@@ -446,7 +449,7 @@ Request DTO（建議）：
     { "id": "EMP001", "name": "王小明", "branch": "總公司", "department": "倉儲部", "isActive": true }
   ],
   "shifts": [
-    { "name": "早班", "shortName": "早", "start": "08:00", "end": "17:00", "hours": 8, "rest": 1, "otStart": "17:00", "otEnd": "20:00" }
+    { "name": "早班", "shortName": "早", "start": "08:00", "end": "17:00", "crossDay": false, "hours": 8, "rest": 1, "otStart": "17:00", "otEnd": "20:00" }
   ],
   "holidayGroups": [
     { "name": "台灣國定假日", "dates": ["2026-01-01", "2026-02-28"] },
@@ -508,7 +511,7 @@ SQL upsert 順序（同一 transaction 內）：
 ```json
 {
   "ok": true,
-  "version": 14,
+  "version": 13,
   "updatedAt": "2026-05-05T09:30:00Z",
   "stats": {
     "employees": 5,
@@ -603,7 +606,7 @@ DECLARE @payload NVARCHAR(MAX) = N'{
     "punchLocations": ["倉儲中心"]
   },
   "persons": [{"id":"EMP001","name":"王小明","branch":"總公司","department":"倉儲部","isActive":true}],
-  "shifts": [{"name":"早班","shortName":"早","start":"08:00","end":"17:00","hours":8,"rest":1,"otStart":"17:00","otEnd":"20:00"}],
+  "shifts": [{"name":"早班","shortName":"早","start":"08:00","end":"17:00","crossDay":false,"hours":8,"rest":1,"otStart":"17:00","otEnd":"20:00"}],
   "holidayGroups": [{"name":"台灣國定假日","dates":["2026-01-01"]}],
   "individualHolidays": ["2026-01-20"],
   "attendanceGroups": [{
