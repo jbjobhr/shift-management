@@ -254,6 +254,16 @@
    </div>
   </div>
 
+  <div id="groupDetailModal" class="modal-overlay hidden">
+   <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-lg space-y-4">
+    <div class="flex items-center justify-between gap-3">
+     <h3 id="groupDetailTitle" class="font-bold text-lg text-slate-800">明細</h3>
+     <button onclick="closeGroupDetailModal()" class="px-2 py-1 text-sm text-slate-500 hover:bg-slate-100 rounded">關閉</button>
+    </div>
+    <div id="groupDetailBody" class="max-h-[60vh] overflow-y-auto text-sm text-slate-700"></div>
+   </div>
+  </div>
+
   <script>
   function _genWeekendsOfYear(year) {
     const out = [], d = new Date(year, 0, 1);
@@ -870,6 +880,102 @@
     closeAssignModal();
   }
 
+  function escapeHtml(str) {
+    return String(str || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function openGroupDetailModal(title, bodyHtml) {
+    const titleEl = document.getElementById('groupDetailTitle');
+    const bodyEl = document.getElementById('groupDetailBody');
+    if (!titleEl || !bodyEl) return;
+    titleEl.textContent = title || '明細';
+    bodyEl.innerHTML = bodyHtml || '';
+    document.getElementById('groupDetailModal').classList.remove('hidden');
+  }
+
+  function closeGroupDetailModal() {
+    document.getElementById('groupDetailModal').classList.add('hidden');
+  }
+
+  function openHolidayGroupDetail(name) {
+    const groupName = String(name || '');
+    const dates = ((G.holidayGroups || {})[groupName] || []).slice().sort();
+    const datesHtml = dates.length
+      ? `<div class="flex flex-wrap gap-1">${dates.map(d => `<span class="px-2 py-1 rounded bg-red-50 text-red-700 border border-red-100 text-xs">${escapeHtml(d)}</span>`).join('')}</div>`
+      : '<div class="text-slate-500">此假別組尚未設定日期</div>';
+    const bodyHtml = `
+      <div class="space-y-3">
+        <div>
+          <div class="text-slate-500 text-xs mb-1">假別組名稱</div>
+          <div class="font-medium text-slate-800">${escapeHtml(groupName)}</div>
+        </div>
+        <div>
+          <div class="text-slate-500 text-xs mb-1">假日清單（${dates.length}）</div>
+          ${datesHtml}
+        </div>
+      </div>`;
+    openGroupDetailModal(`假別組明細：${groupName}`, bodyHtml);
+  }
+
+  function openAttendanceGroupDetail(name) {
+    const groupName = String(name || '');
+    const g = (G.attendanceGroups || []).find(x => x.name === groupName);
+    if (!g) {
+      openGroupDetailModal('考勤組明細', '<div class="text-slate-500">找不到此考勤組資料</div>');
+      return;
+    }
+    const DOW_LABELS = [['mon','週一'],['tue','週二'],['wed','週三'],['thu','週四'],['fri','週五'],['sat','週六'],['sun','週日']];
+    const shiftHourMap = {};
+    (G.shifts || []).forEach(s => { shiftHourMap[s.name] = Number(s.hours) || 0; });
+    let ws = g.weekdayShifts;
+    if (!ws) {
+      const first = (G.shifts && G.shifts[0] && G.shifts[0].name) ? [G.shifts[0].name] : [];
+      ws = { mon: first, tue: first, wed: first, thu: first, fri: first, sat: [], sun: [] };
+    }
+    let weeklyHours = 0;
+    const weekdaysHtml = DOW_LABELS.map(([k, label]) => {
+      const arr = Array.isArray(ws[k]) ? ws[k] : (typeof ws[k] === 'string' && ws[k] ? [ws[k]] : []);
+      arr.forEach(n => { weeklyHours += shiftHourMap[n] || 0; });
+      return `<div class="flex items-start justify-between gap-3 border-b border-slate-100 py-1.5">
+        <span class="text-slate-500">${label}</span>
+        <span class="text-right">${arr.length ? arr.map(escapeHtml).join('、') : '休'}</span>
+      </div>`;
+    }).join('');
+    const punchLocations = Array.isArray(g.punchLocations) ? g.punchLocations : [];
+    const punchLocationHtml = punchLocations.length
+      ? `<div class="flex flex-wrap gap-1">${punchLocations.map(v => `<span class="px-2 py-1 rounded bg-cyan-50 text-cyan-700 border border-cyan-100 text-xs">${escapeHtml(v)}</span>`).join('')}</div>`
+      : '<div class="text-slate-500">未設定打卡地</div>';
+    const bodyHtml = `
+      <div class="space-y-3">
+        <div>
+          <div class="text-slate-500 text-xs mb-1">考勤組名稱</div>
+          <div class="font-medium text-slate-800">${escapeHtml(g.name)}</div>
+        </div>
+        <div class="grid grid-cols-2 gap-3 text-sm">
+          <div class="rounded border border-slate-200 bg-slate-50 px-3 py-2">成員數：${(g.members || []).length} 人</div>
+          <div class="rounded border border-slate-200 bg-slate-50 px-3 py-2">排班型態：${(g.scheduleType || 'auto') === 'auto' ? '自動排班' : '手動排班'}</div>
+        </div>
+        <div class="grid grid-cols-2 gap-3 text-sm">
+          <div class="rounded border border-slate-200 bg-slate-50 px-3 py-2">每週總工時：${weeklyHours} h</div>
+          <div class="rounded border border-slate-200 bg-slate-50 px-3 py-2">假日仍排班：${g.workOnHoliday ? '是（視為加班）' : '否（假日優先）'}</div>
+        </div>
+        <div>
+          <div class="text-slate-500 text-xs mb-1">打卡地</div>
+          ${punchLocationHtml}
+        </div>
+        <div>
+          <div class="text-slate-500 text-xs mb-1">週間排班設定</div>
+          <div class="rounded border border-slate-200 px-3 py-1">${weekdaysHtml}</div>
+        </div>
+      </div>`;
+    openGroupDetailModal(`考勤組明細：${g.name}`, bodyHtml);
+  }
+
   // ===== 個人化分組設定 =====
   function renderHolidayGroupsPanel(){
     const c = document.getElementById('personalHolidayGroups');
@@ -888,13 +994,16 @@
       return;
     }
     c.innerHTML = names.map(n => `
-      <label class="flex items-center gap-3 p-3 bg-red-50 rounded-lg border ${draft.holidayGroups.includes(n) ? 'border-red-300 ring-1 ring-red-200' : 'border-red-100'} cursor-pointer">
-        <input type="checkbox" ${draft.holidayGroups.includes(n)?'checked':''} onclick="toggleDraftHolidayGroup('${n.replace(/'/g,"\\'")}')">
-        <div class="flex-1">
-          <div class="text-sm font-medium text-slate-800">${n}</div>
-          <div class="text-xs text-slate-500">${(G.holidayGroups[n]||[]).length} 個假日</div>
-        </div>
-      </label>
+      <div class="flex items-center gap-3 p-3 bg-red-50 rounded-lg border ${draft.holidayGroups.includes(n) ? 'border-red-300 ring-1 ring-red-200' : 'border-red-100'}">
+        <label class="flex items-center gap-3 flex-1 min-w-0 cursor-pointer">
+          <input type="checkbox" ${draft.holidayGroups.includes(n)?'checked':''} onclick="toggleDraftHolidayGroup('${n.replace(/'/g,"\\'")}')">
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-medium text-slate-800 truncate">${n}</div>
+            <div class="text-xs text-slate-500">${(G.holidayGroups[n]||[]).length} 個假日</div>
+          </div>
+        </label>
+        <button type="button" onclick="openHolidayGroupDetail('${n.replace(/'/g,"\\'")}')" class="shrink-0 px-3 py-1 text-sm font-medium text-red-600 border border-red-300 rounded hover:bg-red-100">查看</button>
+      </div>
     `).join('');
   }
   function toggleDraftHolidayGroup(name){
@@ -957,14 +1066,17 @@
         weekdayHtml = `<div class="mt-2 text-xs text-slate-500">手動排班</div>`;
       }
       return `
-      <label class="flex items-start gap-3 p-3 bg-green-50 rounded-lg border ${draft.attendanceGroups.includes(g.name) ? 'border-green-300 ring-1 ring-green-200' : 'border-green-100'} cursor-pointer">
-        <input type="radio" name="personalAttendanceGroup" class="mt-1" ${draft.attendanceGroups.includes(g.name)?'checked':''} onclick="selectDraftSingle('attendanceGroups','${g.name.replace(/'/g,"\\'")}')">
-        <div class="flex-1 min-w-0">
-          <div class="text-sm font-medium text-slate-800">${g.name}</div>
-          <div class="text-xs text-slate-500">${(g.members||[]).length} 人</div>
-          ${weekdayHtml}
-        </div>
-      </label>
+      <div class="flex items-start gap-3 p-3 bg-green-50 rounded-lg border ${draft.attendanceGroups.includes(g.name) ? 'border-green-300 ring-1 ring-green-200' : 'border-green-100'}">
+        <label class="flex items-start gap-3 flex-1 min-w-0 cursor-pointer">
+          <input type="radio" name="personalAttendanceGroup" class="mt-1" ${draft.attendanceGroups.includes(g.name)?'checked':''} onclick="selectDraftSingle('attendanceGroups','${g.name.replace(/'/g,"\\'")}')">
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-medium text-slate-800">${g.name}</div>
+            <div class="text-xs text-slate-500">${(g.members||[]).length} 人</div>
+            ${weekdayHtml}
+          </div>
+        </label>
+        <button type="button" onclick="openAttendanceGroupDetail('${g.name.replace(/'/g,"\\'")}')" class="shrink-0 px-3 py-1 text-sm font-medium text-blue-600 border border-blue-300 rounded hover:bg-blue-100">查看</button>
+      </div>
     `;}).join('') + noneOption;
   }
   function renderShiftsPanel(){
@@ -1276,6 +1388,9 @@
   window.clearDraftAttendanceGroup = clearDraftAttendanceGroup;
   window.filterPersonalTagDropdown = filterPersonalTagDropdown;
   window.selectPersonalTag = selectPersonalTag;
+  window.openHolidayGroupDetail = openHolidayGroupDetail;
+  window.openAttendanceGroupDetail = openAttendanceGroupDetail;
+  window.closeGroupDetailModal = closeGroupDetailModal;
 
   document.addEventListener('click', e => {
     const input = document.getElementById('personalTagInput');
