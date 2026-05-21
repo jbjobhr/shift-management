@@ -962,7 +962,7 @@
         </div>
         <div class="grid grid-cols-2 gap-3 text-sm">
           <div class="rounded border border-slate-200 bg-slate-50 px-3 py-2">每週總工時：${weeklyHours} h</div>
-          <div class="rounded border border-slate-200 bg-slate-50 px-3 py-2">假日仍排班：${g.workOnHoliday ? '是（視為加班）' : '否（假日優先）'}</div>
+          <div class="rounded border border-slate-200 bg-slate-50 px-3 py-2">假日仍排班：${g.workOnHoliday ? ((g.employmentType === 'parttime') ? '是（一例一休不視為加班，台灣國定假日視為加班）' : '是（視為加班）') : '否（假日優先）'}</div>
         </div>
         <div>
           <div class="text-slate-500 text-xs mb-1">打卡地</div>

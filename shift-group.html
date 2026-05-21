@@ -37,10 +37,10 @@
         <div>
           <div class="flex items-center gap-4 mb-1">
             <label class="text-sm font-bold text-slate-700">排班型態</label>
-            <label class="flex items-center gap-1 text-sm cursor-pointer"><input type="radio" name="scheduleType" value="auto" checked onchange="updateScheduleTypeUI()">自動排班</label>
-            <label class="flex items-center gap-1 text-sm cursor-pointer"><input type="radio" name="scheduleType" value="manual" onchange="updateScheduleTypeUI()">手動排班</label>
+            <label class="flex items-center gap-1 text-sm cursor-pointer"><input type="radio" name="employmentType" value="fulltime" checked onchange="updateEmploymentTypeUI()">正職（長派）</label>
+            <label class="flex items-center gap-1 text-sm cursor-pointer"><input type="radio" name="employmentType" value="parttime" onchange="updateEmploymentTypeUI()">兼職（短派）</label>
           </div>
-          <p class="text-xs text-slate-500 mb-2" id="scheduleTypeHint">自動排班適用於週間固定上班日之行業</p>
+          <p class="text-xs text-slate-500 mb-2" id="scheduleTypeHint">正職（長派）：假別組優先於考勤組。</p>
           <div id="weekdayShiftsBlock" class="border border-slate-200 rounded-md overflow-hidden"></div>
           <div id="weeklyHoursIndicator" class="mt-2 flex items-center justify-between text-xs px-3 py-2 rounded-md bg-slate-50 border border-slate-200">
             <span class="text-slate-600">每週總工時（上限 40h）</span>
@@ -48,10 +48,10 @@
           </div>
           <p class="text-xs text-slate-500 mt-1" id="weekdayShiftsFooter">請設定固定上班日之班別。</p>
           <label id="workOnHolidayWrap" class="mt-2 flex items-start gap-2 text-sm cursor-pointer bg-orange-50 border border-orange-200 rounded-md px-3 py-2">
-            <input type="checkbox" id="workOnHoliday" class="mt-0.5" onchange="currentGroupWorkOnHoliday = this.checked">
+            <input type="checkbox" id="workOnHoliday" class="mt-0.5" onchange="handleWorkOnHolidayToggle(this.checked)">
             <span>
-              <span class="font-medium text-orange-700">假日仍排班（視為加班）</span>
-              <span class="block text-xs text-slate-500">勾選後，同仍依週間設定排班，並以「假日加班」樣式顯示；未勾選則施行「假日優先」，假日不排班。</span>
+              <span class="font-medium text-orange-700" id="workOnHolidayTitle">假日仍排班（視為加班）</span>
+              <span class="block text-xs text-slate-500" id="workOnHolidayHint">勾選後，同仍依週間設定排班，並以「假日加班」樣式顯示；未勾選則施行「假日優先」，假日不排班。</span>
             </span>
           </label>
         </div>
@@ -255,9 +255,10 @@
     return { mon: [...first], tue: [...first], wed: [...first], thu: [...first], fri: [...first], sat: [], sun: [] };
   }
 
-  let currentGroupScheduleType = 'auto';
+  let currentGroupEmploymentType = 'fulltime';
   let currentGroupWeekdayShifts = defaultWeekdayShifts();
   let currentGroupWorkOnHoliday = false;
+  let currentGroupWorkOnHolidayForFulltime = false;
   let currentGroupMembers = [];
   let currentGroupPunchLocations = [];
 
@@ -269,9 +270,12 @@
     if (isEdit) {
       const group = attendanceGroups[editingGroupIndex];
       currentGroupMembers = Array.isArray(group.members) ? [...group.members] : [];
-      currentGroupScheduleType = group.scheduleType || 'auto';
+      currentGroupEmploymentType = group.employmentType || (group.workOnHoliday ? 'parttime' : 'fulltime');
       currentGroupPunchLocations = Array.isArray(group.punchLocations) ? [...group.punchLocations] : [];
-      currentGroupWorkOnHoliday = !!group.workOnHoliday;
+      currentGroupWorkOnHolidayForFulltime = currentGroupEmploymentType === 'fulltime' ? !!group.workOnHoliday : false;
+      currentGroupWorkOnHoliday = currentGroupEmploymentType === 'parttime'
+        ? true
+        : currentGroupWorkOnHolidayForFulltime;
       const base = defaultWeekdayShifts();
       if (group.weekdayShifts) {
         WEEKDAYS.forEach(w => {
@@ -282,11 +286,17 @@
       }
       currentGroupWeekdayShifts = base;
       document.getElementById('groupName').value = group.name || '';
-      const radio = document.querySelector(`input[name="scheduleType"][value="${currentGroupScheduleType}"]`);
+      const radio = document.querySelector(`input[name="employmentType"][value="${currentGroupEmploymentType}"]`);
       if (radio) radio.checked = true;
       document.getElementById('workOnHoliday').checked = currentGroupWorkOnHoliday;
     } else {
       currentGroupPunchLocations = Array.isArray(allPunchLocations) ? [...allPunchLocations] : [];
+      currentGroupEmploymentType = 'fulltime';
+      currentGroupWorkOnHoliday = false;
+      currentGroupWorkOnHolidayForFulltime = false;
+      const defaultRadio = document.querySelector('input[name="employmentType"][value="fulltime"]');
+      if (defaultRadio) defaultRadio.checked = true;
+      document.getElementById('workOnHoliday').checked = false;
     }
 
     renderWeekdayShifts();
@@ -294,7 +304,7 @@
     renderReportListSelect();
     renderAssigneeListSelect();
     renderSelectedPersonsInGroup();
-    updateScheduleTypeUI();
+    updateEmploymentTypeUI();
     updateWeeklyHoursIndicator();
     lucide.createIcons();
   }
@@ -433,24 +443,38 @@
     }).join('');
   }
 
-  function updateScheduleTypeUI() {
-    const checked = document.querySelector('input[name="scheduleType"]:checked');
-    currentGroupScheduleType = checked ? checked.value : 'auto';
-    const block = document.getElementById('weekdayShiftsBlock');
-    const footer = document.getElementById('weekdayShiftsFooter');
+  function updateEmploymentTypeUI() {
+    const checked = document.querySelector('input[name="employmentType"]:checked');
+    currentGroupEmploymentType = checked ? checked.value : 'fulltime';
     const hint = document.getElementById('scheduleTypeHint');
-    const indicator = document.getElementById('weeklyHoursIndicator');
-    if (currentGroupScheduleType === 'auto') {
-      block.classList.remove('hidden');
-      footer.classList.remove('hidden');
-      if (indicator) indicator.classList.remove('hidden');
-      hint.textContent = '自動排班適用於週間固定上班日之行業';
+    const workOnHolidayTitle = document.getElementById('workOnHolidayTitle');
+    const workOnHolidayInput = document.getElementById('workOnHoliday');
+    const workOnHolidayHint = document.getElementById('workOnHolidayHint');
+    if (currentGroupEmploymentType === 'parttime') {
+      currentGroupWorkOnHoliday = true;
+      if (workOnHolidayInput) {
+        workOnHolidayInput.checked = true;
+        workOnHolidayInput.disabled = true;
+      }
+      if (workOnHolidayTitle) workOnHolidayTitle.textContent = '假日仍排班';
+      hint.textContent = '兼職（短派）：考勤組優先於假別組。';
+      if (workOnHolidayHint) workOnHolidayHint.textContent = '兼職（短派）固定啟用假日仍排班：一例一休可排班但不套用「假日加班」樣式；台灣國定假日可排班且套用「假日加班」樣式。排班優先序為考勤組優先於假別組。';
     } else {
-      block.classList.add('hidden');
-      footer.classList.add('hidden');
-      if (indicator) indicator.classList.add('hidden');
-      hint.textContent = '手動排班可於排班表中逐日指定班別';
+      currentGroupWorkOnHoliday = !!currentGroupWorkOnHolidayForFulltime;
+      if (workOnHolidayInput) {
+        workOnHolidayInput.checked = currentGroupWorkOnHoliday;
+        workOnHolidayInput.disabled = false;
+      }
+      if (workOnHolidayTitle) workOnHolidayTitle.textContent = '假日仍排班（視為加班）';
+      hint.textContent = '正職（長派）：假別組優先於考勤組。';
+      if (workOnHolidayHint) workOnHolidayHint.textContent = '勾選後，同仍依週間設定排班，並以「假日加班」樣式顯示；未勾選則施行「假日優先」，假日不排班。';
     }
+  }
+
+  function handleWorkOnHolidayToggle(checked) {
+    if (currentGroupEmploymentType !== 'fulltime') return;
+    currentGroupWorkOnHolidayForFulltime = !!checked;
+    currentGroupWorkOnHoliday = !!checked;
   }
 
   function renderWeekdayShifts() {
@@ -567,21 +591,20 @@
       alert('請至少添加一位人員');
       return;
     }
-    if (currentGroupScheduleType === 'auto') {
-      const weekly = calcWeeklyHours(currentGroupWeekdayShifts);
-      if (weekly > MAX_WEEKLY_HOURS) {
-        alert(`每週總工時 ${weekly}h 已超過上限 ${MAX_WEEKLY_HOURS}h，請調整班別設定。`);
-        return;
-      }
+    const weekly = calcWeeklyHours(currentGroupWeekdayShifts);
+    if (weekly > MAX_WEEKLY_HOURS) {
+      alert(`每週總工時 ${weekly}h 已超過上限 ${MAX_WEEKLY_HOURS}h，請調整班別設定。`);
+      return;
     }
 
     const payload = {
       name: groupName,
       members: [...currentGroupMembers],
-      scheduleType: currentGroupScheduleType,
+      scheduleType: 'auto',
+      employmentType: currentGroupEmploymentType,
       weekdayShifts: { ...currentGroupWeekdayShifts },
       punchLocations: [...currentGroupPunchLocations],
-      workOnHoliday: !!currentGroupWorkOnHoliday
+      workOnHoliday: currentGroupEmploymentType === 'parttime' ? true : !!currentGroupWorkOnHoliday
     };
 
     if (Number.isInteger(editingGroupIndex) && editingGroupIndex >= 0 && editingGroupIndex < attendanceGroups.length) {
@@ -617,7 +640,8 @@
   window.addPersonToGroup = addPersonToGroup;
   window.toggleWeekdayShift = toggleWeekdayShift;
   window.togglePunchLocation = togglePunchLocation;
-  window.updateScheduleTypeUI = updateScheduleTypeUI;
+  window.updateEmploymentTypeUI = updateEmploymentTypeUI;
+  window.handleWorkOnHolidayToggle = handleWorkOnHolidayToggle;
   window.syncAssigneeList = syncAssigneeList;
   window.saveGroup = saveGroup;
   window.goBack = goBack;

@@ -747,12 +747,16 @@
       const g = getPersonGroup(empId);
       if (!g || (g.scheduleType && g.scheduleType !== 'auto')) return { list: [], isHolidayOt: false };
       const isHoliday = conflictHolidaySet.has(dateStr);
+      const nationalHolidaySet = new Set((holidayGroups || {})['台灣國定假日'] || []);
+      const isNationalHoliday = nationalHolidaySet.has(dateStr);
       // 假日優先：默設不排班；除非考勤組勾選「假日仍排班」
       if (isHoliday && !g.workOnHoliday) return { list: [], isHolidayOt: false };
       const ws = g.weekdayShifts || {};
       const arr = ws[DOW_KEYS[dow]];
       const list = Array.isArray(arr) ? arr.filter(n => n) : [];
-      return { list, isHolidayOt: isHoliday && list.length > 0 };
+      const isParttime = g.employmentType === 'parttime';
+      const isHolidayOt = list.length > 0 && (isParttime ? isNationalHoliday : isHoliday);
+      return { list, isHolidayOt };
     }
 
     const head = document.getElementById('scheduleHead');
