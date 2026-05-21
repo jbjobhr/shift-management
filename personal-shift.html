@@ -947,6 +947,8 @@
       </div>`;
     }).join('');
     const punchLocations = Array.isArray(g.punchLocations) ? g.punchLocations : [];
+    const employmentType = g.employmentType || (g.workOnHoliday ? 'parttime' : 'fulltime');
+    const employmentTypeLabel = employmentType === 'parttime' ? '兼職（短派）' : '正職（長派）';
     const punchLocationHtml = punchLocations.length
       ? `<div class="flex flex-wrap gap-1">${punchLocations.map(v => `<span class="px-2 py-1 rounded bg-cyan-50 text-cyan-700 border border-cyan-100 text-xs">${escapeHtml(v)}</span>`).join('')}</div>`
       : '<div class="text-slate-500">未設定打卡地</div>';
@@ -958,7 +960,7 @@
         </div>
         <div class="grid grid-cols-2 gap-3 text-sm">
           <div class="rounded border border-slate-200 bg-slate-50 px-3 py-2">成員數：${(g.members || []).length} 人</div>
-          <div class="rounded border border-slate-200 bg-slate-50 px-3 py-2">排班型態：${(g.scheduleType || 'auto') === 'auto' ? '自動排班' : '手動排班'}</div>
+          <div class="rounded border border-slate-200 bg-slate-50 px-3 py-2">排班型態：${employmentTypeLabel}</div>
         </div>
         <div class="grid grid-cols-2 gap-3 text-sm">
           <div class="rounded border border-slate-200 bg-slate-50 px-3 py-2">每週總工時：${weeklyHours} h</div>
