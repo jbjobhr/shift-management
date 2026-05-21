@@ -573,7 +573,7 @@
     const personalBadge = document.getElementById('priorityPersonalBadge');
     if (!baseBadge || !baseText || !secondBadge || !personalBadge) return;
 
-    let selectedName = (draft.attendanceGroups && draft.attendanceGroups[0]) || '';
+    let selectedName = (personal.attendanceGroups && personal.attendanceGroups[0]) || '';
     if (!selectedName) {
       selectedName = getAssignedAttendanceGroupNameForRange(personal.rangeStart, personal.rangeEnd);
     }
@@ -1330,6 +1330,7 @@
     personal.positions = [...draft.positions];
     autoFillAssignments(mode);
     persistPersonal();
+    updatePriorityLegend();
     renderCalendar();
     setDirty(false);
   }
