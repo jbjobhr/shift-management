@@ -53,16 +53,20 @@
     <h1 class="text-xl font-bold tracking-wide flex items-center gap-2">
      <i data-lucide="user-circle" class="w-5 h-5"></i><span id="pageTitle">個人排班</span>
     </h1>
-    <nav class="flex gap-2">
-     <button onclick="savePersonal()" class="px-4 py-1.5 rounded-md text-sm font-medium transition bg-blue-600 hover:bg-blue-700 flex items-center gap-2">
-      <i data-lucide="save" class="w-4 h-4"></i>儲存
-     </button>
-      <button onclick="cancelPersonalChanges()" class="px-4 py-1.5 rounded-md text-sm font-medium transition bg-slate-200 hover:bg-slate-300 text-slate-700 flex items-center gap-2" title="回到未改動前（上次儲存）狀態">
-       <i data-lucide="x-circle" class="w-4 h-4"></i>取消
+    <nav class="flex gap-2 items-center">
+      <span id="applyDirtyHint" class="text-xs text-amber-300 hidden">有未套用的變更</span>
+      <button onclick="applyPersonalSettings('keep')" class="px-4 py-1.5 rounded-md text-sm font-medium transition bg-white border border-[#1e3a5f] text-[#1e3a5f] hover:bg-slate-100 flex items-center gap-1" title="保留原本班表，並將新班別 append 到既有班別（不重複）">
+        <i data-lucide="plus" class="w-4 h-4"></i>保留並套用
       </button>
-     <a id="backToOverview" href="index.html" class="px-4 py-1.5 rounded-md text-sm font-medium transition bg-transparent hover:bg-white/10 text-white flex items-center gap-2">
-      <i data-lucide="arrow-left" class="w-4 h-4"></i>返回
-     </a>
+      <button onclick="applyPersonalSettings('clear')" class="px-4 py-1.5 rounded-md text-sm font-medium transition bg-[#1e3a5f] text-white hover:bg-[#2a4f7f] flex items-center gap-1" title="清除區間內原有的指派並重新套用">
+        <i data-lucide="refresh-cw" class="w-4 h-4"></i>清除並套用
+      </button>
+      <button onclick="cancelPersonalChanges()" class="px-4 py-1.5 rounded-md text-sm font-medium transition bg-slate-200 hover:bg-slate-300 text-slate-700 flex items-center gap-2" title="回到未改動前（上次儲存）狀態">
+        <i data-lucide="x-circle" class="w-4 h-4"></i>取消
+      </button>
+      <a id="backToOverview" href="index.html" class="px-4 py-1.5 rounded-md text-sm font-medium transition bg-transparent hover:bg-white/10 text-white flex items-center gap-2">
+        <i data-lucide="arrow-left" class="w-4 h-4"></i>返回
+      </a>
     </nav>
    </header>
 
@@ -188,20 +192,12 @@
       </div>
 
      <!-- 個人化指派：假別組/考勤組/班別/崗位/標籤 -->
-     <div class="flex items-center justify-between">
-      <h2 class="text-lg font-bold text-slate-700 flex items-center gap-2">
-       <i data-lucide="settings" class="w-5 h-5 text-slate-500"></i>個人化指派
-      </h2>
-      <div class="flex items-center gap-3">
-       <span id="applyDirtyHint" class="text-xs text-amber-600 hidden">有未套用的變更</span>
-      <button onclick="applyPersonalSettings('keep')" class="px-4 py-2 bg-white border border-[#1e3a5f] text-[#1e3a5f] rounded-lg text-sm font-medium hover:bg-slate-100 transition flex items-center gap-1" title="保留原本班表，並將新班別 append 到既有班別（不重複）">
-        <i data-lucide="plus" class="w-4 h-4"></i>保留並套用
-       </button>
-       <button onclick="applyPersonalSettings('clear')" class="px-4 py-2 bg-[#1e3a5f] text-white rounded-lg text-sm font-medium hover:bg-[#2a4f7f] transition flex items-center gap-1" title="清除區間內原有的指派並重新套用">
-        <i data-lucide="refresh-cw" class="w-4 h-4"></i>清除並套用
-       </button>
-      </div>
-     </div>
+    <div class="flex items-center justify-between">
+     <h2 class="text-lg font-bold text-slate-700 flex items-center gap-2">
+      <i data-lucide="settings" class="w-5 h-5 text-slate-500"></i>個人化指派
+     </h2>
+     <div class="flex items-center gap-3"></div>
+    </div>
      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
       <!-- 假別組 -->
       <section class="bg-white rounded-xl shadow-sm p-5 space-y-3">
