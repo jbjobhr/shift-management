@@ -333,6 +333,21 @@ index.html               班表總覽（主視圖，橫向日曆表格）
 **版本控制**：`__version` 欄位目前為 `13`。載入時若儲存版本低於此值，自動重置 `attendanceGroups`、`holidayGroups`、`shifts` 為 Fallback 預設值，避免舊結構導致顯示錯誤。
 
 **跨頁同步**：從個人排班返回總覽時，總覽頁監聽 `pageshow` 事件後會重讀 `localStorage` 並重新執行 `renderSchedule()`，確保個人排班變更即時反映。
+
+### localStorage 最新狀況（2026-05-22）
+
+1. 目前仍以三個主要 key 運作：`shiftMgmt:global`、`shiftMgmt:personal:{empId}`、`shiftMgmt:newScheduleDraft`。
+2. 新增班表流程的草稿 key（`shiftMgmt:newScheduleDraft`）生命週期如下：
+  - 一般直接進入 `shift-setting-new.html` 時，會先清除舊草稿。
+  - 從 `shift-choose.html` 以 `index=-1` 返回時，會保留並載入草稿。
+  - 完成儲存後會清除草稿，避免殘留資料污染下次新增流程。
+3. 全域資料版本檢查常數目前為 `DATA_VERSION = 13`（`index.html`、`personal-shift.html` 均有檢查）。
+4. 當偵測到舊版資料（`__version < 13`）時，會自動回填並重置：
+  - `attendanceGroups`
+  - `holidayGroups`
+  - `shifts`
+5. 班表設定頁另有每個班表自己的結構版本：`_schedConfigVersion = 5`（儲存在 `shiftMgmt:global.schedules[]` 的班表物件內），用於舊班表欄位補齊與遷移。
+6. 個人資料 key（`shiftMgmt:personal:{empId}`）仍是以「按下儲存」才真正寫回，草稿操作不會立即覆寫該 key。
 ---
 
 ## 資料庫（MSSQL）
