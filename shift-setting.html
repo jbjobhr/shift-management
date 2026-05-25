@@ -467,7 +467,7 @@
   }
   // ── 對所有班表補齊 per-schedule 預設欄位（舊資料遷移）──────────────
   // 版本號升高時強制重置各班表至各自的 FALLBACK（保留 name/start/end/branch）
-  const _SCHED_CONFIG_VERSION = 5;
+  const _SCHED_CONFIG_VERSION = 6;
   schedules.forEach((s, i) => {
     const fb = _SCHED_FALLBACK[i] || _SCHED_FALLBACK[0];
     if ((s._schedConfigVersion || 0) >= _SCHED_CONFIG_VERSION) return; // 已是最新，不重置
@@ -1240,15 +1240,27 @@
 
   function renderAttendanceGroups() {
     const DOW_LABELS = [['mon','一'],['tue','二'],['wed','三'],['thu','四'],['fri','五'],['sat','六'],['sun','日']];
+    const SYSTEM_LABELS = {
+      general: '一般（單週）',
+      twoWeek: '兩週變形',
+      fourWeek: '四週變形',
+      eightWeek: '八週變形'
+    };
     document.getElementById('attendanceGroupList').innerHTML = attendanceGroups.map((g, i) => {
       const isAuto = (g.scheduleType || 'auto') === 'auto';
+      const systemType = g.systemType || 'general';
+      const systemLabel = SYSTEM_LABELS[systemType] || systemType || '一般（單週）';
+      const rotatingDetails = Array.isArray(g.rotatingDetails)
+        ? g.rotatingDetails
+        : (Array.isArray(g.details) ? g.details : []);
+      const effectiveDate = g.effectiveDate || '';
       let ws = g.weekdayShifts;
       if (!ws) {
         const first = (shifts[0] && shifts[0].name) ? [shifts[0].name] : [];
         ws = { mon: first, tue: first, wed: first, thu: first, fri: first, sat: [], sun: [] };
       }
       let weekdayHtml = '';
-      if (isAuto) {
+      if (isAuto && systemType === 'general') {
         weekdayHtml = `<div class="mt-2 grid grid-cols-7 gap-1">` + DOW_LABELS.map(([k, label]) => {
           const v = ws[k];
           const arr = Array.isArray(v) ? v : (typeof v === 'string' && v ? [v] : []);
@@ -1262,6 +1274,24 @@
             ${content}
           </div>`;
         }).join('') + `</div>`;
+      } else if (isAuto && systemType !== 'general') {
+        const cycleSequence = [];
+        rotatingDetails.forEach(item => {
+          const shiftName = String(item.shiftName || item.shiftCode || '').trim() || '未命名';
+          const days = Math.max(1, parseInt(item.days, 10) || 1);
+          for (let d = 0; d < days; d += 1) cycleSequence.push(shiftName);
+        });
+        const preview = Array.from({ length: 7 }, (_, idx) => cycleSequence[idx % cycleSequence.length]);
+        const previewCells = preview.map((name, idx) => {
+          const isRest = name === '休息日' || name === '休';
+          return `<div class="bg-white border border-slate-200 rounded p-1 text-center">
+            <div class="text-[10px] text-slate-500 mb-1">D${idx + 1}</div>
+            <div class="text-[10px] px-1 py-0.5 rounded truncate ${isRest ? 'bg-slate-100 text-slate-500' : 'bg-amber-100 text-amber-700'}" title="${name}">${isRest ? '休' : name}</div>
+          </div>`;
+        }).join('');
+        weekdayHtml = cycleSequence.length
+          ? `<div class="mt-2 text-[10px] text-cyan-700">循環預覽（前 7 天）</div><div class="mt-1 grid grid-cols-7 gap-1">${previewCells}</div>`
+          : `<div class="mt-2 text-xs text-slate-400">尚未設定輪班明細</div>`;
       } else {
         weekdayHtml = `<div class="mt-2 text-xs text-slate-500">手動排班</div>`;
       }
@@ -1271,9 +1301,14 @@
       <div class="flex-1 min-w-0">
         <div class="font-medium text-sm flex items-center gap-2">
           <span>${g.name}</span>
+          <span class="chip bg-cyan-100 text-cyan-700 text-[10px]">${systemLabel}</span>
           ${g.workOnHoliday ? '<span class="chip bg-orange-100 text-orange-700 text-[10px]">假日加班</span>' : ''}
         </div>
         <div class="text-xs text-slate-500">${g.members.length} 人</div>
+        ${systemType !== 'general' ? `
+          <div class="mt-1 text-xs text-slate-500">生效日期：${effectiveDate || '未設定'}</div>
+          <div class="mt-1 flex flex-wrap gap-1">${rotatingDetails.slice(0, 3).map(d => `<span class="chip bg-cyan-50 text-cyan-700 text-[10px]">${d.shiftName || d.shiftCode || '未命名'} × ${d.days || 1} 天</span>`).join('')}${rotatingDetails.length > 3 ? '<span class="text-[10px] text-slate-400 self-center">...</span>' : ''}</div>
+        ` : ''}
         ${weekdayHtml}
       </div>
       <button onclick="openShiftGroupPage(${i})" class="text-blue-400 hover:text-blue-600 text-sm px-2">編輯</button>

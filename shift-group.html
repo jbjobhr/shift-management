@@ -52,12 +52,45 @@
               <span id="secondLayerBadgeText">假別組</span>
             </span>
           </div>
-          <div id="weekdayShiftsBlock" class="border border-slate-200 rounded-md overflow-hidden"></div>
-          <div id="weeklyHoursIndicator" class="mt-2 flex items-center justify-between text-xs px-3 py-2 rounded-md bg-slate-50 border border-slate-200">
-            <span class="text-slate-600">每週總工時（上限 40h）</span>
-            <span id="weeklyHoursValue" class="font-semibold">0 h</span>
+          <div id="weekdayShiftsSection">
+            <div id="weekdayShiftsBlock" class="border border-slate-200 rounded-md overflow-hidden"></div>
+            <div id="weeklyHoursIndicator" class="mt-2 flex items-center justify-between text-xs px-3 py-2 rounded-md bg-slate-50 border border-slate-200">
+              <span class="text-slate-600">每週總工時（上限 40h）</span>
+              <span id="weeklyHoursValue" class="font-semibold">0 h</span>
+            </div>
+            <p class="text-xs text-slate-500 mt-1" id="weekdayShiftsFooter">請設定固定上班日之班別。</p>
           </div>
-          <p class="text-xs text-slate-500 mt-1" id="weekdayShiftsFooter">請設定固定上班日之班別。</p>
+          <div id="rotatingSystemSection" class="mt-3 border border-cyan-100 rounded-md bg-cyan-50 p-3 space-y-3">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <div class="text-sm font-medium text-cyan-800">輪班制度</div>
+                <div class="text-xs text-slate-500" id="rotatingSystemHint">每週循環，適用於一般一例一休排班。</div>
+              </div>
+              <span id="rotatingSystemBadge" class="chip bg-cyan-100 text-cyan-700">一般（單週）</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+              <label class="flex items-center gap-1 text-sm cursor-pointer px-2 py-1 rounded hover:bg-white/70"><input type="radio" name="rotatingSystemType" value="general" checked onchange="updateRotatingSystemUI()"><span>一般（單週）</span></label>
+              <label class="flex items-center gap-1 text-sm cursor-pointer px-2 py-1 rounded hover:bg-white/70"><input type="radio" name="rotatingSystemType" value="twoWeek" onchange="updateRotatingSystemUI()"><span>兩週變形</span></label>
+              <label class="flex items-center gap-1 text-sm cursor-pointer px-2 py-1 rounded hover:bg-white/70"><input type="radio" name="rotatingSystemType" value="fourWeek" onchange="updateRotatingSystemUI()"><span>四週變形</span></label>
+              <label class="flex items-center gap-1 text-sm cursor-pointer px-2 py-1 rounded hover:bg-white/70"><input type="radio" name="rotatingSystemType" value="eightWeek" onchange="updateRotatingSystemUI()"><span>八週變形</span></label>
+            </div>
+            <div id="rotatingEffectiveWrap" class="grid grid-cols-1 md:grid-cols-2 gap-3 hidden">
+              <div>
+                <label class="block text-sm font-medium text-slate-600 mb-1">生效日期 <span class="text-red-500">*</span></label>
+                <input type="date" id="rotatingEffectiveDate" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm">
+              </div>
+            </div>
+            <div id="rotatingDetailWrap" class="space-y-3 hidden">
+              <div class="flex items-center justify-between gap-2">
+                <div>
+                  <div class="text-sm font-medium text-cyan-800">輪班明細資料</div>
+                  <div class="text-xs text-slate-500">請輸入班別/休息與輪班天數。</div>
+                </div>
+                <button type="button" onclick="addRotatingDetail()" class="px-3 py-1.5 bg-cyan-50 text-cyan-700 rounded-md text-sm font-medium hover:bg-cyan-100 transition flex items-center gap-1"><i data-lucide="plus" class="w-4 h-4"></i>增加明細</button>
+              </div>
+              <div id="rotatingDetailList" class="space-y-2"></div>
+            </div>
+          </div>
           <label id="workOnHolidayWrap" class="mt-2 flex items-start gap-2 text-sm cursor-pointer bg-orange-50 border border-orange-200 rounded-md px-3 py-2">
             <input type="checkbox" id="workOnHoliday" class="mt-0.5" onchange="handleWorkOnHolidayToggle(this.checked)">
             <span>
@@ -301,6 +334,126 @@
   let currentGroupWorkOnHolidayForFulltime = false;
   let currentGroupMembers = [];
   let currentGroupPunchLocations = [];
+  let currentGroupSystemType = 'general';
+  let currentGroupEffectiveDate = '';
+  let currentGroupRotatingDetails = [];
+
+  const ROTATING_SYSTEM_OPTIONS = [
+    { value: 'general', label: '一般（單週）', hint: '每週循環，適用於一般一例一休排班。' },
+    { value: 'twoWeek', label: '兩週變形', hint: '需填寫生效日期與輪班明細。' },
+    { value: 'fourWeek', label: '四週變形', hint: '需填寫生效日期與輪班明細。' },
+    { value: 'eightWeek', label: '八週變形', hint: '需填寫生效日期與輪班明細。' }
+  ];
+
+  const ROTATING_SYSTEM_LABELS = {
+    general: '一般（單週）',
+    twoWeek: '兩週變形',
+    fourWeek: '四週變形',
+    eightWeek: '八週變形'
+  };
+
+  const ROTATING_REST_VALUE = '__rest__';
+  const ROTATING_REST_LABEL = '休息日';
+
+  function normalizeRotatingDetail(item = {}) {
+    const rawShiftName = String(item.shiftName || item.shiftCode || '').trim();
+    return {
+      shiftName: rawShiftName === ROTATING_REST_VALUE ? ROTATING_REST_LABEL : rawShiftName,
+      days: Math.max(1, parseInt(item.days, 10) || 1)
+    };
+  }
+
+  function renderRotatingDetailRows() {
+    const container = document.getElementById('rotatingDetailList');
+    if (!container) return;
+    const shiftOptions = shifts.map(s => ({ value: s.name, label: s.name }));
+    shiftOptions.push({ value: ROTATING_REST_VALUE, label: ROTATING_REST_LABEL });
+    if (!currentGroupRotatingDetails.length) {
+      container.innerHTML = '<div class="text-sm text-slate-500 bg-cyan-50 border border-cyan-100 rounded-lg px-3 py-2">尚未新增輪班明細</div>';
+      return;
+    }
+    container.innerHTML = currentGroupRotatingDetails.map((row, idx) => `
+      <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-3">
+        <div class="grid grid-cols-1 md:grid-cols-[1fr_140px_auto] gap-3 items-end">
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">班別/休息 <span class="text-red-500">*</span></label>
+            <select onchange="updateRotatingDetail(${idx}, 'shiftName', this.value)"><option value="">請選擇班別/休息</option>${shiftOptions.map(opt => `<option value="${opt.value}" ${(opt.value === row.shiftName || (opt.value === ROTATING_REST_VALUE && row.shiftName === ROTATING_REST_LABEL)) ? 'selected' : ''}>${opt.label}</option>`).join('')}</select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">輪班天數 <span class="text-red-500">*</span></label>
+            <input type="number" min="1" step="1" value="${row.days}" onchange="updateRotatingDetail(${idx}, 'days', this.value)">
+          </div>
+          <div class="flex justify-end">
+            <button type="button" onclick="removeRotatingDetail(${idx})" class="px-3 py-2 rounded-md bg-red-50 text-red-600 hover:bg-red-100 transition">
+              <i data-lucide="trash-2" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    `).join('');
+    lucide.createIcons();
+  }
+
+  function addRotatingDetail() {
+    currentGroupRotatingDetails.push({ shiftName: '', days: 1 });
+    renderRotatingDetailRows();
+  }
+
+  function removeRotatingDetail(index) {
+    if (index < 0 || index >= currentGroupRotatingDetails.length) return;
+    currentGroupRotatingDetails.splice(index, 1);
+    renderRotatingDetailRows();
+  }
+
+  function updateRotatingDetail(index, field, value) {
+    if (!currentGroupRotatingDetails[index]) return;
+    if (field === 'days') {
+      const parsed = parseInt(value, 10);
+      currentGroupRotatingDetails[index].days = Number.isNaN(parsed) || parsed < 1 ? 1 : parsed;
+      return;
+    }
+    let nextValue = String(value || '').trim();
+    if (field === 'shiftName' && nextValue === ROTATING_REST_VALUE) nextValue = ROTATING_REST_LABEL;
+    currentGroupRotatingDetails[index][field] = nextValue;
+  }
+
+  function updateRotatingSystemUI() {
+    const checked = document.querySelector('input[name="rotatingSystemType"]:checked');
+    currentGroupSystemType = checked ? checked.value : 'general';
+    const detailWrap = document.getElementById('rotatingDetailWrap');
+    const effectiveWrap = document.getElementById('rotatingEffectiveWrap');
+    const hint = document.getElementById('rotatingSystemHint');
+    const label = ROTATING_SYSTEM_LABELS[currentGroupSystemType] || '一般（單週）';
+    if (hint) {
+      const selected = ROTATING_SYSTEM_OPTIONS.find(item => item.value === currentGroupSystemType);
+      hint.textContent = selected ? selected.hint : '每週循環，適用於一般一例一休排班。';
+    }
+    if (detailWrap) detailWrap.classList.toggle('hidden', currentGroupSystemType === 'general');
+    if (effectiveWrap) effectiveWrap.classList.toggle('hidden', currentGroupSystemType === 'general');
+    const badge = document.getElementById('rotatingSystemBadge');
+    if (badge) badge.textContent = label;
+    syncWeekdayShiftsLayout();
+  }
+
+  function syncWeekdayShiftsLayout() {
+    const weekdaySection = document.getElementById('weekdayShiftsSection');
+    const rotatingSection = document.getElementById('rotatingSystemSection');
+    if (!weekdaySection || !rotatingSection) return;
+
+    const parent = rotatingSection.parentElement;
+    if (!parent) return;
+
+    if (currentGroupSystemType === 'general') {
+      weekdaySection.classList.remove('hidden');
+      const afterRotating = rotatingSection.nextElementSibling;
+      if (afterRotating !== weekdaySection) {
+        parent.insertBefore(weekdaySection, rotatingSection.nextSibling);
+      }
+      return;
+    }
+
+    weekdaySection.classList.add('hidden');
+  }
 
   function initPage() {
     const isEdit = Number.isInteger(editingGroupIndex) && editingGroupIndex >= 0 && editingGroupIndex < attendanceGroups.length;
@@ -312,6 +465,13 @@
       currentGroupMembers = Array.isArray(group.members) ? [...group.members] : [];
       currentGroupEmploymentType = group.employmentType || (group.workOnHoliday ? 'parttime' : 'fulltime');
       currentGroupPunchLocations = Array.isArray(group.punchLocations) ? [...group.punchLocations] : [];
+      currentGroupSystemType = group.systemType || 'general';
+      currentGroupEffectiveDate = group.effectiveDate || '';
+      currentGroupRotatingDetails = Array.isArray(group.rotatingDetails)
+        ? group.rotatingDetails.map(normalizeRotatingDetail)
+        : Array.isArray(group.details)
+          ? group.details.map(normalizeRotatingDetail)
+        : [];
       currentGroupWorkOnHolidayForFulltime = currentGroupEmploymentType === 'fulltime' ? !!group.workOnHoliday : false;
       currentGroupWorkOnHoliday = currentGroupEmploymentType === 'parttime'
         ? true
@@ -334,17 +494,27 @@
       currentGroupEmploymentType = 'fulltime';
       currentGroupWorkOnHoliday = false;
       currentGroupWorkOnHolidayForFulltime = false;
+      currentGroupSystemType = 'general';
+      currentGroupEffectiveDate = '';
+      currentGroupRotatingDetails = [];
       const defaultRadio = document.querySelector('input[name="employmentType"][value="fulltime"]');
       if (defaultRadio) defaultRadio.checked = true;
       document.getElementById('workOnHoliday').checked = false;
     }
 
+    const systemRadio = document.querySelector(`input[name="rotatingSystemType"][value="${currentGroupSystemType}"]`);
+    if (systemRadio) systemRadio.checked = true;
+    const effectiveDateInput = document.getElementById('rotatingEffectiveDate');
+    if (effectiveDateInput) effectiveDateInput.value = currentGroupEffectiveDate;
+
     renderWeekdayShifts();
     renderPunchLocationOptions();
+    renderRotatingDetailRows();
     renderReportListSelect();
     renderAssigneeListSelect();
     renderSelectedPersonsInGroup();
     updateEmploymentTypeUI();
+    updateRotatingSystemUI();
     updateWeeklyHoursIndicator();
     lucide.createIcons();
   }
@@ -481,6 +651,15 @@
         <button onclick="currentGroupMembers.splice(${idx}, 1); renderSelectedPersonsInGroup()" class="text-red-400 hover:text-red-600 text-xs">移除</button>
       </div>`;
     }).join('');
+  }
+
+  function renderRotatingSystemOptions() {
+    return ROTATING_SYSTEM_OPTIONS.map(item => `
+      <label class="flex items-center gap-1 text-sm cursor-pointer px-2 py-1 rounded hover:bg-slate-50">
+        <input type="radio" name="rotatingSystemType" value="${item.value}" ${item.value === 'general' ? 'checked' : ''} onchange="updateRotatingSystemUI()">
+        <span>${item.label}</span>
+      </label>
+    `).join('');
   }
 
   function updateEmploymentTypeUI() {
@@ -647,6 +826,7 @@
 
   function saveGroup() {
     const groupName = document.getElementById('groupName').value.trim();
+    const effectiveDate = document.getElementById('rotatingEffectiveDate').value;
     if (!groupName) {
       alert('請輸入考勤組名稱');
       return;
@@ -661,11 +841,34 @@
       return;
     }
 
+    const systemType = document.querySelector('input[name="rotatingSystemType"]:checked')?.value || 'general';
+    const rotatingDetails = currentGroupRotatingDetails.map(normalizeRotatingDetail).filter(item => item.shiftName);
+    if (systemType !== 'general') {
+      if (!effectiveDate) {
+        alert('請選擇生效日期');
+        return;
+      }
+      if (rotatingDetails.length === 0) {
+        alert('請至少新增一筆輪班明細');
+        return;
+      }
+      const duplicateShift = rotatingDetails.find((item, idx) => rotatingDetails.findIndex(other => other.shiftName === item.shiftName) !== idx);
+      if (duplicateShift) {
+        alert('輪班明細中的班別/休息不可重複');
+        return;
+      }
+    }
+
     const payload = {
       name: groupName,
       members: [...currentGroupMembers],
       scheduleType: 'auto',
       employmentType: currentGroupEmploymentType,
+      systemType,
+      systemLabel: ROTATING_SYSTEM_LABELS[systemType] || '一般（單週）',
+      effectiveDate: systemType === 'general' ? '' : effectiveDate,
+      rotatingDetails: systemType === 'general' ? [] : rotatingDetails,
+      details: systemType === 'general' ? [] : rotatingDetails,
       weekdayShifts: { ...currentGroupWeekdayShifts },
       punchLocations: [...currentGroupPunchLocations],
       workOnHoliday: currentGroupEmploymentType === 'parttime' ? true : !!currentGroupWorkOnHoliday
