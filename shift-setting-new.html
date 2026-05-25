@@ -346,6 +346,7 @@
   const NEW_SCHEDULE_DRAFT_KEY = 'shiftMgmt:newScheduleDraft';
   const _newPageParams = new URLSearchParams(window.location.search);
   const _isReturnFromShiftChoose = _newPageParams.get('index') === '-1';
+  const _editShiftName = (_newPageParams.get('editShiftName') || '').trim();
 
   // 一般開啟「新增班表」頁時，清除舊草稿，避免帶入上次新增資料。
   // 只有從 shift-choose 返回（index=-1）才保留並載入草稿。
@@ -1514,6 +1515,10 @@
   renderBranchAndDepartment();
   renderAllowedOptions();
   renderAllowedSummary();
+  if (_editShiftName) {
+    const _targetShiftIndex = shifts.findIndex(s => s && s.name === _editShiftName);
+    if (_targetShiftIndex >= 0) editShift(_targetShiftIndex);
+  }
   document.getElementById('scheduleName').value = document.getElementById('scheduleName').value || '';
   document.getElementById('startDate').value = document.getElementById('startDate').value || '';
   document.getElementById('endDate').value = document.getElementById('endDate').value || '';

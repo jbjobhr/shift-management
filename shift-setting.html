@@ -485,9 +485,11 @@
   });
   G.schedules = schedules;
   try { localStorage.setItem('shiftMgmt:global', JSON.stringify(G)); } catch(e) {}
+  const _pageParams = new URLSearchParams(location.search);
+  const _editShiftName = (_pageParams.get('editShiftName') || '').trim();
   let currentScheduleIndex = 0;
   try {
-    const _idx = parseInt(new URLSearchParams(location.search).get('index'), 10);
+    const _idx = parseInt(_pageParams.get('index'), 10);
     if (!isNaN(_idx) && _idx >= 0 && _idx < schedules.length) currentScheduleIndex = _idx;
   } catch(e) {}
 
@@ -1789,6 +1791,10 @@
   renderTags();
   renderBranchAndDepartment();
   renderAllowedOptions();
+  if (_editShiftName) {
+    const _targetShiftIndex = shifts.findIndex(s => s && s.name === _editShiftName);
+    if (_targetShiftIndex >= 0) editShift(_targetShiftIndex);
+  }
   // 初始化基本資訊欄位（依目前班表 index）
   document.getElementById('scheduleName').value = schedules[currentScheduleIndex].name || '';
   document.getElementById('startDate').value    = schedules[currentScheduleIndex].start || '';

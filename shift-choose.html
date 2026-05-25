@@ -14,6 +14,21 @@
     .picker-row.active { background: #dbeafe; color: #1e40af; }
     input[type="text"] { border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 10px; font-size: 14px; }
     input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.1); }
+    .row-edit-btn {
+      border: 1px solid #cbd5e1;
+      background: #fff;
+      color: #475569;
+      font-size: 12px;
+      line-height: 1;
+      padding: 6px 10px;
+      border-radius: 9999px;
+      transition: all 0.15s ease;
+    }
+    .row-edit-btn:hover {
+      border-color: #93c5fd;
+      background: #eff6ff;
+      color: #1d4ed8;
+    }
   </style>
  </head>
  <body class="h-full bg-slate-50 w-full">
@@ -35,7 +50,10 @@
             <h3 class="font-semibold text-slate-800">班別</h3>
             <p class="text-xs text-slate-500">設定此班表允許使用的班別。</p>
           </div>
-          <button type="button" onclick="selectAllAllowedAvailable('shifts')" class="px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm">全部加入</button>
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="goEditPage('shifts')" class="px-3 py-1.5 bg-white border border-slate-300 text-slate-700 rounded-md text-sm hover:bg-slate-50">編輯</button>
+            <button type="button" onclick="selectAllAllowedAvailable('shifts')" class="px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm">全部加入</button>
+          </div>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-4 items-start">
           <div>
@@ -61,7 +79,10 @@
             <h3 class="font-semibold text-slate-800">假別組</h3>
             <p class="text-xs text-slate-500">設定此班表允許使用的假別組。</p>
           </div>
-          <button type="button" onclick="selectAllAllowedAvailable('holidayGroups')" class="px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm">全部加入</button>
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="goEditPage('holidayGroups')" class="px-3 py-1.5 bg-white border border-slate-300 text-slate-700 rounded-md text-sm hover:bg-slate-50">編輯</button>
+            <button type="button" onclick="selectAllAllowedAvailable('holidayGroups')" class="px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm">全部加入</button>
+          </div>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-4 items-start">
           <div>
@@ -87,7 +108,10 @@
             <h3 class="font-semibold text-slate-800">考勤組</h3>
             <p class="text-xs text-slate-500">設定此班表允許使用的考勤組。</p>
           </div>
-          <button type="button" onclick="selectAllAllowedAvailable('attendanceGroups')" class="px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm">全部加入</button>
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="goEditPage('attendanceGroups')" class="px-3 py-1.5 bg-white border border-slate-300 text-slate-700 rounded-md text-sm hover:bg-slate-50">編輯</button>
+            <button type="button" onclick="selectAllAllowedAvailable('attendanceGroups')" class="px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm">全部加入</button>
+          </div>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-4 items-start">
           <div>
@@ -237,6 +261,69 @@
     attendanceGroups: { available: [], selected: [], activeAvailable: [], activeSelected: [] }
   };
 
+  const SYSTEM_LABELS = {
+    general: '一般（單週）',
+    twoWeek: '兩週變形',
+    fourWeek: '四週變形',
+    eightWeek: '八週變形'
+  };
+
+  function formatHoursValue(v) {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return '0';
+    return Number.isInteger(n) ? String(n) : String(n);
+  }
+
+  function formatRestHours(v) {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return '0.0';
+    return n.toFixed(1);
+  }
+
+  function getRowMetaLines(type, name) {
+    if (type === 'shifts') {
+      const s = globalShiftTemplates[name];
+      if (!s) return [];
+      const before = Number.parseInt(String(s.punchBeforeMinutes), 10);
+      const after = Number.parseInt(String(s.punchAfterMinutes), 10);
+      return [
+        `${s.start || '-'} - ${s.end || '-'}`,
+        `工時 ${formatHoursValue(s.hours)}h`,
+        `休息 ${formatRestHours(s.rest)}h`,
+        `可打卡 前${Number.isNaN(before) ? 30 : before}/後${Number.isNaN(after) ? 30 : after}分`
+      ];
+    }
+
+    if (type === 'holidayGroups') {
+      const days = globalHolidayGroupTemplates[name];
+      const count = Array.isArray(days) ? days.length : 0;
+      return [`${count} 個假日`];
+    }
+
+    if (type === 'attendanceGroups') {
+      const g = globalAttendanceGroupTemplates[name];
+      if (!g) return [];
+      const lines = [];
+      const systemType = g.systemType || 'general';
+      lines.push(SYSTEM_LABELS[systemType] || systemType);
+      if (g.workOnHoliday) lines.push('假日加班');
+      if (systemType !== 'general') {
+        lines.push(`生效日期：${g.effectiveDate || '未設定'}`);
+        const rotatingDetails = Array.isArray(g.rotatingDetails)
+          ? g.rotatingDetails
+          : (Array.isArray(g.details) ? g.details : []);
+        rotatingDetails.slice(0, 3).forEach((d) => {
+          const shiftName = d.shiftName || d.shiftCode || '未命名';
+          const days = Math.max(1, parseInt(d.days, 10) || 1);
+          lines.push(`${shiftName} × ${days} 天`);
+        });
+      }
+      return lines;
+    }
+
+    return [];
+  }
+
   function getAllowedPickerConfig(type) {
     if (type === 'holidayGroups') {
       return { all: Object.keys(globalHolidayGroupTemplates), selected: allowedHolidayGroupNames };
@@ -279,16 +366,102 @@
     const leftBox = document.getElementById(`allowedPickerAvailableList-${type}`);
     const rightBox = document.getElementById(`allowedPickerSelectedList-${type}`);
 
+    const renderRow = (name, side) => {
+      const isActive = side === 'available'
+        ? state.activeAvailable.includes(name)
+        : state.activeSelected.includes(name);
+      const meta = getRowMetaLines(type, name)
+        .map(line => `<div class="text-xs text-slate-500 leading-4 truncate" title="${line}">${line}</div>`)
+        .join('');
+      return `<div class="picker-row ${isActive ? 'active' : ''}" onclick='setAllowedPickerActive(${JSON.stringify(type)}, ${JSON.stringify(side)}, ${JSON.stringify(name)})'>
+        <div class="flex items-start justify-between gap-2">
+          <div class="font-medium text-slate-800 truncate" title="${name}">${name}</div>
+          <button type="button" class="row-edit-btn" onclick='event.stopPropagation();goEditItem(${JSON.stringify(type)}, ${JSON.stringify(name)})'>編輯</button>
+        </div>
+        ${meta ? `<div class="mt-1 space-y-0.5">${meta}</div>` : ''}
+      </div>`;
+    };
+
     if (leftBox) {
-      leftBox.innerHTML = left.map(name => `<div class="picker-row ${state.activeAvailable.includes(name) ? 'active' : ''}" onclick='setAllowedPickerActive(${JSON.stringify(type)}, "available", ${JSON.stringify(name)})'>${name}</div>`).join('') || '<div class="p-2 text-sm text-slate-500">無可選項目</div>';
+      leftBox.innerHTML = left.map(name => renderRow(name, 'available')).join('') || '<div class="p-2 text-sm text-slate-500">無可選項目</div>';
     }
     if (rightBox) {
-      rightBox.innerHTML = right.map(name => `<div class="picker-row ${state.activeSelected.includes(name) ? 'active' : ''}" onclick='setAllowedPickerActive(${JSON.stringify(type)}, "selected", ${JSON.stringify(name)})'>${name}</div>`).join('') || '<div class="p-2 text-sm text-slate-500">尚未選擇</div>';
+      rightBox.innerHTML = right.map(name => renderRow(name, 'selected')).join('') || '<div class="p-2 text-sm text-slate-500">尚未選擇</div>';
     }
   }
 
   function renderAllowedPicker() {
     ALLOWED_PICKER_TYPES.forEach(renderAllowedPickerSection);
+  }
+
+  function getAttendanceGroupIndexByName(name) {
+    const list = Array.isArray(schedule.attendanceGroups) ? schedule.attendanceGroups : [];
+    return list.findIndex(g => g && g.name === name);
+  }
+
+  function goEditPage(type) {
+    const params = new URLSearchParams();
+    if (isNewSchedule) {
+      params.set('source', 'new');
+      if (type === 'shifts') {
+        window.location.href = 'shift-setting-new.html';
+        return;
+      }
+      if (type === 'holidayGroups') {
+        window.location.href = `holiday-group.html?${params.toString()}`;
+        return;
+      }
+      window.location.href = `shift-group.html?${params.toString()}`;
+      return;
+    }
+
+    params.set('index', String(currentScheduleIndex));
+    if (type === 'shifts') {
+      window.location.href = `shift-setting.html?${params.toString()}`;
+      return;
+    }
+    if (type === 'holidayGroups') {
+      window.location.href = `holiday-group.html?${params.toString()}`;
+      return;
+    }
+    window.location.href = `shift-group.html?${params.toString()}`;
+  }
+
+  function goEditItem(type, name) {
+    const params = new URLSearchParams();
+    if (isNewSchedule) {
+      params.set('source', 'new');
+      params.set('index', '-1');
+      if (type === 'shifts') {
+        params.set('editShiftName', name);
+        window.location.href = `shift-setting-new.html?${params.toString()}`;
+        return;
+      }
+      if (type === 'holidayGroups') {
+        params.set('groupName', name);
+        window.location.href = `holiday-group.html?${params.toString()}`;
+        return;
+      }
+      const groupIndex = getAttendanceGroupIndexByName(name);
+      if (groupIndex >= 0) params.set('groupIndex', String(groupIndex));
+      window.location.href = `shift-group.html?${params.toString()}`;
+      return;
+    }
+
+    params.set('index', String(currentScheduleIndex));
+    if (type === 'shifts') {
+      params.set('editShiftName', name);
+      window.location.href = `shift-setting.html?${params.toString()}`;
+      return;
+    }
+    if (type === 'holidayGroups') {
+      params.set('groupName', name);
+      window.location.href = `holiday-group.html?${params.toString()}`;
+      return;
+    }
+    const groupIndex = getAttendanceGroupIndexByName(name);
+    if (groupIndex >= 0) params.set('groupIndex', String(groupIndex));
+    window.location.href = `shift-group.html?${params.toString()}`;
   }
 
   function moveAllowedToSelected(type) {
@@ -386,6 +559,8 @@
   window.moveAllowedToSelected = moveAllowedToSelected;
   window.moveAllowedToAvailable = moveAllowedToAvailable;
   window.selectAllAllowedAvailable = selectAllAllowedAvailable;
+  window.goEditItem = goEditItem;
+  window.goEditPage = goEditPage;
   window.saveAndBack = saveAndBack;
   window.goBackWithoutSave = goBackWithoutSave;
 
