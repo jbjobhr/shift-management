@@ -29,6 +29,20 @@
       background: #eff6ff;
       color: #1d4ed8;
     }
+    .scope-select {
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 14px;
+      color: #334155;
+      background: #ffffff;
+      min-width: 220px;
+    }
+    .scope-select:focus {
+      outline: none;
+      border-color: #60a5fa;
+      box-shadow: 0 0 0 2px rgba(96,165,250,0.15);
+    }
   </style>
  </head>
  <body class="h-full bg-slate-50 w-full">
@@ -42,6 +56,26 @@
       <div class="bg-white rounded-xl shadow-sm p-4">
         <h2 class="text-lg font-bold text-slate-800">選擇此班表會用到的項目</h2>
         <p class="text-sm text-slate-500 mt-1">可複選多筆，再用左右箭頭移動。</p>
+        <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div class="flex items-center gap-2">
+            <label for="scopeBranchSelect" class="text-sm text-slate-600 whitespace-nowrap">分公司/分店/案場</label>
+            <select id="scopeBranchSelect" class="scope-select" onchange="setScopeBranchFilter(this.value)"></select>
+          </div>
+          <div class="flex items-center gap-2">
+            <label for="scopeDepartmentSelect" class="text-sm text-slate-600 whitespace-nowrap">部門/工作地</label>
+            <select id="scopeDepartmentSelect" class="scope-select" onchange="setScopeDepartmentFilter(this.value)"></select>
+          </div>
+        </div>
+        <div class="mt-3 flex items-center gap-2">
+          <label for="scopeKeywordInput" class="text-sm text-slate-600 whitespace-nowrap">關鍵字搜尋</label>
+          <input
+            id="scopeKeywordInput"
+            type="text"
+            class="w-full md:max-w-md"
+            placeholder="輸入班別、假別組或考勤組關鍵字"
+            oninput="setScopeKeywordFilter(this.value)"
+          >
+        </div>
       </div>
 
       <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 space-y-3">
@@ -180,6 +214,18 @@
     } catch (e) {}
   }
   const schedule = isNewSchedule ? newScheduleDraft : (schedules[currentScheduleIndex] || {});
+  const currentBranch = String(
+    isNewSchedule
+      ? (newScheduleDraft.selectedBranch || newScheduleDraft.branch || G.selectedBranch || '')
+      : (schedule.branch || G.selectedBranch || '')
+  ).trim();
+  let scopeBranchFilter = '';
+  let scopeBranchOptions = [];
+
+  let scopeDepartmentFilter = '';
+  let scopeKeywordFilter = '';
+
+  let scopeDepartmentOptions = [];
 
   function cloneDeep(v) {
     return JSON.parse(JSON.stringify(v));
@@ -188,24 +234,41 @@
   let globalShiftTemplates = {};
   let globalHolidayGroupTemplates = {};
   let globalAttendanceGroupTemplates = {};
+  let shiftBranchesMap = {};
+  let holidayGroupBranchesMap = {};
+  let attendanceGroupBranchesMap = {};
+
+  function addBranchRef(map, name, branch) {
+    if (!name || !branch) return;
+    if (!map[name]) map[name] = new Set();
+    map[name].add(branch);
+  }
 
   function buildGlobalTemplates() {
     globalShiftTemplates = {};
     globalHolidayGroupTemplates = {};
     globalAttendanceGroupTemplates = {};
+    shiftBranchesMap = {};
+    holidayGroupBranchesMap = {};
+    attendanceGroupBranchesMap = {};
 
-    const collectShift = (s) => {
-      if (!s || !s.name || globalShiftTemplates[s.name]) return;
+    const collectShift = (s, branch = '') => {
+      if (!s || !s.name) return;
+      addBranchRef(shiftBranchesMap, s.name, branch);
+      if (globalShiftTemplates[s.name]) return;
       globalShiftTemplates[s.name] = cloneDeep(s);
     };
-    const collectHoliday = (obj) => {
+    const collectHoliday = (obj, branch = '') => {
       if (!obj || typeof obj !== 'object') return;
       Object.keys(obj).forEach((k) => {
         if (!globalHolidayGroupTemplates[k]) globalHolidayGroupTemplates[k] = cloneDeep(obj[k]);
+        addBranchRef(holidayGroupBranchesMap, k, branch);
       });
     };
-    const collectAttendance = (g) => {
-      if (!g || !g.name || globalAttendanceGroupTemplates[g.name]) return;
+    const collectAttendance = (g, branch = '') => {
+      if (!g || !g.name) return;
+      addBranchRef(attendanceGroupBranchesMap, g.name, branch);
+      if (globalAttendanceGroupTemplates[g.name]) return;
       globalAttendanceGroupTemplates[g.name] = cloneDeep(g);
     };
 
@@ -214,9 +277,10 @@
     (Array.isArray(G.attendanceGroups) ? G.attendanceGroups : []).forEach(collectAttendance);
 
     schedules.forEach((sched) => {
-      (Array.isArray(sched.shifts) ? sched.shifts : []).forEach(collectShift);
-      collectHoliday(sched.holidayGroups);
-      (Array.isArray(sched.attendanceGroups) ? sched.attendanceGroups : []).forEach(collectAttendance);
+      const branch = String((sched && sched.branch) || '').trim();
+      (Array.isArray(sched.shifts) ? sched.shifts : []).forEach(s => collectShift(s, branch));
+      collectHoliday(sched.holidayGroups, branch);
+      (Array.isArray(sched.attendanceGroups) ? sched.attendanceGroups : []).forEach(g => collectAttendance(g, branch));
     });
   }
 
@@ -325,13 +389,189 @@
   }
 
   function getAllowedPickerConfig(type) {
+    const allSource = type === 'holidayGroups'
+      ? Object.keys(globalHolidayGroupTemplates)
+      : type === 'attendanceGroups'
+        ? Object.keys(globalAttendanceGroupTemplates)
+        : Object.keys(globalShiftTemplates);
+    const all = allSource.filter(name => nameInScopeBranch(type, name));
+
     if (type === 'holidayGroups') {
-      return { all: Object.keys(globalHolidayGroupTemplates), selected: allowedHolidayGroupNames };
+      return { all, selected: allowedHolidayGroupNames.filter(name => all.includes(name)) };
     }
     if (type === 'attendanceGroups') {
-      return { all: Object.keys(globalAttendanceGroupTemplates), selected: allowedAttendanceGroupNames };
+      return { all, selected: allowedAttendanceGroupNames.filter(name => all.includes(name)) };
     }
-    return { all: Object.keys(globalShiftTemplates), selected: allowedShiftNames };
+    return { all, selected: allowedShiftNames.filter(name => all.includes(name)) };
+  }
+
+  function getBranchMapByType(type) {
+    if (type === 'holidayGroups') return holidayGroupBranchesMap;
+    if (type === 'attendanceGroups') return attendanceGroupBranchesMap;
+    return shiftBranchesMap;
+  }
+
+  function nameInScopeBranch(type, name) {
+    if (!scopeBranchFilter) return true;
+    const branchMap = getBranchMapByType(type);
+    const refs = branchMap[name];
+    if (!refs || refs.size === 0) return false;
+    return refs.has(scopeBranchFilter);
+  }
+
+  function normalizeScopeTokens(value) {
+    if (value == null) return [];
+    if (typeof value === 'string') {
+      const v = value.trim();
+      return v ? [v] : [];
+    }
+    if (Array.isArray(value)) return value.flatMap(item => normalizeScopeTokens(item));
+    if (typeof value === 'object') {
+      return Object.keys(value).flatMap(key => normalizeScopeTokens(value[key]));
+    }
+    return [];
+  }
+
+  function splitScopeValues(raw) {
+    return String(raw || '')
+      .split(/[\/,，、；;｜|\s]+/)
+      .map(v => v.trim())
+      .filter(Boolean);
+  }
+
+  function getScopeSource(type, name) {
+    if (type === 'shifts') return globalShiftTemplates[name] || null;
+    if (type === 'attendanceGroups') return globalAttendanceGroupTemplates[name] || null;
+    if (type === 'holidayGroups') return globalHolidayGroupTemplates[name] || null;
+    return null;
+  }
+
+  function getTokensByKeys(source, keys) {
+    const tokens = [];
+    if (source && typeof source === 'object') {
+      keys.forEach((k) => {
+        if (Object.prototype.hasOwnProperty.call(source, k)) {
+          tokens.push(...normalizeScopeTokens(source[k]));
+        }
+      });
+    }
+    return Array.from(new Set(tokens.filter(Boolean).map(v => String(v).trim()).filter(Boolean)));
+  }
+
+  function getItemDepartmentTokens(type, name) {
+    const src = getScopeSource(type, name);
+    return getTokensByKeys(src, [
+      'department', 'departments', 'departmentName', 'departmentNames',
+      'worksite', 'worksites', 'workplace', 'workplaces',
+      'location', 'locations'
+    ]);
+  }
+
+  function getItemBranchTokens(type, name) {
+    const src = getScopeSource(type, name);
+    return getTokensByKeys(src, ['branch', 'branches', 'branchName', 'branchNames']);
+  }
+
+  function itemMatchesBranch(type, name) {
+    return nameInScopeBranch(type, name);
+  }
+
+  function itemMatchesScope(type, name) {
+    if (!scopeDepartmentFilter) return true;
+    const q = scopeDepartmentFilter.toLowerCase();
+    const haystacks = getItemDepartmentTokens(type, name).map(v => v.toLowerCase());
+    if (!haystacks.length) return true;
+    return haystacks.some(v => v.includes(q));
+  }
+
+  function buildScopeBranchOptions() {
+    const all = new Set();
+    if (Array.isArray(G.branches)) {
+      G.branches.forEach(b => splitScopeValues(b).forEach(v => all.add(v)));
+    }
+    if (schedule && schedule.branch) {
+      splitScopeValues(schedule.branch).forEach(v => all.add(v));
+    }
+    if (isNewSchedule && newScheduleDraft && newScheduleDraft.branch) {
+      splitScopeValues(newScheduleDraft.branch).forEach(v => all.add(v));
+    }
+    if (currentBranch) {
+      splitScopeValues(currentBranch).forEach(v => all.add(v));
+    }
+    if (scopeBranchFilter) {
+      splitScopeValues(scopeBranchFilter).forEach(v => all.add(v));
+    }
+    scopeBranchOptions = Array.from(all).filter(Boolean).sort((a, b) => a.localeCompare(b, 'zh-Hant'));
+  }
+
+  function itemMatchesKeyword(type, name) {
+    if (!scopeKeywordFilter) return true;
+    const q = scopeKeywordFilter.toLowerCase();
+    const values = [name, ...getRowMetaLines(type, name)].map(v => String(v || '').toLowerCase());
+    return values.some(v => v.includes(q));
+  }
+
+  function buildScopeDepartmentOptions() {
+    const all = new Set();
+    if (Array.isArray(G.departments)) {
+      G.departments.forEach(d => splitScopeValues(d).forEach(v => all.add(v)));
+    }
+    if (schedule && schedule.department) {
+      splitScopeValues(schedule.department).forEach(v => all.add(v));
+    }
+    if (isNewSchedule && newScheduleDraft && newScheduleDraft.department) {
+      splitScopeValues(newScheduleDraft.department).forEach(v => all.add(v));
+    }
+    if (scopeDepartmentFilter) {
+      splitScopeValues(scopeDepartmentFilter).forEach(v => all.add(v));
+    }
+
+    scopeDepartmentOptions = Array.from(all).filter(Boolean).sort((a, b) => a.localeCompare(b, 'zh-Hant'));
+  }
+
+  function renderScopeFilters() {
+    const branchSelect = document.getElementById('scopeBranchSelect');
+    const deptSelect = document.getElementById('scopeDepartmentSelect');
+    if (branchSelect) {
+      buildScopeBranchOptions();
+      branchSelect.innerHTML = `<option value="">全部</option>` + scopeBranchOptions.map(v => `<option value="${v}">${v}</option>`).join('');
+      branchSelect.value = scopeBranchFilter;
+      if (branchSelect.value !== scopeBranchFilter) branchSelect.value = '';
+    }
+    if (!deptSelect) return;
+    buildScopeDepartmentOptions();
+    deptSelect.innerHTML = `<option value="">全部</option>` + scopeDepartmentOptions.map(v => `<option value="${v}">${v}</option>`).join('');
+    deptSelect.value = scopeDepartmentFilter;
+    if (deptSelect.value !== scopeDepartmentFilter) deptSelect.value = '';
+  }
+
+  function setScopeBranchFilter(value) {
+    scopeBranchFilter = String(value || '').trim();
+    initAllowedPicker();
+  }
+
+  function setScopeDepartmentFilter(value) {
+    scopeDepartmentFilter = String(value || '').trim();
+    ALLOWED_PICKER_TYPES.forEach((type) => {
+      const state = getAllowedPickerState(type);
+      if (state) {
+        state.activeAvailable = [];
+        state.activeSelected = [];
+      }
+    });
+    renderAllowedPicker();
+  }
+
+  function setScopeKeywordFilter(value) {
+    scopeKeywordFilter = String(value || '').trim();
+    ALLOWED_PICKER_TYPES.forEach((type) => {
+      const state = getAllowedPickerState(type);
+      if (state) {
+        state.activeAvailable = [];
+        state.activeSelected = [];
+      }
+    });
+    renderAllowedPicker();
   }
 
   function getAllowedPickerState(type) {
@@ -361,8 +601,16 @@
     const selectedSearch = document.getElementById(`allowedPickerSelectedSearch-${type}`);
     const leftQ = availableSearch ? availableSearch.value.toLowerCase().trim() : '';
     const rightQ = selectedSearch ? selectedSearch.value.toLowerCase().trim() : '';
-    const left = state.available.filter(name => name.toLowerCase().includes(leftQ));
-    const right = state.selected.filter(name => name.toLowerCase().includes(rightQ));
+    const left = state.available
+      .filter(name => itemMatchesBranch(type, name))
+      .filter(name => itemMatchesScope(type, name))
+      .filter(name => itemMatchesKeyword(type, name))
+      .filter(name => name.toLowerCase().includes(leftQ));
+    const right = state.selected
+      .filter(name => itemMatchesBranch(type, name))
+      .filter(name => itemMatchesScope(type, name))
+      .filter(name => itemMatchesKeyword(type, name))
+      .filter(name => name.toLowerCase().includes(rightQ));
     const leftBox = document.getElementById(`allowedPickerAvailableList-${type}`);
     const rightBox = document.getElementById(`allowedPickerSelectedList-${type}`);
 
@@ -561,9 +809,13 @@
   window.selectAllAllowedAvailable = selectAllAllowedAvailable;
   window.goEditItem = goEditItem;
   window.goEditPage = goEditPage;
+  window.setScopeBranchFilter = setScopeBranchFilter;
+  window.setScopeDepartmentFilter = setScopeDepartmentFilter;
+  window.setScopeKeywordFilter = setScopeKeywordFilter;
   window.saveAndBack = saveAndBack;
   window.goBackWithoutSave = goBackWithoutSave;
 
+  renderScopeFilters();
   initAllowedPicker();
   </script>
  </body>
