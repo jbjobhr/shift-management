@@ -155,6 +155,16 @@
       </div>
      </div>
     </div>
+    <div class="border-t border-slate-200 pt-4 mt-4">
+     <label class="block text-sm font-medium text-slate-600 mb-3 flex items-center gap-2"><i data-lucide="alarm-clock" class="w-4 h-4 text-sky-600"></i>可打卡時段（班表開始）</label>
+     <div class="grid grid-cols-2 gap-3">
+      <div><label class="block text-sm font-medium text-slate-600 mb-1">開始前（分鐘）</label><input type="number" id="shiftPunchBeforeMinutes" min="0" max="180" step="1" value="30" class="w-full">
+      </div>
+      <div><label class="block text-sm font-medium text-slate-600 mb-1">開始後（分鐘）</label><input type="number" id="shiftPunchAfterMinutes" min="0" max="180" step="1" value="30" class="w-full">
+      </div>
+     </div>
+     <p class="text-xs text-slate-500 mt-1">可在班表開始前/後指定分鐘內打卡。</p>
+    </div>
     <div class="flex justify-end gap-2 pt-2">
      <button onclick="closeShiftModal()" class="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-md">取消</button> <button id="shiftModalConfirmBtn" onclick="confirmAddShift()" class="px-4 py-2 text-sm bg-[#1e3a5f] text-white rounded-md hover:bg-[#2a4f7f]">確認</button>
     </div>
@@ -362,9 +372,9 @@
 
   // 全部班表共用的班別清單
   const _ALL_SHIFTS = [
-    { name: '早班', shortName: '早', start: '08:00', end: '17:00', hours: 8, rest: 1, otStart: '', otEnd: '' },
-    { name: '午班', shortName: '午', start: '13:00', end: '17:00', hours: 4, rest: 0, otStart: '', otEnd: '' },
-    { name: '晚班', shortName: '晚', start: '18:00', end: '22:00', hours: 4, rest: 0, otStart: '22:00', otEnd: '23:00' }
+    { name: '早班', shortName: '早', start: '08:00', end: '17:00', hours: 8, rest: 1, otStart: '', otEnd: '', punchBeforeMinutes: 30, punchAfterMinutes: 30 },
+    { name: '午班', shortName: '午', start: '13:00', end: '17:00', hours: 4, rest: 0, otStart: '', otEnd: '', punchBeforeMinutes: 30, punchAfterMinutes: 30 },
+    { name: '晚班', shortName: '晚', start: '18:00', end: '22:00', hours: 4, rest: 0, otStart: '22:00', otEnd: '23:00', punchBeforeMinutes: 30, punchAfterMinutes: 30 }
   ];
 
   // 全部班表共用的假別組清單
@@ -1153,9 +1163,26 @@
     }
   }
 
+  function normalizePunchWindowMinutes(value, fallback = 30) {
+    const parsed = Number.parseInt(String(value), 10);
+    if (Number.isNaN(parsed)) return fallback;
+    return Math.max(0, Math.min(180, parsed));
+  }
+
+  function normalizeShiftPunchWindows() {
+    shifts = (shifts || []).map((s) => ({
+      ...s,
+      punchBeforeMinutes: normalizePunchWindowMinutes(s.punchBeforeMinutes, 30),
+      punchAfterMinutes: normalizePunchWindowMinutes(s.punchAfterMinutes, 30)
+    }));
+  }
+
   function renderShifts() {
+    normalizeShiftPunchWindows();
     document.getElementById('shiftList').innerHTML = shifts.map((s, i) => {
       const rest = Number(s.rest) || 0;
+      const punchBeforeMinutes = normalizePunchWindowMinutes(s.punchBeforeMinutes, 30);
+      const punchAfterMinutes = normalizePunchWindowMinutes(s.punchAfterMinutes, 30);
       return `<div class="flex items-center gap-3 p-3 bg-amber-50 rounded-lg">
         <input type="checkbox" checked class="rounded">
         <div class="flex-1">
@@ -1166,6 +1193,7 @@
         ${s.crossDay ? '<span class="chip bg-indigo-100 text-indigo-700">跨天</span>' : ''}
         <span class="chip bg-amber-100 text-amber-800">工時 ${s.hours}h</span>
         <span class="chip bg-orange-100 text-orange-800">休息 ${rest.toFixed(1)}h</span>
+        <span class="chip bg-sky-100 text-sky-800">可打卡 前${punchBeforeMinutes}/後${punchAfterMinutes}分</span>
         <button onclick="editShift(${i})" class="ml-auto text-blue-400 hover:text-blue-600 text-sm">編輯</button>
         <button onclick="deleteShift(${i})" class="text-red-400 hover:text-red-600 text-sm">刪除</button>
       </div>`;
@@ -1204,6 +1232,8 @@
     document.getElementById('shiftRest').value = (s.rest != null ? s.rest : 0);
     document.getElementById('shiftOtStart').value = s.otStart || '';
     document.getElementById('shiftOtEnd').value = s.otEnd || '';
+    document.getElementById('shiftPunchBeforeMinutes').value = normalizePunchWindowMinutes(s.punchBeforeMinutes, 30);
+    document.getElementById('shiftPunchAfterMinutes').value = normalizePunchWindowMinutes(s.punchAfterMinutes, 30);
     updateShiftHoursPreview();
     document.getElementById('shiftModal').classList.remove('hidden');
   }
@@ -1573,6 +1603,8 @@
     document.getElementById('shiftRest').value = '0';
     document.getElementById('shiftOtStart').value = '';
     document.getElementById('shiftOtEnd').value = '';
+    document.getElementById('shiftPunchBeforeMinutes').value = '30';
+    document.getElementById('shiftPunchAfterMinutes').value = '30';
     updateShiftHoursPreview();
     document.getElementById('shiftModal').classList.remove('hidden');
   }
@@ -1648,6 +1680,8 @@
     const rest = parseFloat(document.getElementById('shiftRest').value) || 0;
     const otStart = document.getElementById('shiftOtStart').value || '';
     const otEnd = document.getElementById('shiftOtEnd').value || '';
+    const punchBeforeMinutes = normalizePunchWindowMinutes(document.getElementById('shiftPunchBeforeMinutes').value, 30);
+    const punchAfterMinutes = normalizePunchWindowMinutes(document.getElementById('shiftPunchAfterMinutes').value, 30);
     const duration = calcDurationHours(start, end, crossDay);
     const hours = calcWorkHours(start, end, rest, crossDay);
 
@@ -1683,7 +1717,7 @@
 
     if (editingShiftIndex >= 0 && shifts[editingShiftIndex]) {
       const oldName = shifts[editingShiftIndex].name;
-      shifts[editingShiftIndex] = { name, shortName, start, end, crossDay, hours, rest, otStart, otEnd };
+      shifts[editingShiftIndex] = { name, shortName, start, end, crossDay, hours, rest, otStart, otEnd, punchBeforeMinutes, punchAfterMinutes };
       // 同步更新考勤組中引用此班別名稱
       if (oldName !== name) {
         attendanceGroups.forEach(g => {
@@ -1698,7 +1732,7 @@
         renderAttendanceGroups();
       }
     } else {
-      shifts.push({ name, shortName, start, end, crossDay, hours, rest, otStart, otEnd });
+      shifts.push({ name, shortName, start, end, crossDay, hours, rest, otStart, otEnd, punchBeforeMinutes, punchAfterMinutes });
     }
     if (!allowedShiftNames.includes(name)) allowedShiftNames.push(name);
     renderShifts();
