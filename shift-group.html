@@ -61,12 +61,63 @@
             <p class="text-xs text-slate-500 mt-1" id="weekdayShiftsFooter">請設定固定上班日之班別。</p>
           </div>
           <div id="rotatingSystemSection" class="mt-3 border border-cyan-100 rounded-md bg-cyan-50 p-3 space-y-3">
-            <div class="flex items-center justify-between gap-3">
+            <div class="flex items-start justify-between gap-3">
               <div>
                 <div class="text-sm font-medium text-cyan-800">輪班制度</div>
-                <div class="text-xs text-slate-500" id="rotatingSystemHint">每週循環，適用於一般一例一休排班。</div>
+                <div class="text-xs text-slate-500">需填寫生效日期與輪班明細。</div>
               </div>
-              <span id="rotatingSystemBadge" class="chip bg-cyan-100 text-cyan-700">一般（單週）</span>
+              <div class="relative group shrink-0">
+                <button type="button" class="inline-flex items-center gap-1 px-2 py-1 text-xs text-cyan-700 bg-cyan-100 border border-cyan-200 rounded-md hover:bg-cyan-200 focus:outline-none focus:ring-2 focus:ring-cyan-300" aria-label="查看輪班制度規則説明" title="移入查看輪班制度規則説明">
+                  <i data-lucide="info" class="w-3.5 h-3.5"></i>
+                  <span>規則説明</span>
+                </button>
+                <div class="absolute right-0 top-full mt-2 z-30 w-[44rem] max-w-[85vw] rounded-lg border border-cyan-200 bg-white shadow-xl p-3 text-xs text-slate-700 space-y-2 invisible opacity-0 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 transition-opacity duration-150 pointer-events-none group-hover:pointer-events-auto group-focus-within:pointer-events-auto">
+                  <div class="font-semibold text-cyan-800">輪班制度規則説明</div>
+                  <div class="overflow-x-auto">
+                    <table class="min-w-full border border-cyan-100 bg-white rounded-md overflow-hidden">
+                      <thead class="bg-cyan-50 text-cyan-800">
+                        <tr>
+                          <th class="px-2 py-1.5 text-left font-medium border-b border-cyan-100">制度</th>
+                          <th class="px-2 py-1.5 text-left font-medium border-b border-cyan-100">適用行業</th>
+                          <th class="px-2 py-1.5 text-left font-medium border-b border-cyan-100">休假底線與分配</th>
+                          <th class="px-2 py-1.5 text-left font-medium border-b border-cyan-100">單日正常工時上限</th>
+                          <th class="px-2 py-1.5 text-left font-medium border-b border-cyan-100">最長連續出勤</th>
+                        </tr>
+                      </thead>
+                      <tbody class="text-slate-700">
+                        <tr class="border-b border-cyan-50">
+                          <td class="px-2 py-1.5">一般 (一例一休)</td>
+                          <td class="px-2 py-1.5">所有適用勞基法行業</td>
+                          <td class="px-2 py-1.5">每 7 天：1例 + 1休</td>
+                          <td class="px-2 py-1.5">8 小時</td>
+                          <td class="px-2 py-1.5">6 天</td>
+                        </tr>
+                        <tr class="border-b border-cyan-50">
+                          <td class="px-2 py-1.5">兩週變形</td>
+                          <td class="px-2 py-1.5">所有適用勞基法行業</td>
+                          <td class="px-2 py-1.5">每 2 週：總計至少 4 天 (每 7 天需 1例)</td>
+                          <td class="px-2 py-1.5">10 小時</td>
+                          <td class="px-2 py-1.5">6 天</td>
+                        </tr>
+                        <tr class="border-b border-cyan-50">
+                          <td class="px-2 py-1.5">四週變形</td>
+                          <td class="px-2 py-1.5">中央指定行業 (如餐飲、零售、保全)</td>
+                          <td class="px-2 py-1.5">每 4 週：總計至少 8 天 (每 2 週需 2例)</td>
+                          <td class="px-2 py-1.5">10 小時</td>
+                          <td class="px-2 py-1.5">12 天</td>
+                        </tr>
+                        <tr>
+                          <td class="px-2 py-1.5">八週變形</td>
+                          <td class="px-2 py-1.5">中央指定行業 (如製造、運輸、營造)</td>
+                          <td class="px-2 py-1.5">每 8 週：總計至少 16 天 (每 7 天需 1例)</td>
+                          <td class="px-2 py-1.5">8 小時</td>
+                          <td class="px-2 py-1.5">6 天</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
               <label class="flex items-center gap-1 text-sm cursor-pointer px-2 py-1 rounded hover:bg-white/70"><input type="radio" name="rotatingSystemType" value="general" checked onchange="updateRotatingSystemUI()"><span>一般（單週）</span></label>
@@ -422,16 +473,8 @@
     currentGroupSystemType = checked ? checked.value : 'general';
     const detailWrap = document.getElementById('rotatingDetailWrap');
     const effectiveWrap = document.getElementById('rotatingEffectiveWrap');
-    const hint = document.getElementById('rotatingSystemHint');
-    const label = ROTATING_SYSTEM_LABELS[currentGroupSystemType] || '一般（單週）';
-    if (hint) {
-      const selected = ROTATING_SYSTEM_OPTIONS.find(item => item.value === currentGroupSystemType);
-      hint.textContent = selected ? selected.hint : '每週循環，適用於一般一例一休排班。';
-    }
     if (detailWrap) detailWrap.classList.toggle('hidden', currentGroupSystemType === 'general');
     if (effectiveWrap) effectiveWrap.classList.toggle('hidden', currentGroupSystemType === 'general');
-    const badge = document.getElementById('rotatingSystemBadge');
-    if (badge) badge.textContent = label;
     syncWeekdayShiftsLayout();
   }
 
