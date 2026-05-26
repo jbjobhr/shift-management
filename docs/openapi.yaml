@@ -1,0 +1,787 @@
+﻿openapi: 3.1.0
+info:
+  title: Shift Management Backend API
+  version: v1
+  description: |
+    OpenAPI spec generated from docs/backend_api.md.
+    Goal: migrate frontend data flow from localStorage to API + DB.
+
+servers:
+  - url: /api/v1
+    description: API v1 base path
+
+tags:
+  - name: Health
+    description: Service health checks
+  - name: Global
+    description: Global data read and sync
+  - name: Personal
+    description: Personal data read and sync
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check
+      description: Service and database health check
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              examples:
+                ok:
+                  value:
+                    ok: true
+                    data:
+                      status: healthy
+                      db: up
+
+  /global:
+    get:
+      tags: [Global]
+      summary: Get global data
+      description: Return payload compatible with shiftMgmt:global
+      operationId: getGlobal
+      responses:
+        '200':
+          description: Global payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetGlobalResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /sync/global:
+    post:
+      tags: [Global]
+      summary: Sync global payload
+      description: Upsert full global payload in a single transaction
+      operationId: syncGlobal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncGlobalRequest'
+      responses:
+        '200':
+          description: Sync success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncGlobalResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+        '422':
+          $ref: '#/components/responses/FkResolveFailed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /personal/{employeeId}:
+    get:
+      tags: [Personal]
+      summary: Get personal data
+      description: Return payload compatible with shiftMgmt:personal:{empId}
+      operationId: getPersonal
+      parameters:
+        - name: employeeId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Personal payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetPersonalResponse'
+        '404':
+          $ref: '#/components/responses/EmployeeNotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /sync/personal:
+    post:
+      tags: [Personal]
+      summary: Sync personal payload
+      description: Upsert one employee personal payload in a single transaction
+      operationId: syncPersonal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncPersonalRequest'
+      responses:
+        '200':
+          description: Sync success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncPersonalResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/EmployeeNotFound'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+        '422':
+          $ref: '#/components/responses/FkResolveFailed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  responses:
+    ValidationError:
+      description: Payload validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            validation:
+              value:
+                ok: false
+                error:
+                  code: VALIDATION_ERROR
+                  message: Payload validation failed
+                  details:
+                    - field: schedules[0].start
+                      reason: Invalid date format
+                meta:
+                  requestId: ca7dd668-9a2f-4f66-a94b-0e2f5d8cf8ae
+                  serverTime: 2026-05-22T09:30:00Z
+
+    EmployeeNotFound:
+      description: Employee not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            not_found:
+              value:
+                ok: false
+                error:
+                  code: EMPLOYEE_NOT_FOUND
+                  message: Employee not found
+                meta:
+                  requestId: 11111111-2222-4333-8444-555555555555
+                  serverTime: 2026-05-22T09:30:00Z
+
+    ConflictError:
+      description: Version conflict or optimistic lock failure
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            conflict:
+              value:
+                ok: false
+                error:
+                  code: CONFLICT
+                  message: Optimistic lock failed
+                meta:
+                  requestId: 11111111-2222-4333-8444-555555555555
+                  serverTime: 2026-05-22T09:30:00Z
+
+    FkResolveFailed:
+      description: Name cannot be resolved to FK
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            fk:
+              value:
+                ok: false
+                error:
+                  code: FK_RESOLVE_FAILED
+                  message: Some names cannot be resolved to FK
+                meta:
+                  requestId: 11111111-2222-4333-8444-555555555555
+                  serverTime: 2026-05-22T09:30:00Z
+
+    InternalError:
+      description: Unexpected error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            internal:
+              value:
+                ok: false
+                error:
+                  code: INTERNAL_ERROR
+                  message: Unexpected error
+                meta:
+                  requestId: 11111111-2222-4333-8444-555555555555
+                  serverTime: 2026-05-22T09:30:00Z
+
+  schemas:
+    Meta:
+      type: object
+      properties:
+        requestId:
+          type: string
+          format: uuid
+        serverTime:
+          type: string
+          format: date-time
+      required: [requestId, serverTime]
+
+    ErrorDetail:
+      type: object
+      properties:
+        field:
+          type: string
+        reason:
+          type: string
+      required: [field, reason]
+
+    ErrorObject:
+      type: object
+      properties:
+        code:
+          type: string
+          enum:
+            - VALIDATION_ERROR
+            - EMPLOYEE_NOT_FOUND
+            - CONFLICT
+            - FK_RESOLVE_FAILED
+            - INTERNAL_ERROR
+        message:
+          type: string
+        details:
+          type: array
+          items:
+            $ref: '#/components/schemas/ErrorDetail'
+      required: [code, message]
+
+    ErrorResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          const: false
+        error:
+          $ref: '#/components/schemas/ErrorObject'
+        meta:
+          $ref: '#/components/schemas/Meta'
+      required: [ok, error]
+
+    HealthData:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy]
+        db:
+          type: string
+          enum: [up]
+      required: [status, db]
+
+    HealthResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/HealthData'
+      required: [ok, data]
+
+    GlobalData:
+      type: object
+      properties:
+        __version:
+          type: integer
+        schedules:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScheduleInput'
+        shifts:
+          type: array
+          items:
+            $ref: '#/components/schemas/Shift'
+        holidayGroups:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+              format: date
+        individualHolidays:
+          type: array
+          items:
+            type: string
+            format: date
+        persons:
+          type: array
+          items:
+            $ref: '#/components/schemas/PersonInput'
+        supervisors:
+          type: array
+          items:
+            type: string
+        attendanceGroups:
+          type: array
+          items:
+            $ref: '#/components/schemas/AttendanceGroupInput'
+        branches:
+          type: array
+          items:
+            type: string
+        departments:
+          type: array
+          items:
+            type: string
+        allPositions:
+          type: array
+          items:
+            type: string
+        positions:
+          type: array
+          items:
+            type: string
+        tags:
+          type: array
+          items:
+            type: string
+        selectedBranch:
+          type: string
+        selectedDepartment:
+          type: string
+
+    GetGlobalData:
+      type: object
+      properties:
+        version:
+          type: integer
+        global:
+          $ref: '#/components/schemas/GlobalData'
+      required: [version, global]
+
+    GetGlobalResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/GetGlobalData'
+      required: [ok, data]
+
+    DictionaryInput:
+      type: object
+      properties:
+        branches:
+          type: array
+          items:
+            type: string
+        departments:
+          type: array
+          items:
+            type: string
+        positions:
+          type: array
+          items:
+            type: string
+        tags:
+          type: array
+          items:
+            type: string
+        supervisors:
+          type: array
+          items:
+            type: string
+        punchLocations:
+          type: array
+          items:
+            type: string
+
+    PersonInput:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        branch:
+          type: string
+        department:
+          type: string
+        isActive:
+          type: boolean
+      required: [id, name]
+
+    Shift:
+      type: object
+      properties:
+        name:
+          type: string
+        shortName:
+          type: string
+        start:
+          type: string
+          pattern: '^([01]\\d|2[0-3]):[0-5]\\d$'
+        end:
+          type: string
+          pattern: '^([01]\\d|2[0-3]):[0-5]\\d$'
+        crossDay:
+          type: boolean
+        hours:
+          type: number
+        rest:
+          type: number
+        otStart:
+          type: string
+          pattern: '^([01]\\d|2[0-3]):[0-5]\\d$'
+        otEnd:
+          type: string
+          pattern: '^([01]\\d|2[0-3]):[0-5]\\d$'
+      required: [name, shortName, start, end]
+
+    HolidayGroupInput:
+      type: object
+      properties:
+        name:
+          type: string
+        dates:
+          type: array
+          items:
+            type: string
+            format: date
+      required: [name, dates]
+
+    WeekdayShifts:
+      type: object
+      properties:
+        sun:
+          type: array
+          items:
+            type: string
+        mon:
+          type: array
+          items:
+            type: string
+        tue:
+          type: array
+          items:
+            type: string
+        wed:
+          type: array
+          items:
+            type: string
+        thu:
+          type: array
+          items:
+            type: string
+        fri:
+          type: array
+          items:
+            type: string
+        sat:
+          type: array
+          items:
+            type: string
+      additionalProperties: false
+
+    AttendanceGroupInput:
+      type: object
+      properties:
+        name:
+          type: string
+        scheduleType:
+          type: string
+          enum: [auto, manual]
+        workOnHoliday:
+          type: boolean
+        members:
+          type: array
+          items:
+            type: string
+        punchLocations:
+          type: array
+          items:
+            type: string
+        weekdayShifts:
+          $ref: '#/components/schemas/WeekdayShifts'
+      required: [name, scheduleType, members, weekdayShifts]
+
+    ScheduleInput:
+      type: object
+      properties:
+        name:
+          type: string
+        start:
+          type: string
+          format: date
+        end:
+          type: string
+          format: date
+        branch:
+          type: string
+        department:
+          type: string
+        positions:
+          type: array
+          items:
+            type: string
+        supervisors:
+          type: array
+          items:
+            type: string
+        tags:
+          type: array
+          items:
+            type: string
+        allowedShiftNames:
+          type: array
+          items:
+            type: string
+        allowedHolidayGroupNames:
+          type: array
+          items:
+            type: string
+        allowedAttendanceGroupNames:
+          type: array
+          items:
+            type: string
+      required: [name, start, end]
+
+    SyncGlobalRequest:
+      type: object
+      properties:
+        version:
+          type: integer
+          minimum: 1
+        dictionary:
+          $ref: '#/components/schemas/DictionaryInput'
+        persons:
+          type: array
+          items:
+            $ref: '#/components/schemas/PersonInput'
+        shifts:
+          type: array
+          items:
+            $ref: '#/components/schemas/Shift'
+        holidayGroups:
+          type: array
+          items:
+            $ref: '#/components/schemas/HolidayGroupInput'
+        individualHolidays:
+          type: array
+          items:
+            type: string
+            format: date
+        attendanceGroups:
+          type: array
+          items:
+            $ref: '#/components/schemas/AttendanceGroupInput'
+        schedules:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScheduleInput'
+      required:
+        - version
+        - dictionary
+        - persons
+        - shifts
+        - holidayGroups
+        - individualHolidays
+        - attendanceGroups
+        - schedules
+
+    SyncGlobalData:
+      type: object
+      properties:
+        version:
+          type: integer
+        updatedAt:
+          type: string
+          format: date-time
+        stats:
+          type: object
+          properties:
+            employees:
+              type: integer
+            shifts:
+              type: integer
+            attendanceGroups:
+              type: integer
+            schedules:
+              type: integer
+          required: [employees, shifts, attendanceGroups, schedules]
+      required: [version, updatedAt, stats]
+
+    SyncGlobalResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/SyncGlobalData'
+      required: [ok, data]
+
+    PersonalAssignmentMapValue:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [work, off]
+        shiftNames:
+          type: array
+          items:
+            type: string
+        source:
+          type: string
+      required: [type]
+
+    PersonalPayload:
+      type: object
+      properties:
+        rangeStart:
+          type: string
+          format: date
+        rangeEnd:
+          type: string
+          format: date
+        assignments:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/PersonalAssignmentMapValue'
+        holidayGroups:
+          type: array
+          items:
+            type: string
+        attendanceGroups:
+          type: array
+          items:
+            type: string
+        shifts:
+          type: array
+          items:
+            type: string
+        positions:
+          type: array
+          items:
+            type: string
+        tags:
+          type: array
+          items:
+            type: string
+      required: [rangeStart, rangeEnd, assignments, holidayGroups, attendanceGroups, shifts, positions, tags]
+
+    GetPersonalData:
+      type: object
+      properties:
+        employeeId:
+          type: string
+        personal:
+          $ref: '#/components/schemas/PersonalPayload'
+      required: [employeeId, personal]
+
+    GetPersonalResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/GetPersonalData'
+      required: [ok, data]
+
+    SyncPersonalAssignment:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        type:
+          type: string
+          enum: [work, off]
+        shiftNames:
+          type: array
+          items:
+            type: string
+        source:
+          type: string
+      required: [date, type, shiftNames]
+
+    PersonalSettings:
+      type: object
+      properties:
+        holidayGroups:
+          type: array
+          items:
+            type: string
+        attendanceGroups:
+          type: array
+          items:
+            type: string
+        shifts:
+          type: array
+          items:
+            type: string
+        positions:
+          type: array
+          items:
+            type: string
+        tags:
+          type: array
+          items:
+            type: string
+      required: [holidayGroups, attendanceGroups, shifts, positions, tags]
+
+    SyncPersonalRequest:
+      type: object
+      properties:
+        employeeId:
+          type: string
+        rangeStart:
+          type: string
+          format: date
+        rangeEnd:
+          type: string
+          format: date
+        assignments:
+          type: array
+          items:
+            $ref: '#/components/schemas/SyncPersonalAssignment'
+        settings:
+          $ref: '#/components/schemas/PersonalSettings'
+      required: [employeeId, rangeStart, rangeEnd, assignments, settings]
+
+    SyncPersonalData:
+      type: object
+      properties:
+        employeeId:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+        assignmentCount:
+          type: integer
+      required: [employeeId, updatedAt, assignmentCount]
+
+    SyncPersonalResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/SyncPersonalData'
+      required: [ok, data]

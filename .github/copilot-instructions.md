@@ -34,3 +34,7 @@ description: Copilot AI 協作指引 - 程式碼風格與開發原則
 - 明確的錯誤訊息
 - 使用適當的錯誤類型
 - 記錄關鍵錯誤但避免過度日誌
+
+## 每次更新都要更新的文件
+- README.md：更新專案說明和使用指南
+- docs/backend_api.md：更新 API 規格和使用說明
