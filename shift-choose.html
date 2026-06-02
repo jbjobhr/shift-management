@@ -231,6 +231,74 @@
     return JSON.parse(JSON.stringify(v));
   }
 
+  function normalizeOvertimeMinutes(value, fallback, max = 720) {
+    const parsed = Number.parseInt(String(value), 10);
+    if (Number.isNaN(parsed)) return fallback;
+    return Math.max(0, Math.min(max, parsed));
+  }
+
+  function normalizePunchWindowMinutes(value, fallback, max) {
+    const parsed = Number.parseInt(String(value), 10);
+    if (Number.isNaN(parsed)) return fallback;
+    return Math.max(0, Math.min(max, parsed));
+  }
+
+  function timeToMinutes(value) {
+    if (!value || typeof value !== 'string' || !value.includes(':')) return null;
+    const [hours, minutes] = value.split(':').map(Number);
+    if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
+    return hours * 60 + minutes;
+  }
+
+  function diffMinutesFromBase(baseTime, targetTime) {
+    const base = timeToMinutes(baseTime);
+    const target = timeToMinutes(targetTime);
+    if (base == null || target == null) return null;
+    return target >= base ? (target - base) : ((24 * 60 - base) + target);
+  }
+
+  function normalizeShiftTemplate(shift) {
+    const hasLegacyOvertime = !!((shift && shift.otStart) || (shift && shift.otEnd));
+    const legacyMinMinutes = diffMinutesFromBase(shift && shift.end, shift && shift.otStart);
+    const legacyMaxMinutes = diffMinutesFromBase(shift && shift.end, shift && shift.otEnd);
+    const minOvertimeMinutes = normalizeOvertimeMinutes(
+      shift && shift.minOvertimeMinutes,
+      legacyMinMinutes != null ? legacyMinMinutes : 30,
+      720
+    );
+    const maxOvertimeMinutes = Math.max(
+      normalizeOvertimeMinutes(
+        shift && shift.maxOvertimeMinutes,
+        legacyMaxMinutes != null ? Math.max(legacyMaxMinutes, minOvertimeMinutes) : 360,
+        720
+      ),
+      minOvertimeMinutes
+    );
+
+    return {
+      ...shift,
+      autoCountOvertime: typeof shift?.autoCountOvertime === 'boolean' ? shift.autoCountOvertime : hasLegacyOvertime,
+      countEarlyArrivalAsOvertime: !!shift?.countEarlyArrivalAsOvertime,
+      countLateDepartureAsOvertime: typeof shift?.countLateDepartureAsOvertime === 'boolean' ? shift.countLateDepartureAsOvertime : hasLegacyOvertime,
+      minOvertimeMinutes,
+      maxOvertimeMinutes,
+      restBeforeOvertimeMinutes: normalizeOvertimeMinutes(shift && shift.restBeforeOvertimeMinutes, 30, 240),
+      punchBeforeMinutes: normalizePunchWindowMinutes(shift && shift.punchBeforeMinutes, 30, 180),
+      punchAfterMinutes: normalizePunchWindowMinutes(shift && shift.punchAfterMinutes, 30, 720)
+    };
+  }
+
+  function getShiftOvertimeMetaLine(shift) {
+    const normalized = normalizeShiftTemplate(shift || {});
+    if (!normalized.autoCountOvertime) return '加班：手動認定';
+    const modes = [
+      normalized.countEarlyArrivalAsOvertime ? '早到' : '',
+      normalized.countLateDepartureAsOvertime ? '晚退' : ''
+    ].filter(Boolean).join('/');
+    if (!modes) return '加班：已啟用自動統計';
+    return `加班 ${modes} 門檻${normalized.minOvertimeMinutes} / 上限${normalized.maxOvertimeMinutes}分`;
+  }
+
   let globalShiftTemplates = {};
   let globalHolidayGroupTemplates = {};
   let globalAttendanceGroupTemplates = {};
@@ -256,7 +324,7 @@
       if (!s || !s.name) return;
       addBranchRef(shiftBranchesMap, s.name, branch);
       if (globalShiftTemplates[s.name]) return;
-      globalShiftTemplates[s.name] = cloneDeep(s);
+      globalShiftTemplates[s.name] = normalizeShiftTemplate(cloneDeep(s));
     };
     const collectHoliday = (obj, branch = '') => {
       if (!obj || typeof obj !== 'object') return;
@@ -354,6 +422,7 @@
         `${s.start || '-'} - ${s.end || '-'}`,
         `工時 ${formatHoursValue(s.hours)}h`,
         `休息 ${formatRestHours(s.rest)}h`,
+        getShiftOvertimeMetaLine(s),
         `可打卡 前${Number.isNaN(before) ? 30 : before}/後${Number.isNaN(after) ? 30 : after}分`
       ];
     }

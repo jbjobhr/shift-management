@@ -244,9 +244,9 @@
     ],
     supervisors: ['劉經理'],
     shifts: [
-      { name: '早班', shortName: '早', start: '08:00', end: '17:00', hours: 8, rest: 1 },
-      { name: '午班', shortName: '午', start: '13:00', end: '17:00', hours: 4 },
-      { name: '晚班', shortName: '晚', start: '18:00', end: '22:00', hours: 4 }
+      { name: '早班', shortName: '早', start: '08:00', end: '17:00', hours: 8, rest: 1, otStart: '', otEnd: '', autoCountOvertime: false, countEarlyArrivalAsOvertime: false, countLateDepartureAsOvertime: false, minOvertimeMinutes: 30, maxOvertimeMinutes: 360, restBeforeOvertimeMinutes: 30, punchBeforeMinutes: 30, punchAfterMinutes: 30 },
+      { name: '午班', shortName: '午', start: '13:00', end: '17:00', hours: 4, rest: 0, otStart: '', otEnd: '', autoCountOvertime: false, countEarlyArrivalAsOvertime: false, countLateDepartureAsOvertime: false, minOvertimeMinutes: 30, maxOvertimeMinutes: 360, restBeforeOvertimeMinutes: 30, punchBeforeMinutes: 30, punchAfterMinutes: 30 },
+      { name: '晚班', shortName: '晚', start: '18:00', end: '22:00', hours: 4, rest: 0, otStart: '22:00', otEnd: '23:00', autoCountOvertime: true, countEarlyArrivalAsOvertime: false, countLateDepartureAsOvertime: true, minOvertimeMinutes: 0, maxOvertimeMinutes: 60, restBeforeOvertimeMinutes: 30, punchBeforeMinutes: 30, punchAfterMinutes: 30 }
     ],
     attendanceGroups: [
       { name: 'A組 - 倉儲', members: ['EMP001', 'EMP002'], scheduleType: 'auto',
