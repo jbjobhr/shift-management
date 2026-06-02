@@ -1813,7 +1813,7 @@
   renderAllowedSummary();
   if (_editShiftName) {
     const _targetShiftIndex = shifts.findIndex(s => s && s.name === _editShiftName);
-    if (_targetShiftIndex >= 0) editShift(_targetShiftIndex);
+    if (_targetShiftIndex >= 0) openShiftDetailPage(_targetShiftIndex);
   }
   document.getElementById('scheduleName').value = document.getElementById('scheduleName').value || '';
   document.getElementById('startDate').value = document.getElementById('startDate').value || '';
