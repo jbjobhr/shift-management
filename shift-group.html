@@ -142,13 +142,6 @@
               <div id="rotatingDetailList" class="space-y-2"></div>
             </div>
           </div>
-          <label id="workOnHolidayWrap" class="mt-2 flex items-start gap-2 text-sm cursor-pointer bg-orange-50 border border-orange-200 rounded-md px-3 py-2">
-            <input type="checkbox" id="workOnHoliday" class="mt-0.5" onchange="handleWorkOnHolidayToggle(this.checked)">
-            <span>
-              <span class="font-medium text-orange-700" id="workOnHolidayTitle">假日仍排班（視為加班）</span>
-              <span class="block text-xs text-slate-500" id="workOnHolidayHint">勾選後，同仍依週間設定排班，並以「假日加班」樣式顯示；未勾選則施行「假日優先」，假日不排班。</span>
-            </span>
-          </label>
           <div class="mt-3 flex justify-end">
             <div class="relative group">
               <button type="button" class="inline-flex items-center gap-1 px-2 py-1 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-300" aria-label="查看正職與兼職加班費法規摘要" title="移入查看加班費法規摘要">
@@ -382,7 +375,6 @@
   let currentGroupEmploymentType = 'fulltime';
   let currentGroupWeekdayShifts = defaultWeekdayShifts();
   let currentGroupWorkOnHoliday = false;
-  let currentGroupWorkOnHolidayForFulltime = false;
   let currentGroupMembers = [];
   let currentGroupPunchLocations = [];
   let currentGroupSystemType = 'general';
@@ -515,10 +507,7 @@
         : Array.isArray(group.details)
           ? group.details.map(normalizeRotatingDetail)
         : [];
-      currentGroupWorkOnHolidayForFulltime = currentGroupEmploymentType === 'fulltime' ? !!group.workOnHoliday : false;
-      currentGroupWorkOnHoliday = currentGroupEmploymentType === 'parttime'
-        ? true
-        : currentGroupWorkOnHolidayForFulltime;
+      currentGroupWorkOnHoliday = currentGroupEmploymentType === 'parttime';
       const base = defaultWeekdayShifts();
       if (group.weekdayShifts) {
         WEEKDAYS.forEach(w => {
@@ -531,18 +520,15 @@
       document.getElementById('groupName').value = group.name || '';
       const radio = document.querySelector(`input[name="employmentType"][value="${currentGroupEmploymentType}"]`);
       if (radio) radio.checked = true;
-      document.getElementById('workOnHoliday').checked = currentGroupWorkOnHoliday;
     } else {
       currentGroupPunchLocations = Array.isArray(allPunchLocations) ? [...allPunchLocations] : [];
       currentGroupEmploymentType = 'fulltime';
       currentGroupWorkOnHoliday = false;
-      currentGroupWorkOnHolidayForFulltime = false;
       currentGroupSystemType = 'general';
       currentGroupEffectiveDate = '';
       currentGroupRotatingDetails = [];
       const defaultRadio = document.querySelector('input[name="employmentType"][value="fulltime"]');
       if (defaultRadio) defaultRadio.checked = true;
-      document.getElementById('workOnHoliday').checked = false;
     }
 
     const systemRadio = document.querySelector(`input[name="rotatingSystemType"][value="${currentGroupSystemType}"]`);
@@ -713,16 +699,8 @@
     const baseLayerBadgeText = document.getElementById('baseLayerBadgeText');
     const secondLayerBadge = document.getElementById('secondLayerBadge');
     const secondLayerBadgeText = document.getElementById('secondLayerBadgeText');
-    const workOnHolidayTitle = document.getElementById('workOnHolidayTitle');
-    const workOnHolidayInput = document.getElementById('workOnHoliday');
-    const workOnHolidayHint = document.getElementById('workOnHolidayHint');
     if (currentGroupEmploymentType === 'parttime') {
       currentGroupWorkOnHoliday = true;
-      if (workOnHolidayInput) {
-        workOnHolidayInput.checked = true;
-        workOnHolidayInput.disabled = true;
-      }
-      if (workOnHolidayTitle) workOnHolidayTitle.textContent = '假日仍排班';
       if (baseLayerBadge) {
         baseLayerBadge.classList.remove('bg-emerald-50', 'text-emerald-700', 'border-emerald-100');
         baseLayerBadge.classList.add('bg-rose-50', 'text-rose-700', 'border-rose-100');
@@ -734,14 +712,8 @@
       }
       if (secondLayerBadgeText) secondLayerBadgeText.textContent = '考勤組週排班';
       hint.textContent = '兼職（短派）：考勤組優先於假別組。';
-      if (workOnHolidayHint) workOnHolidayHint.textContent = '兼職（短派）固定啟用假日仍排班：一例一休可排班但不套用「假日加班」樣式；台灣國定假日可排班且套用「假日加班」樣式。排班優先序為考勤組優先於假別組。';
     } else {
-      currentGroupWorkOnHoliday = !!currentGroupWorkOnHolidayForFulltime;
-      if (workOnHolidayInput) {
-        workOnHolidayInput.checked = currentGroupWorkOnHoliday;
-        workOnHolidayInput.disabled = false;
-      }
-      if (workOnHolidayTitle) workOnHolidayTitle.textContent = '假日仍排班（視為加班）';
+      currentGroupWorkOnHoliday = false;
       if (baseLayerBadge) {
         baseLayerBadge.classList.remove('bg-rose-50', 'text-rose-700', 'border-rose-100');
         baseLayerBadge.classList.add('bg-emerald-50', 'text-emerald-700', 'border-emerald-100');
@@ -753,14 +725,7 @@
       }
       if (secondLayerBadgeText) secondLayerBadgeText.textContent = '假別組';
       hint.textContent = '正職（長派）：假別組優先於考勤組。';
-      if (workOnHolidayHint) workOnHolidayHint.textContent = '勾選後，同仍依週間設定排班，並以「假日加班」樣式顯示；未勾選則施行「假日優先」，假日不排班。';
     }
-  }
-
-  function handleWorkOnHolidayToggle(checked) {
-    if (currentGroupEmploymentType !== 'fulltime') return;
-    currentGroupWorkOnHolidayForFulltime = !!checked;
-    currentGroupWorkOnHoliday = !!checked;
   }
 
   function renderWeekdayShifts() {
@@ -914,7 +879,7 @@
       details: systemType === 'general' ? [] : rotatingDetails,
       weekdayShifts: { ...currentGroupWeekdayShifts },
       punchLocations: [...currentGroupPunchLocations],
-      workOnHoliday: currentGroupEmploymentType === 'parttime' ? true : !!currentGroupWorkOnHoliday
+      workOnHoliday: currentGroupEmploymentType === 'parttime'
     };
 
     if (Number.isInteger(editingGroupIndex) && editingGroupIndex >= 0 && editingGroupIndex < attendanceGroups.length) {
@@ -951,7 +916,6 @@
   window.toggleWeekdayShift = toggleWeekdayShift;
   window.togglePunchLocation = togglePunchLocation;
   window.updateEmploymentTypeUI = updateEmploymentTypeUI;
-  window.handleWorkOnHolidayToggle = handleWorkOnHolidayToggle;
   window.syncAssigneeList = syncAssigneeList;
   window.saveGroup = saveGroup;
   window.goBack = goBack;

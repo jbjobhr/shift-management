@@ -68,7 +68,7 @@
      </section>
      <section class="bg-white rounded-xl shadow-sm p-5 space-y-4">
       <h2 class="font-bold text-lg text-slate-800 flex items-center gap-2"><i data-lucide="clock" class="w-5 h-5 text-amber-600"></i>班別排班</h2>
-      <div id="shiftList" class="space-y-2"></div><button onclick="showAddShift()" class="px-4 py-2 bg-amber-50 text-amber-700 rounded-md text-sm font-medium hover:bg-amber-100 transition flex items-center gap-1"><i data-lucide="plus" class="w-4 h-4"></i>新增班別</button>
+      <div id="shiftList" class="space-y-2"></div><button onclick="openShiftDetailPage()" class="px-4 py-2 bg-amber-50 text-amber-700 rounded-md text-sm font-medium hover:bg-amber-100 transition flex items-center gap-1"><i data-lucide="plus" class="w-4 h-4"></i>新增班別</button>
      </section>
      <section class="bg-white rounded-xl shadow-sm p-5 space-y-4">
       <h2 class="font-bold text-lg text-slate-800 flex items-center gap-2"><i data-lucide="calendar-off" class="w-5 h-5 text-red-500"></i>節假日設定</h2>
@@ -1257,7 +1257,7 @@
         <span class="chip bg-amber-100 text-amber-800">工時 ${s.hours}h</span>
         <span class="chip bg-orange-100 text-orange-800">${restSummary}</span>
         ${overtimeSummary ? `<span class="chip bg-rose-100 text-rose-800">${overtimeSummary}</span>` : ''}
-        <button onclick="editShift(${i})" class="ml-auto text-blue-400 hover:text-blue-600 text-sm">編輯</button>
+        <button onclick="openShiftDetailPage(${i})" class="ml-auto text-blue-400 hover:text-blue-600 text-sm">編輯</button>
         <button onclick="deleteShift(${i})" class="text-red-400 hover:text-red-600 text-sm">刪除</button>
       </div>`;
     }).join('');
@@ -1348,6 +1348,14 @@
     params.set('source', 'new');
     if (groupIndex >= 0) params.set('groupIndex', String(groupIndex));
     window.location.href = `shift-group.html?${params.toString()}`;
+  }
+
+  function openShiftDetailPage(shiftIndex = -1) {
+    syncGlobalData();
+    const params = new URLSearchParams();
+    params.set('source', 'new');
+    if (shiftIndex >= 0) params.set('shiftIndex', String(shiftIndex));
+    window.location.href = `shift-detail.html?${params.toString()}`;
   }
 
   function showAddAttendanceGroup() {
