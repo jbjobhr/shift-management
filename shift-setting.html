@@ -64,14 +64,14 @@
        <select id="departmentSelect" class="w-full"></select>
       </div>
       <div>
-       <label class="block text-sm font-medium text-slate-600 mb-1">選取此班表會用到的 班別/假別組/考勤組</label>
+       <label class="block text-sm font-medium text-slate-600 mb-1">選取此班表會用到的 班別/節假日/考勤組</label>
         <button type="button" id="shiftChooseBtn" onclick="goShiftChoosePage()" class="w-full text-left px-3 py-2 border border-slate-300 rounded-md bg-white hover:bg-slate-50 text-slate-700">請選擇</button>
       </div>
       </div>
      </section>
      <section class="bg-white rounded-xl shadow-sm p-5 space-y-4">
-      <h2 class="font-bold text-lg text-slate-800 flex items-center gap-2"><i data-lucide="clock" class="w-5 h-5 text-amber-600"></i>班別排班</h2>
-      <div id="shiftList" class="space-y-2"></div><button onclick="openShiftDetailPage()" class="px-4 py-2 bg-amber-50 text-amber-700 rounded-md text-sm font-medium hover:bg-amber-100 transition flex items-center gap-1"><i data-lucide="plus" class="w-4 h-4"></i>新增班別</button>
+      <h2 class="font-bold text-lg text-slate-800 flex items-center gap-2"><i data-lucide="clock" class="w-5 h-5 text-amber-600"></i>班別設定</h2>
+      <div id="shiftList" class="space-y-2"></div><button onclick="showAddShift()" class="px-4 py-2 bg-amber-50 text-amber-700 rounded-md text-sm font-medium hover:bg-amber-100 transition flex items-center gap-1"><i data-lucide="plus" class="w-4 h-4"></i>新增班別</button>
      </section>
      <section class="bg-white rounded-xl shadow-sm p-5 space-y-4">
       <h2 class="font-bold text-lg text-slate-800 flex items-center gap-2"><i data-lucide="calendar-off" class="w-5 h-5 text-red-500"></i>節假日設定</h2>
@@ -90,7 +90,7 @@
       </div>
      </section>
      <section class="bg-white rounded-xl shadow-sm p-5 space-y-4">
-      <h2 class="font-bold text-lg text-slate-800 flex items-center gap-2"><i data-lucide="users" class="w-5 h-5 text-green-600"></i>排班人員</h2>
+      <h2 class="font-bold text-lg text-slate-800 flex items-center gap-2"><i data-lucide="users" class="w-5 h-5 text-green-600"></i>考勤設定</h2>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
        <div>
         <label class="block text-sm font-medium text-slate-600 mb-2">考勤組</label>
@@ -1483,7 +1483,7 @@
         <span class="chip bg-orange-100 text-orange-800">${restSummary}</span>
         ${overtimeSummary ? `<span class="chip bg-rose-100 text-rose-800">${overtimeSummary}</span>` : ''}
         <span class="chip bg-sky-100 text-sky-800">可打卡 前${punchBeforeMinutes}/後${punchAfterMinutes}分</span>
-        <button onclick="openShiftDetailPage(${i})" class="ml-auto text-blue-400 hover:text-blue-600 text-sm">編輯</button>
+        <button onclick="editShift(${i})" class="ml-auto text-blue-400 hover:text-blue-600 text-sm">編輯</button>
         <button onclick="deleteShift(${i})" class="text-red-400 hover:text-red-600 text-sm">刪除</button>
       </div>`;
     }).join('');
@@ -1612,14 +1612,6 @@
     params.set('index', String(currentScheduleIndex));
     if (groupIndex >= 0) params.set('groupIndex', String(groupIndex));
     window.location.href = `shift-group.html?${params.toString()}`;
-  }
-
-  function openShiftDetailPage(shiftIndex = -1) {
-    syncGlobalData();
-    const params = new URLSearchParams();
-    params.set('index', String(currentScheduleIndex));
-    if (shiftIndex >= 0) params.set('shiftIndex', String(shiftIndex));
-    window.location.href = `shift-detail.html?${params.toString()}`;
   }
 
   function showAddAttendanceGroup() {
@@ -1820,7 +1812,7 @@
     if (!block) return;
     const options = shifts.map(s => s.name);
     if (options.length === 0) {
-      block.innerHTML = '<div class="px-3 py-3 text-sm text-slate-500">尚未設定班別，請先到「班別排班」新增。</div>';
+      block.innerHTML = '<div class="px-3 py-3 text-sm text-slate-500">尚未設定班別，請先到「班別設定」新增。</div>';
       return;
     }
     block.innerHTML = WEEKDAYS.map(w => {

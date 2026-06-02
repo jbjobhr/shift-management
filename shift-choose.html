@@ -72,7 +72,7 @@
             id="scopeKeywordInput"
             type="text"
             class="w-full md:max-w-md"
-            placeholder="輸入班別、假別組或考勤組關鍵字"
+            placeholder="輸入班別、節假日或考勤關鍵字"
             oninput="setScopeKeywordFilter(this.value)"
           >
         </div>
@@ -109,8 +109,8 @@
       <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 space-y-3">
         <div class="flex items-center justify-between gap-3">
           <div>
-            <h3 class="font-semibold text-slate-800">假別組</h3>
-            <p class="text-xs text-slate-500">設定此班表允許使用的假別組。</p>
+            <h3 class="font-semibold text-slate-800">節假日</h3>
+            <p class="text-xs text-slate-500">設定此班表允許使用的節假日。</p>
           </div>
           <div class="flex items-center gap-2">
             <button type="button" onclick="selectAllAllowedAvailable('holidayGroups')" class="px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm">全部加入</button>
@@ -137,7 +137,7 @@
       <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 space-y-3">
         <div class="flex items-center justify-between gap-3">
           <div>
-            <h3 class="font-semibold text-slate-800">考勤組</h3>
+            <h3 class="font-semibold text-slate-800">考勤</h3>
             <p class="text-xs text-slate-500">設定此班表允許使用的考勤組。</p>
           </div>
           <div class="flex items-center gap-2">
