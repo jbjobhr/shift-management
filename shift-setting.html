@@ -64,21 +64,23 @@
        <select id="departmentSelect" class="w-full"></select>
       </div>
       <div>
-       <label class="block text-sm font-medium text-slate-600 mb-1">選取此班表會用到的 班別/節假日/考勤組</label>
-        <button type="button" id="shiftChooseBtn" onclick="goShiftChoosePage()" class="w-full text-left px-3 py-2 border border-slate-300 rounded-md bg-white hover:bg-slate-50 text-slate-700">請選擇</button>
+      <label class="block text-sm font-medium text-slate-600 mb-1">選取此班表會用到的 班別/節假日/考勤組</label>
+       <button type="button" id="shiftChooseBtn" onclick="goShiftChoosePage()" class="w-full text-left px-3 py-2 border border-slate-300 rounded-md bg-white hover:bg-slate-50 text-slate-700">前往統一管理頁</button>
       </div>
       </div>
      </section>
      <section class="bg-white rounded-xl shadow-sm p-5 space-y-4">
       <h2 class="font-bold text-lg text-slate-800 flex items-center gap-2"><i data-lucide="clock" class="w-5 h-5 text-amber-600"></i>班別設定</h2>
-      <div id="shiftList" class="space-y-2"></div><button onclick="openShiftDetailPage()" class="px-4 py-2 bg-amber-50 text-amber-700 rounded-md text-sm font-medium hover:bg-amber-100 transition flex items-center gap-1"><i data-lucide="plus" class="w-4 h-4"></i>新增班別</button>
+      <p class="text-xs text-slate-500">此區可編輯快照，但不會和統一管理頁同步。</p>
+      <div id="shiftList" class="space-y-2"></div>
      </section>
      <section class="bg-white rounded-xl shadow-sm p-5 space-y-4">
       <h2 class="font-bold text-lg text-slate-800 flex items-center gap-2"><i data-lucide="calendar-off" class="w-5 h-5 text-red-500"></i>節假日設定</h2>
+      <p class="text-xs text-slate-500">此區可編輯快照，但不會和統一管理頁同步。</p>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
        <div>
         <label class="block text-sm font-medium text-slate-600 mb-2">假別組管理</label>
-        <div id="holidayGroupList" class="space-y-2"></div><button onclick="openHolidayGroupPage()" class="mt-3 px-3 py-1.5 bg-red-50 text-red-600 rounded-md text-sm font-medium hover:bg-red-100 transition flex items-center gap-1"><i data-lucide="plus" class="w-4 h-4"></i>新增假別組</button>
+        <div id="holidayGroupList" class="space-y-2"></div>
        </div>
        <div>
         <label class="block text-sm font-medium text-slate-600 mb-2">彈性假期</label>
@@ -91,10 +93,11 @@
      </section>
      <section class="bg-white rounded-xl shadow-sm p-5 space-y-4">
       <h2 class="font-bold text-lg text-slate-800 flex items-center gap-2"><i data-lucide="users" class="w-5 h-5 text-green-600"></i>考勤設定</h2>
+      <p class="text-xs text-slate-500">此區可編輯快照，但不會和統一管理頁同步。</p>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
        <div>
         <label class="block text-sm font-medium text-slate-600 mb-2">考勤組</label>
-        <div class="space-y-2" id="attendanceGroupList"></div><button onclick="openShiftGroupPage()" class="mt-3 px-3 py-1.5 bg-green-50 text-green-700 rounded-md text-sm font-medium hover:bg-green-100 transition flex items-center gap-1"><i data-lucide="plus" class="w-4 h-4"></i>新增考勤組</button>
+        <div class="space-y-2" id="attendanceGroupList"></div>
        </div>
        <div>
         <label class="block text-sm font-medium text-slate-600 mb-2">臨時人員</label>
@@ -786,8 +789,6 @@
   function deleteHolidayGroup(groupName) {
     if (confirm(`確定要刪除「${groupName}」嗎？`)) {
       delete holidayGroups[groupName];
-      allowedScopeCustomized = true;
-      allowedHolidayGroupNames = allowedHolidayGroupNames.filter(name => name !== groupName);
       renderHolidays();
     }
   }
@@ -830,7 +831,6 @@
     }
 
     holidayGroups[groupName] = [...editingHolidayDates];
-    if (!allowedHolidayGroupNames.includes(groupName)) allowedHolidayGroupNames.push(groupName);
     renderHolidays();
     renderAllowedOptions();
     closeHolidayGroupModal();
@@ -966,7 +966,7 @@
     if (allowedAttendanceGroupNames.length) selectedTypes.push('考勤組');
 
     if (allowedScopeCustomized && selectedTypes.length) {
-      btn.textContent = `已選擇 ${selectedTypes.join(' / ')}`;
+      btn.textContent = '請選擇';
       btn.classList.remove('text-blue-600', 'font-medium');
       btn.classList.add('text-slate-700');
     } else {
@@ -1498,8 +1498,6 @@
     if (!s) return;
     if (confirm(`確定要刪除「${s.name}」嗎？`)) {
       shifts.splice(i, 1);
-      allowedScopeCustomized = true;
-      allowedShiftNames = allowedShiftNames.filter(name => name !== s.name);
       renderShifts();
     }
   }
@@ -1600,7 +1598,7 @@
         ${weekdayHtml}
       </div>
       <button onclick="openShiftGroupPage(${i})" class="text-blue-400 hover:text-blue-600 text-sm px-2">編輯</button>
-      <button onclick="allowedScopeCustomized=true;allowedAttendanceGroupNames=allowedAttendanceGroupNames.filter(name=>name!=='${g.name.replace(/'/g, "\\'")}');attendanceGroups.splice(${i},1);if(selectedAttendanceGroupIndex>=attendanceGroups.length)selectedAttendanceGroupIndex=attendanceGroups.length-1;renderAttendanceGroups()" class="text-red-400 hover:text-red-600 text-sm">刪除</button>
+      <button onclick="attendanceGroups.splice(${i},1);if(selectedAttendanceGroupIndex>=attendanceGroups.length)selectedAttendanceGroupIndex=attendanceGroups.length-1;renderAttendanceGroups()" class="text-red-400 hover:text-red-600 text-sm">刪除</button>
     </div>`;
     }).join('');
     renderAllowedOptions();
@@ -1908,7 +1906,6 @@
       attendanceGroups.push(payload);
       selectedAttendanceGroupIndex = attendanceGroups.length - 1;
     }
-    if (!allowedAttendanceGroupNames.includes(payload.name)) allowedAttendanceGroupNames.push(payload.name);
     if (selectedAttendanceGroupIndex < 0 && attendanceGroups.length > 0) selectedAttendanceGroupIndex = 0;
     editingGroupIndex = -1;
     renderAttendanceGroups();
@@ -2071,7 +2068,6 @@
     } else {
       shifts.push({ name, shortName, start, end, crossDay, hours, ...restConfig, ...overtime, punchBeforeMinutes, punchAfterMinutes });
     }
-    if (!allowedShiftNames.includes(name)) allowedShiftNames.push(name);
     renderShifts();
     renderAllowedOptions();
     closeShiftModal();
@@ -2144,18 +2140,6 @@
       G.departments        = departments;
       G.allPositions       = allPositions;
       G.allPunchLocations  = allPunchLocations;
-      // 讓 index.html 在未切換班表時仍能讀到合理的全域值
-      G.shifts             = shifts;
-      G.attendanceGroups   = attendanceGroups;
-      G.holidayGroups      = holidayGroups;
-      G.individualHolidays = individualHolidays;
-      G.supervisors        = supervisors;
-      G.positions          = positions;
-      G.tags               = tags;
-      G.allowedScopeCustomized      = allowedScopeCustomized;
-      G.allowedShiftNames           = allowedShiftNames;
-      G.allowedHolidayGroupNames    = allowedHolidayGroupNames;
-      G.allowedAttendanceGroupNames = allowedAttendanceGroupNames;
       G.selectedBranch     = selectedBranch;
       G.selectedDepartment = selectedDepartment;
       localStorage.setItem('shiftMgmt:global', JSON.stringify(G));

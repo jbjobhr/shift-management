@@ -49,6 +49,7 @@
   </div>
 
   <script>
+  const CHOOSE_LIBRARY_KEY = 'shiftMgmt:chooseLibrary';
   const FALLBACK = {
     schedules: [
       {
@@ -69,6 +70,8 @@
   const DRAFT_KEY = 'shiftMgmt:newScheduleDraft';
   const params = new URLSearchParams(location.search);
   const source = params.get('source') || 'edit';
+  const mode = params.get('mode') === 'library' ? 'library' : 'schedule';
+  const returnTo = params.get('returnTo') || '';
   let currentScheduleIndex = parseInt(params.get('index'), 10);
   if (Number.isNaN(currentScheduleIndex)) currentScheduleIndex = 0;
   const editingGroupName = params.get('groupName') || '';
@@ -77,16 +80,33 @@
   if (currentScheduleIndex < 0 || currentScheduleIndex >= schedules.length) currentScheduleIndex = 0;
 
   let draft = null;
+  let chooseLibrary = { holidayGroups: {}, selectedHolidayGroups: [] };
   if (source === 'new') {
     try {
       const rawDraft = localStorage.getItem(DRAFT_KEY);
       if (rawDraft) draft = JSON.parse(rawDraft);
     } catch (e) { console.warn('load draft failed', e); }
+  } else if (mode === 'library') {
+    try {
+      const rawLibrary = localStorage.getItem(CHOOSE_LIBRARY_KEY);
+      if (rawLibrary) {
+        chooseLibrary = Object.assign({}, chooseLibrary, JSON.parse(rawLibrary));
+      } else {
+        chooseLibrary = {
+          holidayGroups: (G.holidayGroups && typeof G.holidayGroups === 'object') ? { ...G.holidayGroups } : {},
+          selectedHolidayGroups: Array.isArray(G.selectedHolidayGroups) ? [...G.selectedHolidayGroups] : []
+        };
+      }
+    } catch (e) {
+      console.warn('load choose library failed', e);
+    }
   }
 
   const sched = source === 'new'
     ? (draft || { holidayGroups: G.holidayGroups || {}, selectedHolidayGroups: G.selectedHolidayGroups || [] })
-    : (schedules[currentScheduleIndex] || FALLBACK.schedules[0]);
+    : (mode === 'library'
+      ? { holidayGroups: chooseLibrary.holidayGroups || {}, selectedHolidayGroups: chooseLibrary.selectedHolidayGroups || [] }
+      : (schedules[currentScheduleIndex] || FALLBACK.schedules[0]));
   let holidayGroups = (sched.holidayGroups && typeof sched.holidayGroups === 'object') ? { ...sched.holidayGroups } : {};
   let selectedHolidayGroups = Array.isArray(sched.selectedHolidayGroups) ? [...sched.selectedHolidayGroups] : [];
   let editingHolidayDates = [];
@@ -160,6 +180,10 @@
         selectedHolidayGroups
       });
       localStorage.setItem(DRAFT_KEY, JSON.stringify(nextDraft));
+    } else if (mode === 'library') {
+      chooseLibrary.holidayGroups = holidayGroups;
+      chooseLibrary.selectedHolidayGroups = selectedHolidayGroups;
+      localStorage.setItem(CHOOSE_LIBRARY_KEY, JSON.stringify(chooseLibrary));
     } else {
       sched.holidayGroups = holidayGroups;
       sched.selectedHolidayGroups = selectedHolidayGroups;
@@ -172,9 +196,14 @@
   }
 
   function goBack() {
-    window.location.href = source === 'new'
-      ? 'shift-setting-new.html'
-      : `shift-setting.html?index=${currentScheduleIndex}`;
+    const target = returnTo || (source === 'new' ? 'shift-setting-new.html' : 'shift-setting.html');
+    const url = new URL(target, window.location.origin);
+    if (source === 'new') {
+      url.searchParams.set('index', '-1');
+    } else {
+      url.searchParams.set('index', String(currentScheduleIndex));
+    }
+    window.location.href = `${url.pathname}${url.search}`;
   }
 
   window.addHolidayDate = addHolidayDate;

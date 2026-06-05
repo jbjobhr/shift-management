@@ -221,6 +221,7 @@
   </div>
 
   <script>
+  const CHOOSE_LIBRARY_KEY = 'shiftMgmt:chooseLibrary';
   const WEEKDAYS = [
     { key: 'mon', label: '每週一' },
     { key: 'tue', label: '每週二' },
@@ -260,6 +261,8 @@
   const DRAFT_KEY = 'shiftMgmt:newScheduleDraft';
   const params = new URLSearchParams(location.search);
   const source = params.get('source') || 'edit';
+  const mode = params.get('mode') === 'library' ? 'library' : 'schedule';
+  const returnTo = params.get('returnTo') || '';
   let currentScheduleIndex = parseInt(params.get('index'), 10);
   if (Number.isNaN(currentScheduleIndex)) currentScheduleIndex = 0;
   const editingGroupIndex = parseInt(params.get('groupIndex'), 10);
@@ -268,16 +271,33 @@
   if (currentScheduleIndex < 0 || currentScheduleIndex >= schedules.length) currentScheduleIndex = 0;
 
   let draft = null;
+  let chooseLibrary = { shifts: [], attendanceGroups: [] };
   if (source === 'new') {
     try {
       const rawDraft = localStorage.getItem(DRAFT_KEY);
       if (rawDraft) draft = JSON.parse(rawDraft);
     } catch (e) { console.warn('load draft failed', e); }
+  } else if (mode === 'library') {
+    try {
+      const rawLibrary = localStorage.getItem(CHOOSE_LIBRARY_KEY);
+      if (rawLibrary) {
+        chooseLibrary = Object.assign({}, chooseLibrary, JSON.parse(rawLibrary));
+      } else {
+        chooseLibrary = {
+          shifts: Array.isArray(G.shifts) ? [...G.shifts] : [],
+          attendanceGroups: Array.isArray(G.attendanceGroups) ? [...G.attendanceGroups] : []
+        };
+      }
+    } catch (e) {
+      console.warn('load choose library failed', e);
+    }
   }
 
   const sched = source === 'new'
     ? (draft || { shifts: G.shifts || FALLBACK.schedules[0].shifts, attendanceGroups: G.attendanceGroups || [] })
-    : (schedules[currentScheduleIndex] || FALLBACK.schedules[0]);
+    : (mode === 'library'
+      ? { shifts: chooseLibrary.shifts || [], attendanceGroups: chooseLibrary.attendanceGroups || [] }
+      : (schedules[currentScheduleIndex] || FALLBACK.schedules[0]));
   let shifts = Array.isArray(sched.shifts) ? sched.shifts : FALLBACK.schedules[0].shifts;
   let attendanceGroups = Array.isArray(sched.attendanceGroups) ? sched.attendanceGroups : [];
   let persons = Array.isArray(G.persons) ? G.persons : FALLBACK.persons;
@@ -818,6 +838,10 @@
         allPunchLocations
       });
       localStorage.setItem(DRAFT_KEY, JSON.stringify(nextDraft));
+    } else if (mode === 'library') {
+      chooseLibrary.shifts = shifts;
+      chooseLibrary.attendanceGroups = attendanceGroups;
+      localStorage.setItem(CHOOSE_LIBRARY_KEY, JSON.stringify(chooseLibrary));
     } else {
       sched.attendanceGroups = attendanceGroups;
       if (typeof sched.selectedAttendanceGroupIndex !== 'number') {
@@ -894,9 +918,14 @@
   }
 
   function goBack() {
-    window.location.href = source === 'new'
-      ? 'shift-setting-new.html'
-      : `shift-setting.html?index=${currentScheduleIndex}`;
+    const target = returnTo || (source === 'new' ? 'shift-setting-new.html' : 'shift-setting.html');
+    const url = new URL(target, window.location.origin);
+    if (source === 'new') {
+      url.searchParams.set('index', '-1');
+    } else {
+      url.searchParams.set('index', String(currentScheduleIndex));
+    }
+    window.location.href = `${url.pathname}${url.search}`;
   }
 
   initPage();

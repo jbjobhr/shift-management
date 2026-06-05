@@ -3,7 +3,7 @@
  <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>選取班表可用項目</title>
+  <title>班別/節假日/考勤管理</title>
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
   <style>
@@ -48,14 +48,14 @@
  <body class="h-full bg-slate-50 w-full">
   <div class="min-h-full w-full flex flex-col">
    <header class="bg-[#1e3a5f] text-white px-6 py-4 flex items-center justify-between">
-    <h1 class="text-xl font-bold tracking-wide">班表可用項目設定</h1>
+    <h1 class="text-xl font-bold tracking-wide">班別/節假日/考勤管理</h1>
     <a id="backLinkTop" href="shift-setting.html" class="px-4 py-1.5 rounded-md text-sm font-medium bg-white/10 hover:bg-white/20">返回</a>
    </header>
    <main class="flex-1 p-6 overflow-auto">
     <div class="max-w-6xl mx-auto space-y-5">
       <div class="bg-white rounded-xl shadow-sm p-4">
-        <h2 class="text-lg font-bold text-slate-800">選擇此班表會用到的項目</h2>
-        <p class="text-sm text-slate-500 mt-1">可複選多筆，再用左右箭頭移動。</p>
+        <h2 class="text-lg font-bold text-slate-800">管理班表會用到的項目</h2>
+        <p class="text-sm text-slate-500 mt-1">這裡是統一管理頁，可新增、編輯並調整左右清單。</p>
         <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
           <div class="flex items-center gap-2">
             <label for="scopeBranchSelect" class="text-sm text-slate-600 whitespace-nowrap">分公司/分店/案場</label>
@@ -81,8 +81,11 @@
       <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 space-y-3">
         <div class="flex items-center justify-between gap-3">
           <div>
-            <h3 class="font-semibold text-slate-800">班別</h3>
-            <p class="text-xs text-slate-500">設定此班表允許使用的班別。</p>
+            <div class="flex items-center gap-2">
+              <h3 class="font-semibold text-slate-800">班別</h3>
+              <button type="button" onclick="goAddItem('shifts')" class="text-red-500 text-sm font-semibold">新增</button>
+            </div>
+            <p class="text-xs text-slate-500">統一管理頁：管理班別，並設定此班表可用清單。</p>
           </div>
           <div class="flex items-center gap-2">
             <button type="button" onclick="selectAllAllowedAvailable('shifts')" class="px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm">全部加入</button>
@@ -109,8 +112,11 @@
       <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 space-y-3">
         <div class="flex items-center justify-between gap-3">
           <div>
-            <h3 class="font-semibold text-slate-800">節假日</h3>
-            <p class="text-xs text-slate-500">設定此班表允許使用的節假日。</p>
+            <div class="flex items-center gap-2">
+              <h3 class="font-semibold text-slate-800">節假日</h3>
+              <button type="button" onclick="goAddItem('holidayGroups')" class="text-red-500 text-sm font-semibold">新增</button>
+            </div>
+            <p class="text-xs text-slate-500">統一管理頁：管理節假日，並設定此班表可用清單。</p>
           </div>
           <div class="flex items-center gap-2">
             <button type="button" onclick="selectAllAllowedAvailable('holidayGroups')" class="px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm">全部加入</button>
@@ -137,8 +143,11 @@
       <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 space-y-3">
         <div class="flex items-center justify-between gap-3">
           <div>
-            <h3 class="font-semibold text-slate-800">考勤</h3>
-            <p class="text-xs text-slate-500">設定此班表允許使用的考勤組。</p>
+            <div class="flex items-center gap-2">
+              <h3 class="font-semibold text-slate-800">考勤</h3>
+              <button type="button" onclick="goAddItem('attendanceGroups')" class="text-red-500 text-sm font-semibold">新增</button>
+            </div>
+            <p class="text-xs text-slate-500">統一管理頁：管理考勤組，並設定此班表可用清單。</p>
           </div>
           <div class="flex items-center gap-2">
             <button type="button" onclick="selectAllAllowedAvailable('attendanceGroups')" class="px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm">全部加入</button>
@@ -178,6 +187,13 @@
     holidayGroups: {},
     attendanceGroups: []
   };
+  const CHOOSE_LIBRARY_KEY = 'shiftMgmt:chooseLibrary';
+
+  const fallbackChooseLibrary = {
+    shifts: [],
+    holidayGroups: {},
+    attendanceGroups: []
+  };
 
   let G = fallbackGlobal;
   try {
@@ -186,6 +202,30 @@
   } catch (e) {
     console.warn('load global failed', e);
   }
+
+  function loadChooseLibrary() {
+    try {
+      const raw = localStorage.getItem(CHOOSE_LIBRARY_KEY);
+      if (raw) return Object.assign({}, fallbackChooseLibrary, JSON.parse(raw));
+    } catch (e) {
+      console.warn('load choose library failed', e);
+    }
+
+    const initialized = {
+      shifts: cloneDeep(Array.isArray(G.shifts) ? G.shifts : []),
+      holidayGroups: cloneDeep((G.holidayGroups && typeof G.holidayGroups === 'object') ? G.holidayGroups : {}),
+      attendanceGroups: cloneDeep(Array.isArray(G.attendanceGroups) ? G.attendanceGroups : [])
+    };
+
+    try {
+      localStorage.setItem(CHOOSE_LIBRARY_KEY, JSON.stringify(initialized));
+    } catch (e) {
+      console.warn('init choose library failed', e);
+    }
+    return initialized;
+  }
+
+  let chooseLibrary = loadChooseLibrary();
 
   const params = new URLSearchParams(location.search);
   const _rawIndex = parseInt(params.get('index') || '0', 10);
@@ -337,16 +377,10 @@
       globalAttendanceGroupTemplates[g.name] = cloneDeep(g);
     };
 
-    (Array.isArray(G.shifts) ? G.shifts : []).forEach(collectShift);
-    collectHoliday(G.holidayGroups);
-    (Array.isArray(G.attendanceGroups) ? G.attendanceGroups : []).forEach(collectAttendance);
+    (Array.isArray(chooseLibrary.shifts) ? chooseLibrary.shifts : []).forEach(collectShift);
+    collectHoliday(chooseLibrary.holidayGroups);
+    (Array.isArray(chooseLibrary.attendanceGroups) ? chooseLibrary.attendanceGroups : []).forEach(collectAttendance);
 
-    schedules.forEach((sched) => {
-      const branch = String((sched && sched.branch) || '').trim();
-      (Array.isArray(sched.shifts) ? sched.shifts : []).forEach(s => collectShift(s, branch));
-      collectHoliday(sched.holidayGroups, branch);
-      (Array.isArray(sched.attendanceGroups) ? sched.attendanceGroups : []).forEach(g => collectAttendance(g, branch));
-    });
   }
 
   buildGlobalTemplates();
@@ -360,11 +394,10 @@
         attendanceGroupNames: Array.isArray(schedule.allowedAttendanceGroupNames) ? [...schedule.allowedAttendanceGroupNames] : []
       };
     }
-    const fallbackHolidayNames = Object.keys(globalHolidayGroupTemplates || {});
     return {
-      shiftNames: (Array.isArray(schedule.shifts) ? schedule.shifts : []).map(s => s.name).filter(Boolean),
-      holidayGroupNames: Object.keys(schedule.holidayGroups || {}).length ? Object.keys(schedule.holidayGroups || {}) : fallbackHolidayNames,
-      attendanceGroupNames: (Array.isArray(schedule.attendanceGroups) ? schedule.attendanceGroups : []).map(g => g.name).filter(Boolean)
+      shiftNames: Array.isArray(schedule.allowedShiftNames) ? [...schedule.allowedShiftNames] : [],
+      holidayGroupNames: Array.isArray(schedule.allowedHolidayGroupNames) ? [...schedule.allowedHolidayGroupNames] : [],
+      attendanceGroupNames: Array.isArray(schedule.allowedAttendanceGroupNames) ? [...schedule.allowedAttendanceGroupNames] : []
     };
   }
 
@@ -372,13 +405,6 @@
   let allowedShiftNames = [...defaults.shiftNames];
   let allowedHolidayGroupNames = [...defaults.holidayGroupNames];
   let allowedAttendanceGroupNames = [...defaults.attendanceGroupNames];
-
-  if (!isNewSchedule && !schedule.allowedScopeCustomized) {
-    const fallbackHolidayNames = Object.keys(globalHolidayGroupTemplates || {});
-    allowedShiftNames = (Array.isArray(schedule.shifts) ? schedule.shifts : []).map(s => s.name).filter(Boolean);
-    allowedHolidayGroupNames = Object.keys(schedule.holidayGroups || {}).length ? Object.keys(schedule.holidayGroups || {}) : fallbackHolidayNames;
-    allowedAttendanceGroupNames = (Array.isArray(schedule.attendanceGroups) ? schedule.attendanceGroups : []).map(g => g.name).filter(Boolean);
-  }
 
   allowedShiftNames = allowedShiftNames.filter(name => Object.prototype.hasOwnProperty.call(globalShiftTemplates, name));
   allowedHolidayGroupNames = allowedHolidayGroupNames.filter(name => Object.prototype.hasOwnProperty.call(globalHolidayGroupTemplates, name));
@@ -709,70 +735,74 @@
   }
 
   function getAttendanceGroupIndexByName(name) {
-    const list = Array.isArray(schedule.attendanceGroups) ? schedule.attendanceGroups : [];
+    const list = Array.isArray(chooseLibrary.attendanceGroups) ? chooseLibrary.attendanceGroups : [];
     return list.findIndex(g => g && g.name === name);
+  }
+
+  function applyReturnTarget(params) {
+    params.set('returnTo', 'shift-choose.html');
+    if (isNewSchedule) {
+      params.set('index', '-1');
+    } else {
+      params.set('index', String(currentScheduleIndex));
+    }
+  }
+
+  function goAddItem(type) {
+    const params = new URLSearchParams();
+    applyReturnTarget(params);
+    if (isNewSchedule) params.set('source', 'new');
+
+    if (type === 'shifts') {
+      params.set('mode', 'library');
+      window.location.href = `shift-detail.html?${params.toString()}`;
+      return;
+    }
+    if (type === 'holidayGroups') {
+      params.set('mode', 'library');
+      window.location.href = `holiday-group.html?${params.toString()}`;
+      return;
+    }
+    params.set('mode', 'library');
+    window.location.href = `shift-group.html?${params.toString()}`;
   }
 
   function goEditPage(type) {
     const params = new URLSearchParams();
-    if (isNewSchedule) {
-      params.set('source', 'new');
-      if (type === 'shifts') {
-        window.location.href = 'shift-setting-new.html';
-        return;
-      }
-      if (type === 'holidayGroups') {
-        window.location.href = `holiday-group.html?${params.toString()}`;
-        return;
-      }
-      window.location.href = `shift-group.html?${params.toString()}`;
-      return;
-    }
-
-    params.set('index', String(currentScheduleIndex));
+    if (isNewSchedule) params.set('source', 'new');
+    applyReturnTarget(params);
     if (type === 'shifts') {
-      window.location.href = `shift-setting.html?${params.toString()}`;
+      params.set('mode', 'library');
+      window.location.href = `shift-detail.html?${params.toString()}`;
       return;
     }
     if (type === 'holidayGroups') {
+      params.set('mode', 'library');
       window.location.href = `holiday-group.html?${params.toString()}`;
       return;
     }
+    params.set('mode', 'library');
     window.location.href = `shift-group.html?${params.toString()}`;
   }
 
   function goEditItem(type, name) {
     const params = new URLSearchParams();
-    if (isNewSchedule) {
-      params.set('source', 'new');
-      params.set('index', '-1');
-      if (type === 'shifts') {
-        params.set('editShiftName', name);
-        window.location.href = `shift-setting-new.html?${params.toString()}`;
-        return;
-      }
-      if (type === 'holidayGroups') {
-        params.set('groupName', name);
-        window.location.href = `holiday-group.html?${params.toString()}`;
-        return;
-      }
-      const groupIndex = getAttendanceGroupIndexByName(name);
-      if (groupIndex >= 0) params.set('groupIndex', String(groupIndex));
-      window.location.href = `shift-group.html?${params.toString()}`;
-      return;
-    }
-
-    params.set('index', String(currentScheduleIndex));
+    if (isNewSchedule) params.set('source', 'new');
+    applyReturnTarget(params);
     if (type === 'shifts') {
-      params.set('editShiftName', name);
-      window.location.href = `shift-setting.html?${params.toString()}`;
+      params.set('mode', 'library');
+      const shiftIndex = (Array.isArray(chooseLibrary.shifts) ? chooseLibrary.shifts : []).findIndex(s => s && s.name === name);
+      if (shiftIndex >= 0) params.set('shiftIndex', String(shiftIndex));
+      window.location.href = `shift-detail.html?${params.toString()}`;
       return;
     }
     if (type === 'holidayGroups') {
+      params.set('mode', 'library');
       params.set('groupName', name);
       window.location.href = `holiday-group.html?${params.toString()}`;
       return;
     }
+    params.set('mode', 'library');
     const groupIndex = getAttendanceGroupIndexByName(name);
     if (groupIndex >= 0) params.set('groupIndex', String(groupIndex));
     window.location.href = `shift-group.html?${params.toString()}`;
@@ -873,6 +903,7 @@
   window.moveAllowedToSelected = moveAllowedToSelected;
   window.moveAllowedToAvailable = moveAllowedToAvailable;
   window.selectAllAllowedAvailable = selectAllAllowedAvailable;
+  window.goAddItem = goAddItem;
   window.goEditItem = goEditItem;
   window.goEditPage = goEditPage;
   window.setScopeBranchFilter = setScopeBranchFilter;

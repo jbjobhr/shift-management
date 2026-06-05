@@ -152,6 +152,7 @@
 
   <script>
   const DRAFT_KEY = 'shiftMgmt:newScheduleDraft';
+  const CHOOSE_LIBRARY_KEY = 'shiftMgmt:chooseLibrary';
   const PUNCH_BEFORE_MAX_MINUTES = 180;
   const PUNCH_AFTER_MAX_MINUTES = 720;
 
@@ -173,25 +174,44 @@
 
   const params = new URLSearchParams(location.search);
   const source = params.get('source') === 'new' ? 'new' : 'edit';
+  const mode = params.get('mode') === 'library' ? 'library' : 'schedule';
   const shiftIndexParam = parseInt(params.get('shiftIndex'), 10);
   const editingShiftIndex = Number.isInteger(shiftIndexParam) && shiftIndexParam >= 0 ? shiftIndexParam : -1;
   let currentScheduleIndex = parseInt(params.get('index'), 10);
+    const returnTo = params.get('returnTo') || '';
   if (Number.isNaN(currentScheduleIndex)) currentScheduleIndex = 0;
 
   let schedules = Array.isArray(G.schedules) && G.schedules.length ? G.schedules : FALLBACK.schedules;
   if (currentScheduleIndex < 0 || currentScheduleIndex >= schedules.length) currentScheduleIndex = 0;
 
   let draft = null;
+  let chooseLibrary = { shifts: [], attendanceGroups: [] };
   if (source === 'new') {
     try {
       const rawDraft = localStorage.getItem(DRAFT_KEY);
       if (rawDraft) draft = JSON.parse(rawDraft);
     } catch (e) { console.warn('load draft failed', e); }
+  } else if (mode === 'library') {
+    try {
+      const rawLibrary = localStorage.getItem(CHOOSE_LIBRARY_KEY);
+      if (rawLibrary) {
+        chooseLibrary = Object.assign({}, chooseLibrary, JSON.parse(rawLibrary));
+      } else {
+        chooseLibrary = {
+          shifts: Array.isArray(G.shifts) ? JSON.parse(JSON.stringify(G.shifts)) : [],
+          attendanceGroups: Array.isArray(G.attendanceGroups) ? JSON.parse(JSON.stringify(G.attendanceGroups)) : []
+        };
+      }
+    } catch (e) {
+      console.warn('load choose library failed', e);
+    }
   }
 
   const sched = source === 'new'
     ? (draft || { shifts: Array.isArray(G.shifts) ? G.shifts : FALLBACK.shifts, attendanceGroups: Array.isArray(G.attendanceGroups) ? G.attendanceGroups : [] })
-    : (schedules[currentScheduleIndex] || FALLBACK.schedules[0]);
+    : (mode === 'library'
+      ? { shifts: Array.isArray(chooseLibrary.shifts) ? chooseLibrary.shifts : [], attendanceGroups: Array.isArray(chooseLibrary.attendanceGroups) ? chooseLibrary.attendanceGroups : [] }
+      : (schedules[currentScheduleIndex] || FALLBACK.schedules[0]));
 
   let shifts = Array.isArray(sched.shifts) ? JSON.parse(JSON.stringify(sched.shifts)) : [];
   let attendanceGroups = Array.isArray(sched.attendanceGroups) ? JSON.parse(JSON.stringify(sched.attendanceGroups)) : [];
@@ -511,22 +531,29 @@
     if (source === 'new') {
       const nextDraft = Object.assign({}, draft || {}, { shifts, attendanceGroups });
       localStorage.setItem(DRAFT_KEY, JSON.stringify(nextDraft));
+    } else if (mode === 'library') {
+      chooseLibrary.shifts = shifts;
+      chooseLibrary.attendanceGroups = attendanceGroups;
+      localStorage.setItem(CHOOSE_LIBRARY_KEY, JSON.stringify(chooseLibrary));
     } else {
       sched.shifts = shifts;
       sched.attendanceGroups = attendanceGroups;
       schedules[currentScheduleIndex] = sched;
       G.schedules = schedules;
-      G.shifts = shifts;
-      G.attendanceGroups = attendanceGroups;
       localStorage.setItem('shiftMgmt:global', JSON.stringify(G));
     }
     goBack();
   }
 
   function goBack() {
-    window.location.href = source === 'new'
-      ? 'shift-setting-new.html'
-      : `shift-setting.html?index=${currentScheduleIndex}`;
+     const target = returnTo || (source === 'new' ? 'shift-setting-new.html' : 'shift-setting.html');
+     const url = new URL(target, window.location.origin);
+     if (source === 'new') {
+       url.searchParams.set('index', '-1');
+     } else {
+       url.searchParams.set('index', String(currentScheduleIndex));
+     }
+     window.location.href = `${url.pathname}${url.search}`;
   }
 
   window.saveShift = saveShift;
