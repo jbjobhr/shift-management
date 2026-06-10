@@ -124,6 +124,7 @@
               <label class="flex items-center gap-1 text-sm cursor-pointer px-2 py-1 rounded hover:bg-white/70"><input type="radio" name="rotatingSystemType" value="twoWeek" onchange="updateRotatingSystemUI()"><span>兩週變形</span></label>
               <label class="flex items-center gap-1 text-sm cursor-pointer px-2 py-1 rounded hover:bg-white/70"><input type="radio" name="rotatingSystemType" value="fourWeek" onchange="updateRotatingSystemUI()"><span>四週變形</span></label>
               <label class="flex items-center gap-1 text-sm cursor-pointer px-2 py-1 rounded hover:bg-white/70"><input type="radio" name="rotatingSystemType" value="eightWeek" onchange="updateRotatingSystemUI()"><span>八週變形</span></label>
+              <label class="flex items-center gap-1 text-sm cursor-pointer px-2 py-1 rounded hover:bg-white/70"><input type="radio" name="rotatingSystemType" value="none" onchange="updateRotatingSystemUI()"><span>無輪班</span></label>
             </div>
             <div id="rotatingEffectiveWrap" class="grid grid-cols-1 md:grid-cols-2 gap-3 hidden">
               <div>
@@ -405,15 +406,19 @@
     { value: 'general', label: '一般（單週）', hint: '每週循環，適用於一般一例一休排班。' },
     { value: 'twoWeek', label: '兩週變形', hint: '需填寫生效日期與輪班明細。' },
     { value: 'fourWeek', label: '四週變形', hint: '需填寫生效日期與輪班明細。' },
-    { value: 'eightWeek', label: '八週變形', hint: '需填寫生效日期與輪班明細。' }
+    { value: 'eightWeek', label: '八週變形', hint: '需填寫生效日期與輪班明細。' },
+    { value: 'none', label: '無輪班', hint: '不使用輪班制度，只保留固定班別或手動排班。' }
   ];
 
   const ROTATING_SYSTEM_LABELS = {
     general: '一般（單週）',
+    none: '無輪班',
     twoWeek: '兩週變形',
     fourWeek: '四週變形',
     eightWeek: '八週變形'
   };
+
+  const ROTATING_SYSTEMS_WITH_DETAILS = ['twoWeek', 'fourWeek', 'eightWeek'];
 
   const ROTATING_REST_VALUE = '__rest__';
   const ROTATING_REST_LABEL = '休息日';
@@ -485,8 +490,9 @@
     currentGroupSystemType = checked ? checked.value : 'general';
     const detailWrap = document.getElementById('rotatingDetailWrap');
     const effectiveWrap = document.getElementById('rotatingEffectiveWrap');
-    if (detailWrap) detailWrap.classList.toggle('hidden', currentGroupSystemType === 'general');
-    if (effectiveWrap) effectiveWrap.classList.toggle('hidden', currentGroupSystemType === 'general');
+    const hasDetails = ROTATING_SYSTEMS_WITH_DETAILS.includes(currentGroupSystemType);
+    if (detailWrap) detailWrap.classList.toggle('hidden', !hasDetails);
+    if (effectiveWrap) effectiveWrap.classList.toggle('hidden', !hasDetails);
     syncWeekdayShiftsLayout();
   }
 
@@ -705,7 +711,7 @@
   function renderRotatingSystemOptions() {
     return ROTATING_SYSTEM_OPTIONS.map(item => `
       <label class="flex items-center gap-1 text-sm cursor-pointer px-2 py-1 rounded hover:bg-slate-50">
-        <input type="radio" name="rotatingSystemType" value="${item.value}" ${item.value === 'general' ? 'checked' : ''} onchange="updateRotatingSystemUI()">
+        <input type="radio" name="rotatingSystemType" value="${item.value}" ${item.value === currentGroupSystemType ? 'checked' : ''} onchange="updateRotatingSystemUI()">
         <span>${item.label}</span>
       </label>
     `).join('');
@@ -875,7 +881,7 @@
 
     const systemType = document.querySelector('input[name="rotatingSystemType"]:checked')?.value || 'general';
     const rotatingDetails = currentGroupRotatingDetails.map(normalizeRotatingDetail).filter(item => item.shiftName);
-    if (systemType !== 'general') {
+    if (ROTATING_SYSTEMS_WITH_DETAILS.includes(systemType)) {
       if (!effectiveDate) {
         alert('請選擇生效日期');
         return;
@@ -898,9 +904,9 @@
       employmentType: currentGroupEmploymentType,
       systemType,
       systemLabel: ROTATING_SYSTEM_LABELS[systemType] || '一般（單週）',
-      effectiveDate: systemType === 'general' ? '' : effectiveDate,
-      rotatingDetails: systemType === 'general' ? [] : rotatingDetails,
-      details: systemType === 'general' ? [] : rotatingDetails,
+      effectiveDate: ROTATING_SYSTEMS_WITH_DETAILS.includes(systemType) ? effectiveDate : '',
+      rotatingDetails: ROTATING_SYSTEMS_WITH_DETAILS.includes(systemType) ? rotatingDetails : [],
+      details: ROTATING_SYSTEMS_WITH_DETAILS.includes(systemType) ? rotatingDetails : [],
       weekdayShifts: { ...currentGroupWeekdayShifts },
       punchLocations: [...currentGroupPunchLocations],
       workOnHoliday: currentGroupEmploymentType === 'parttime'

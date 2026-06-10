@@ -1528,10 +1528,12 @@
     const DOW_LABELS = [['mon','一'],['tue','二'],['wed','三'],['thu','四'],['fri','五'],['sat','六'],['sun','日']];
     const SYSTEM_LABELS = {
       general: '一般（單週）',
+      none: '無輪班',
       twoWeek: '兩週變形',
       fourWeek: '四週變形',
       eightWeek: '八週變形'
     };
+    const ROTATING_SYSTEMS_WITH_DETAILS = ['twoWeek', 'fourWeek', 'eightWeek'];
     document.getElementById('attendanceGroupList').innerHTML = attendanceGroups.map((g, i) => {
       const isAuto = (g.scheduleType || 'auto') === 'auto';
       const systemType = g.systemType || 'general';
@@ -1560,7 +1562,7 @@
             ${content}
           </div>`;
         }).join('') + `</div>`;
-      } else if (isAuto && systemType !== 'general') {
+      } else if (isAuto && ROTATING_SYSTEMS_WITH_DETAILS.includes(systemType)) {
         const cycleSequence = [];
         rotatingDetails.forEach(item => {
           const shiftName = String(item.shiftName || item.shiftCode || '').trim() || '未命名';
@@ -1578,6 +1580,8 @@
         weekdayHtml = cycleSequence.length
           ? `<div class="mt-2 text-[10px] text-cyan-700">循環預覽（前 7 天）</div><div class="mt-1 grid grid-cols-7 gap-1">${previewCells}</div>`
           : `<div class="mt-2 text-xs text-slate-400">尚未設定輪班明細</div>`;
+      } else if (isAuto && systemType === 'none') {
+        weekdayHtml = `<div class="mt-2 text-xs text-slate-500">無輪班</div>`;
       } else {
         weekdayHtml = `<div class="mt-2 text-xs text-slate-500">手動排班</div>`;
       }
@@ -1591,7 +1595,7 @@
           ${g.workOnHoliday ? '<span class="chip bg-orange-100 text-orange-700 text-[10px]">假日加班</span>' : ''}
         </div>
         <div class="text-xs text-slate-500">${g.members.length} 人</div>
-        ${systemType !== 'general' ? `
+        ${ROTATING_SYSTEMS_WITH_DETAILS.includes(systemType) ? `
           <div class="mt-1 text-xs text-slate-500">生效日期：${effectiveDate || '未設定'}</div>
           <div class="mt-1 flex flex-wrap gap-1">${rotatingDetails.slice(0, 3).map(d => `<span class="chip bg-cyan-50 text-cyan-700 text-[10px]">${d.shiftName || d.shiftCode || '未命名'} × ${d.days || 1} 天</span>`).join('')}${rotatingDetails.length > 3 ? '<span class="text-[10px] text-slate-400 self-center">...</span>' : ''}</div>
         ` : ''}

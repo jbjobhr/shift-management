@@ -418,10 +418,13 @@
 
   const SYSTEM_LABELS = {
     general: '一般（單週）',
+    none: '無輪班',
     twoWeek: '兩週變形',
     fourWeek: '四週變形',
     eightWeek: '八週變形'
   };
+
+  const ROTATING_SYSTEMS_WITH_DETAILS = ['twoWeek', 'fourWeek', 'eightWeek'];
 
   function formatHoursValue(v) {
     const n = Number(v);
@@ -463,7 +466,7 @@
       const systemType = g.systemType || 'general';
       lines.push(SYSTEM_LABELS[systemType] || systemType);
       if (g.workOnHoliday) lines.push('假日加班');
-      if (systemType !== 'general') {
+      if (ROTATING_SYSTEMS_WITH_DETAILS.includes(systemType)) {
         lines.push(`生效日期：${g.effectiveDate || '未設定'}`);
         const rotatingDetails = Array.isArray(g.rotatingDetails)
           ? g.rotatingDetails
