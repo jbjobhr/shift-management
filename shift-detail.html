@@ -34,6 +34,17 @@
           <input type="text" id="shiftShortName" placeholder="如：早" maxlength="4" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm">
         </div>
 
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm font-medium text-slate-600 mb-1">分公司/分店/案場</label>
+            <select id="scopeBranchSelect" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm"></select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-600 mb-1">部門/工作地</label>
+            <select id="scopeDepartmentSelect" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm"></select>
+          </div>
+        </div>
+
         <div class="grid grid-cols-2 gap-3">
           <div>
             <label class="block text-sm font-medium text-slate-600 mb-1">起始</label>
@@ -215,6 +226,71 @@
 
   let shifts = Array.isArray(sched.shifts) ? JSON.parse(JSON.stringify(sched.shifts)) : [];
   let attendanceGroups = Array.isArray(sched.attendanceGroups) ? JSON.parse(JSON.stringify(sched.attendanceGroups)) : [];
+
+  function splitScopeValues(raw) {
+    return String(raw || '')
+      .split(/[\/,，、；;｜|\s]+/)
+      .map(v => v.trim())
+      .filter(Boolean);
+  }
+
+  function pickScopeArray(existing, fallbackRaw) {
+    if (Array.isArray(existing) && existing.length) {
+      return Array.from(new Set(existing.map(v => String(v || '').trim()).filter(Boolean)));
+    }
+    return Array.from(new Set(splitScopeValues(fallbackRaw)));
+  }
+
+  function buildScopeOptions(globalList, scheduleRaw, existingRaw) {
+    const all = new Set();
+    if (Array.isArray(globalList)) {
+      globalList.forEach(item => splitScopeValues(item).forEach(v => all.add(v)));
+    }
+    splitScopeValues(scheduleRaw).forEach(v => all.add(v));
+    splitScopeValues(existingRaw).forEach(v => all.add(v));
+    return Array.from(all).filter(Boolean).sort((a, b) => a.localeCompare(b, 'zh-Hant'));
+  }
+
+  function renderScopeSelectors(existing = null) {
+    const branchSelect = document.getElementById('scopeBranchSelect');
+    const departmentSelect = document.getElementById('scopeDepartmentSelect');
+    if (!branchSelect || !departmentSelect) return;
+
+    const scheduleBranch = sched && sched.branch ? sched.branch : '';
+    const scheduleDepartment = sched && sched.department ? sched.department : '';
+    const currentBranch = existing && existing.branch ? existing.branch : '';
+    const currentDepartment = existing && existing.department ? existing.department : '';
+
+    const branchOptions = buildScopeOptions(G.branches, scheduleBranch, currentBranch);
+    const departmentOptions = buildScopeOptions(G.departments, scheduleDepartment, currentDepartment);
+
+    branchSelect.innerHTML = `<option value="">未指定</option>` + branchOptions.map(v => `<option value="${v}">${v}</option>`).join('');
+    departmentSelect.innerHTML = `<option value="">未指定</option>` + departmentOptions.map(v => `<option value="${v}">${v}</option>`).join('');
+    branchSelect.value = currentBranch;
+    departmentSelect.value = currentDepartment;
+    if (branchSelect.value !== currentBranch) branchSelect.value = '';
+    if (departmentSelect.value !== currentDepartment) departmentSelect.value = '';
+  }
+
+  function buildScopeFields(existing = null) {
+    const scheduleBranch = sched && sched.branch ? sched.branch : '';
+    const scheduleDepartment = sched && sched.department ? sched.department : '';
+    const selectedBranch = (document.getElementById('scopeBranchSelect')?.value || '').trim();
+    const selectedDepartment = (document.getElementById('scopeDepartmentSelect')?.value || '').trim();
+    const hasScopeInputs = !!document.getElementById('scopeBranchSelect') && !!document.getElementById('scopeDepartmentSelect');
+    const branches = hasScopeInputs
+      ? (selectedBranch ? [selectedBranch] : [])
+      : pickScopeArray(existing && existing.branches, existing && existing.branch ? existing.branch : scheduleBranch);
+    const departments = hasScopeInputs
+      ? (selectedDepartment ? [selectedDepartment] : [])
+      : pickScopeArray(existing && existing.departments, existing && existing.department ? existing.department : scheduleDepartment);
+    return {
+      branch: branches[0] || '',
+      branches,
+      department: departments[0] || '',
+      departments
+    };
+  }
 
   function normalizePunchWindowMinutes(value, fallback = 30, max = PUNCH_BEFORE_MAX_MINUTES) {
     const parsed = Number.parseInt(String(value), 10);
@@ -458,6 +534,7 @@
     const isEdit = editingShiftIndex >= 0 && !!shifts[editingShiftIndex];
     document.getElementById('pageTitle').textContent = isEdit ? `編輯班別：${shifts[editingShiftIndex].name || ''}` : '新增班別';
     document.getElementById('saveBtn').textContent = isEdit ? '更新' : '儲存';
+    renderScopeSelectors(isEdit ? shifts[editingShiftIndex] : null);
     if (isEdit) {
       applyShiftFields(shifts[editingShiftIndex]);
     } else {
@@ -506,7 +583,9 @@
     if (restConfig.rest < minRest) { alert(`依勞基法，此時段至少需休息 ${minRest}h（現設 ${restConfig.rest}h）。`); return; }
     if (hours <= 0) { alert('總工時 = 結束-起始-休息，請調整使總工時大於 0'); return; }
 
-    const payload = { name, shortName, start, end, crossDay, hours, ...restConfig, ...overtime, punchBeforeMinutes, punchAfterMinutes };
+    const existing = editingShiftIndex >= 0 && shifts[editingShiftIndex] ? shifts[editingShiftIndex] : null;
+    const scopeFields = buildScopeFields(existing);
+    const payload = { name, shortName, start, end, crossDay, hours, ...restConfig, ...overtime, punchBeforeMinutes, punchAfterMinutes, ...scopeFields };
 
     if (editingShiftIndex >= 0 && shifts[editingShiftIndex]) {
       const oldName = shifts[editingShiftIndex].name;

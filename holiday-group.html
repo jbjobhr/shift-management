@@ -30,6 +30,17 @@
           <input type="text" id="holidayGroupName" placeholder="如：台灣國定假日" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm">
         </div>
 
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm font-medium text-slate-600 mb-1">分公司/分店/案場</label>
+            <select id="scopeBranchSelect" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm"></select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-600 mb-1">部門/工作地</label>
+            <select id="scopeDepartmentSelect" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm"></select>
+          </div>
+        </div>
+
         <div>
           <label class="block text-sm font-medium text-slate-600 mb-2">假日日期</label>
           <div class="flex gap-2 mb-2">
@@ -80,7 +91,7 @@
   if (currentScheduleIndex < 0 || currentScheduleIndex >= schedules.length) currentScheduleIndex = 0;
 
   let draft = null;
-  let chooseLibrary = { holidayGroups: {}, selectedHolidayGroups: [] };
+  let chooseLibrary = { holidayGroups: {}, selectedHolidayGroups: [], holidayGroupMeta: {} };
   if (source === 'new') {
     try {
       const rawDraft = localStorage.getItem(DRAFT_KEY);
@@ -94,7 +105,8 @@
       } else {
         chooseLibrary = {
           holidayGroups: (G.holidayGroups && typeof G.holidayGroups === 'object') ? { ...G.holidayGroups } : {},
-          selectedHolidayGroups: Array.isArray(G.selectedHolidayGroups) ? [...G.selectedHolidayGroups] : []
+          selectedHolidayGroups: Array.isArray(G.selectedHolidayGroups) ? [...G.selectedHolidayGroups] : [],
+          holidayGroupMeta: (G.holidayGroupMeta && typeof G.holidayGroupMeta === 'object') ? { ...G.holidayGroupMeta } : {}
         };
       }
     } catch (e) {
@@ -109,11 +121,79 @@
       : (schedules[currentScheduleIndex] || FALLBACK.schedules[0]));
   let holidayGroups = (sched.holidayGroups && typeof sched.holidayGroups === 'object') ? { ...sched.holidayGroups } : {};
   let selectedHolidayGroups = Array.isArray(sched.selectedHolidayGroups) ? [...sched.selectedHolidayGroups] : [];
+  let holidayGroupMeta = (sched.holidayGroupMeta && typeof sched.holidayGroupMeta === 'object') ? { ...sched.holidayGroupMeta } : {};
   let editingHolidayDates = [];
+
+  function splitScopeValues(raw) {
+    return String(raw || '')
+      .split(/[\/,，、；;｜|\s]+/)
+      .map(v => v.trim())
+      .filter(Boolean);
+  }
+
+  function pickScopeArray(existing, fallbackRaw) {
+    if (Array.isArray(existing) && existing.length) {
+      return Array.from(new Set(existing.map(v => String(v || '').trim()).filter(Boolean)));
+    }
+    return Array.from(new Set(splitScopeValues(fallbackRaw)));
+  }
+
+  function buildScopeOptions(globalList, scheduleRaw, existingRaw) {
+    const all = new Set();
+    if (Array.isArray(globalList)) {
+      globalList.forEach(item => splitScopeValues(item).forEach(v => all.add(v)));
+    }
+    splitScopeValues(scheduleRaw).forEach(v => all.add(v));
+    splitScopeValues(existingRaw).forEach(v => all.add(v));
+    return Array.from(all).filter(Boolean).sort((a, b) => a.localeCompare(b, 'zh-Hant'));
+  }
+
+  function renderScopeSelectors(existing = null) {
+    const branchSelect = document.getElementById('scopeBranchSelect');
+    const departmentSelect = document.getElementById('scopeDepartmentSelect');
+    if (!branchSelect || !departmentSelect) return;
+
+    const scheduleBranch = sched && sched.branch ? sched.branch : '';
+    const scheduleDepartment = sched && sched.department ? sched.department : '';
+    const currentBranch = existing && existing.branch ? existing.branch : '';
+    const currentDepartment = existing && existing.department ? existing.department : '';
+
+    const branchOptions = buildScopeOptions(G.branches, scheduleBranch, currentBranch);
+    const departmentOptions = buildScopeOptions(G.departments, scheduleDepartment, currentDepartment);
+
+    branchSelect.innerHTML = `<option value="">未指定</option>` + branchOptions.map(v => `<option value="${v}">${v}</option>`).join('');
+    departmentSelect.innerHTML = `<option value="">未指定</option>` + departmentOptions.map(v => `<option value="${v}">${v}</option>`).join('');
+    branchSelect.value = currentBranch;
+    departmentSelect.value = currentDepartment;
+    if (branchSelect.value !== currentBranch) branchSelect.value = '';
+    if (departmentSelect.value !== currentDepartment) departmentSelect.value = '';
+  }
+
+  function buildScopeFields(existing = null) {
+    const scheduleBranch = sched && sched.branch ? sched.branch : '';
+    const scheduleDepartment = sched && sched.department ? sched.department : '';
+    const selectedBranch = (document.getElementById('scopeBranchSelect')?.value || '').trim();
+    const selectedDepartment = (document.getElementById('scopeDepartmentSelect')?.value || '').trim();
+    const hasScopeInputs = !!document.getElementById('scopeBranchSelect') && !!document.getElementById('scopeDepartmentSelect');
+    const branches = hasScopeInputs
+      ? (selectedBranch ? [selectedBranch] : [])
+      : pickScopeArray(existing && existing.branches, existing && existing.branch ? existing.branch : scheduleBranch);
+    const departments = hasScopeInputs
+      ? (selectedDepartment ? [selectedDepartment] : [])
+      : pickScopeArray(existing && existing.departments, existing && existing.department ? existing.department : scheduleDepartment);
+    return {
+      branch: branches[0] || '',
+      branches,
+      department: departments[0] || '',
+      departments
+    };
+  }
 
   function initPage() {
     const isEdit = !!editingGroupName && !!holidayGroups[editingGroupName];
     document.getElementById('pageTitle').textContent = isEdit ? '編輯假別組' : '新增假別組';
+    const currentMeta = isEdit ? (holidayGroupMeta[editingGroupName] || null) : null;
+    renderScopeSelectors(currentMeta);
 
     if (isEdit) {
       document.getElementById('holidayGroupName').value = editingGroupName;
@@ -166,27 +246,33 @@
 
     const oldName = editingGroupName;
     const isRename = !!oldName && oldName !== groupName && !!holidayGroups[oldName];
+    const oldScopeMeta = (oldName && holidayGroupMeta && holidayGroupMeta[oldName]) ? holidayGroupMeta[oldName] : null;
 
     if (isRename) {
       delete holidayGroups[oldName];
+      delete holidayGroupMeta[oldName];
       const selectedIdx = selectedHolidayGroups.indexOf(oldName);
       if (selectedIdx > -1) selectedHolidayGroups[selectedIdx] = groupName;
     }
 
     holidayGroups[groupName] = [...editingHolidayDates];
+    holidayGroupMeta[groupName] = buildScopeFields(oldScopeMeta);
     if (source === 'new') {
       const nextDraft = Object.assign({}, draft || {}, {
         holidayGroups,
-        selectedHolidayGroups
+        selectedHolidayGroups,
+        holidayGroupMeta
       });
       localStorage.setItem(DRAFT_KEY, JSON.stringify(nextDraft));
     } else if (mode === 'library') {
       chooseLibrary.holidayGroups = holidayGroups;
       chooseLibrary.selectedHolidayGroups = selectedHolidayGroups;
+      chooseLibrary.holidayGroupMeta = holidayGroupMeta;
       localStorage.setItem(CHOOSE_LIBRARY_KEY, JSON.stringify(chooseLibrary));
     } else {
       sched.holidayGroups = holidayGroups;
       sched.selectedHolidayGroups = selectedHolidayGroups;
+      sched.holidayGroupMeta = holidayGroupMeta;
 
       schedules[currentScheduleIndex] = sched;
       G.schedules = schedules;

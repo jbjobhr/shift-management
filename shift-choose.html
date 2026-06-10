@@ -29,6 +29,21 @@
       background: #eff6ff;
       color: #1d4ed8;
     }
+    .row-delete-btn {
+      border: 1px solid #fecaca;
+      background: #fff;
+      color: #dc2626;
+      font-size: 12px;
+      line-height: 1;
+      padding: 6px 10px;
+      border-radius: 9999px;
+      transition: all 0.15s ease;
+    }
+    .row-delete-btn:hover {
+      border-color: #fca5a5;
+      background: #fef2f2;
+      color: #b91c1c;
+    }
     .scope-select {
       border: 1px solid #cbd5e1;
       border-radius: 8px;
@@ -88,6 +103,7 @@
             <p class="text-xs text-slate-500">統一管理頁：管理班別，並設定此班表可用清單。</p>
           </div>
           <div class="flex items-center gap-2">
+            <button type="button" onclick="selectAllAllowedSelected('shifts')" class="px-3 py-1.5 border border-slate-300 bg-white text-slate-700 rounded-md text-sm">全部移除</button>
             <button type="button" onclick="selectAllAllowedAvailable('shifts')" class="px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm">全部加入</button>
           </div>
         </div>
@@ -119,6 +135,7 @@
             <p class="text-xs text-slate-500">統一管理頁：管理節假日，並設定此班表可用清單。</p>
           </div>
           <div class="flex items-center gap-2">
+            <button type="button" onclick="selectAllAllowedSelected('holidayGroups')" class="px-3 py-1.5 border border-slate-300 bg-white text-slate-700 rounded-md text-sm">全部移除</button>
             <button type="button" onclick="selectAllAllowedAvailable('holidayGroups')" class="px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm">全部加入</button>
           </div>
         </div>
@@ -150,6 +167,7 @@
             <p class="text-xs text-slate-500">統一管理頁：管理考勤組，並設定此班表可用清單。</p>
           </div>
           <div class="flex items-center gap-2">
+            <button type="button" onclick="selectAllAllowedSelected('attendanceGroups')" class="px-3 py-1.5 border border-slate-300 bg-white text-slate-700 rounded-md text-sm">全部移除</button>
             <button type="button" onclick="selectAllAllowedAvailable('attendanceGroups')" class="px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm">全部加入</button>
           </div>
         </div>
@@ -192,6 +210,7 @@
   const fallbackChooseLibrary = {
     shifts: [],
     holidayGroups: {},
+    holidayGroupMeta: {},
     attendanceGroups: []
   };
 
@@ -214,6 +233,7 @@
     const initialized = {
       shifts: cloneDeep(Array.isArray(G.shifts) ? G.shifts : []),
       holidayGroups: cloneDeep((G.holidayGroups && typeof G.holidayGroups === 'object') ? G.holidayGroups : {}),
+      holidayGroupMeta: cloneDeep((G.holidayGroupMeta && typeof G.holidayGroupMeta === 'object') ? G.holidayGroupMeta : {}),
       attendanceGroups: cloneDeep(Array.isArray(G.attendanceGroups) ? G.attendanceGroups : [])
     };
 
@@ -263,6 +283,67 @@
   let scopeKeywordFilter = '';
 
   let scopeDepartmentOptions = [];
+
+  function ensureScopeFields(item, fallbackBranch = '', fallbackDepartment = '') {
+    if (!item || typeof item !== 'object') return false;
+    const normalizeList = (listLike) => {
+      if (Array.isArray(listLike)) return Array.from(new Set(listLike.map(v => String(v || '').trim()).filter(Boolean)));
+      return splitScopeValues(listLike);
+    };
+    const branchList = normalizeList((item.branches && item.branches.length) ? item.branches : item.branch);
+    const deptList = normalizeList((item.departments && item.departments.length) ? item.departments : item.department);
+    const nextBranches = branchList.length ? branchList : splitScopeValues(fallbackBranch);
+    const nextDepartments = deptList.length ? deptList : splitScopeValues(fallbackDepartment);
+    const nextBranch = nextBranches[0] || '';
+    const nextDepartment = nextDepartments[0] || '';
+    const changed = item.branch !== nextBranch
+      || JSON.stringify(item.branches || []) !== JSON.stringify(nextBranches)
+      || item.department !== nextDepartment
+      || JSON.stringify(item.departments || []) !== JSON.stringify(nextDepartments);
+    if (!changed) return false;
+    item.branch = nextBranch;
+    item.branches = nextBranches;
+    item.department = nextDepartment;
+    item.departments = nextDepartments;
+    return true;
+  }
+
+  function migrateChooseLibraryScopeFields() {
+    const fallbackBranch = '';
+    const fallbackDepartment = '';
+    let changed = false;
+
+    if (Array.isArray(chooseLibrary.shifts)) {
+      chooseLibrary.shifts.forEach((item) => {
+        if (ensureScopeFields(item, fallbackBranch, fallbackDepartment)) changed = true;
+      });
+    }
+
+    if (Array.isArray(chooseLibrary.attendanceGroups)) {
+      chooseLibrary.attendanceGroups.forEach((item) => {
+        if (ensureScopeFields(item, fallbackBranch, fallbackDepartment)) changed = true;
+      });
+    }
+
+    if (!chooseLibrary.holidayGroupMeta || typeof chooseLibrary.holidayGroupMeta !== 'object') {
+      chooseLibrary.holidayGroupMeta = {};
+      changed = true;
+    }
+    Object.keys(chooseLibrary.holidayGroups || {}).forEach((name) => {
+      const existingMeta = chooseLibrary.holidayGroupMeta[name] || {};
+      const before = JSON.stringify(existingMeta);
+      ensureScopeFields(existingMeta, fallbackBranch, fallbackDepartment);
+      const after = JSON.stringify(existingMeta);
+      chooseLibrary.holidayGroupMeta[name] = existingMeta;
+      if (before !== after) changed = true;
+    });
+
+    if (changed) {
+      try { localStorage.setItem(CHOOSE_LIBRARY_KEY, JSON.stringify(chooseLibrary)); } catch (e) {}
+    }
+  }
+
+  migrateChooseLibraryScopeFields();
 
   function cloneDeep(v) {
     return JSON.parse(JSON.stringify(v));
@@ -338,6 +419,7 @@
 
   let globalShiftTemplates = {};
   let globalHolidayGroupTemplates = {};
+  let globalHolidayGroupScopeMeta = {};
   let globalAttendanceGroupTemplates = {};
   let shiftBranchesMap = {};
   let holidayGroupBranchesMap = {};
@@ -352,6 +434,7 @@
   function buildGlobalTemplates() {
     globalShiftTemplates = {};
     globalHolidayGroupTemplates = {};
+    globalHolidayGroupScopeMeta = {};
     globalAttendanceGroupTemplates = {};
     shiftBranchesMap = {};
     holidayGroupBranchesMap = {};
@@ -367,6 +450,9 @@
       if (!obj || typeof obj !== 'object') return;
       Object.keys(obj).forEach((k) => {
         if (!globalHolidayGroupTemplates[k]) globalHolidayGroupTemplates[k] = cloneDeep(obj[k]);
+        if (!globalHolidayGroupScopeMeta[k]) {
+          globalHolidayGroupScopeMeta[k] = cloneDeep((chooseLibrary.holidayGroupMeta && chooseLibrary.holidayGroupMeta[k]) || {});
+        }
         addBranchRef(holidayGroupBranchesMap, k, branch);
       });
     };
@@ -508,10 +594,13 @@
 
   function nameInScopeBranch(type, name) {
     if (!scopeBranchFilter) return true;
+    const tokenSet = new Set(getItemBranchTokens(type, name).map(v => String(v || '').trim()).filter(Boolean));
+    if (tokenSet.size > 0) return tokenSet.has(scopeBranchFilter);
+
     const branchMap = getBranchMapByType(type);
     const refs = branchMap[name];
-    if (!refs || refs.size === 0) return false;
-    return refs.has(scopeBranchFilter);
+    if (refs && refs.size > 0) return refs.has(scopeBranchFilter);
+    return true;
   }
 
   function normalizeScopeTokens(value) {
@@ -537,7 +626,7 @@
   function getScopeSource(type, name) {
     if (type === 'shifts') return globalShiftTemplates[name] || null;
     if (type === 'attendanceGroups') return globalAttendanceGroupTemplates[name] || null;
-    if (type === 'holidayGroups') return globalHolidayGroupTemplates[name] || null;
+    if (type === 'holidayGroups') return globalHolidayGroupScopeMeta[name] || null;
     return null;
   }
 
@@ -719,7 +808,10 @@
       return `<div class="picker-row ${isActive ? 'active' : ''}" onclick='setAllowedPickerActive(${JSON.stringify(type)}, ${JSON.stringify(side)}, ${JSON.stringify(name)})'>
         <div class="flex items-start justify-between gap-2">
           <div class="font-medium text-slate-800 truncate" title="${name}">${name}</div>
-          <button type="button" class="row-edit-btn" onclick='event.stopPropagation();goEditItem(${JSON.stringify(type)}, ${JSON.stringify(name)})'>編輯</button>
+          <div class="flex items-center gap-2 shrink-0">
+            <button type="button" class="row-edit-btn" onclick='event.stopPropagation();goEditItem(${JSON.stringify(type)}, ${JSON.stringify(name)})'>編輯</button>
+            <button type="button" class="row-delete-btn" onclick='event.stopPropagation();deleteAllowedItem(${JSON.stringify(type)}, ${JSON.stringify(name)})'>刪除</button>
+          </div>
         </div>
         ${meta ? `<div class="mt-1 space-y-0.5">${meta}</div>` : ''}
       </div>`;
@@ -811,6 +903,39 @@
     window.location.href = `shift-group.html?${params.toString()}`;
   }
 
+  function deleteAllowedItem(type, name) {
+    if (!name) return;
+    const labelMap = {
+      shifts: '班別',
+      holidayGroups: '節假日',
+      attendanceGroups: '考勤組'
+    };
+    if (!window.confirm(`確定要刪除「${name}」嗎？`)) return;
+
+    if (type === 'shifts' && Array.isArray(chooseLibrary.shifts)) {
+      chooseLibrary.shifts = chooseLibrary.shifts.filter(item => item && item.name !== name);
+    } else if (type === 'holidayGroups' && chooseLibrary.holidayGroups && typeof chooseLibrary.holidayGroups === 'object') {
+      delete chooseLibrary.holidayGroups[name];
+      if (chooseLibrary.holidayGroupMeta && typeof chooseLibrary.holidayGroupMeta === 'object') {
+        delete chooseLibrary.holidayGroupMeta[name];
+      }
+    } else if (type === 'attendanceGroups' && Array.isArray(chooseLibrary.attendanceGroups)) {
+      chooseLibrary.attendanceGroups = chooseLibrary.attendanceGroups.filter(item => item && item.name !== name);
+    } else {
+      return;
+    }
+
+    try {
+      localStorage.setItem(CHOOSE_LIBRARY_KEY, JSON.stringify(chooseLibrary));
+    } catch (e) {
+      console.warn('save choose library failed', e);
+    }
+
+    buildGlobalTemplates();
+    initAllowedPicker();
+    alert(`已刪除 ${labelMap[type] || '項目'}「${name}」`);
+  }
+
   function moveAllowedToSelected(type) {
     const state = getAllowedPickerState(type);
     if (!state || state.activeAvailable.length === 0) return;
@@ -835,6 +960,15 @@
     state.selected = Array.from(new Set([...state.selected, ...state.available]));
     state.available = [];
     state.activeAvailable = [];
+    renderAllowedPickerSection(type);
+  }
+
+  function selectAllAllowedSelected(type) {
+    const state = getAllowedPickerState(type);
+    if (!state) return;
+    state.available = Array.from(new Set([...state.available, ...state.selected]));
+    state.selected = [];
+    state.activeSelected = [];
     renderAllowedPickerSection(type);
   }
 
@@ -906,8 +1040,10 @@
   window.moveAllowedToSelected = moveAllowedToSelected;
   window.moveAllowedToAvailable = moveAllowedToAvailable;
   window.selectAllAllowedAvailable = selectAllAllowedAvailable;
+  window.selectAllAllowedSelected = selectAllAllowedSelected;
   window.goAddItem = goAddItem;
   window.goEditItem = goEditItem;
+  window.deleteAllowedItem = deleteAllowedItem;
   window.goEditPage = goEditPage;
   window.setScopeBranchFilter = setScopeBranchFilter;
   window.setScopeDepartmentFilter = setScopeDepartmentFilter;

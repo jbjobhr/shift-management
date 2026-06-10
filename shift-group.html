@@ -34,6 +34,17 @@
           <input type="text" id="groupName" placeholder="如：A組 - 倉儲" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm">
         </div>
 
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm font-medium text-slate-600 mb-1">分公司/分店/案場</label>
+            <select id="scopeBranchSelect" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm"></select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-600 mb-1">部門/工作地</label>
+            <select id="scopeDepartmentSelect" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm"></select>
+          </div>
+        </div>
+
         <div>
           <div class="flex items-center gap-4 mb-1">
             <label class="text-sm font-bold text-slate-700">排班型態</label>
@@ -388,6 +399,71 @@
     if (Array.isArray(draft.allPunchLocations)) allPunchLocations = draft.allPunchLocations;
   }
 
+  function splitScopeValues(raw) {
+    return String(raw || '')
+      .split(/[\/,，、；;｜|\s]+/)
+      .map(v => v.trim())
+      .filter(Boolean);
+  }
+
+  function pickScopeArray(existing, fallbackRaw) {
+    if (Array.isArray(existing) && existing.length) {
+      return Array.from(new Set(existing.map(v => String(v || '').trim()).filter(Boolean)));
+    }
+    return Array.from(new Set(splitScopeValues(fallbackRaw)));
+  }
+
+  function buildScopeOptions(globalList, scheduleRaw, existingRaw) {
+    const all = new Set();
+    if (Array.isArray(globalList)) {
+      globalList.forEach(item => splitScopeValues(item).forEach(v => all.add(v)));
+    }
+    splitScopeValues(scheduleRaw).forEach(v => all.add(v));
+    splitScopeValues(existingRaw).forEach(v => all.add(v));
+    return Array.from(all).filter(Boolean).sort((a, b) => a.localeCompare(b, 'zh-Hant'));
+  }
+
+  function renderScopeSelectors(existing = null) {
+    const branchSelect = document.getElementById('scopeBranchSelect');
+    const departmentSelect = document.getElementById('scopeDepartmentSelect');
+    if (!branchSelect || !departmentSelect) return;
+
+    const scheduleBranch = sched && sched.branch ? sched.branch : '';
+    const scheduleDepartment = sched && sched.department ? sched.department : '';
+    const currentBranch = existing && existing.branch ? existing.branch : '';
+    const currentDepartment = existing && existing.department ? existing.department : '';
+
+    const branchOptions = buildScopeOptions(G.branches, scheduleBranch, currentBranch);
+    const departmentOptions = buildScopeOptions(G.departments, scheduleDepartment, currentDepartment);
+
+    branchSelect.innerHTML = `<option value="">未指定</option>` + branchOptions.map(v => `<option value="${v}">${v}</option>`).join('');
+    departmentSelect.innerHTML = `<option value="">未指定</option>` + departmentOptions.map(v => `<option value="${v}">${v}</option>`).join('');
+    branchSelect.value = currentBranch;
+    departmentSelect.value = currentDepartment;
+    if (branchSelect.value !== currentBranch) branchSelect.value = '';
+    if (departmentSelect.value !== currentDepartment) departmentSelect.value = '';
+  }
+
+  function buildScopeFields(existing = null) {
+    const scheduleBranch = sched && sched.branch ? sched.branch : '';
+    const scheduleDepartment = sched && sched.department ? sched.department : '';
+    const selectedBranch = (document.getElementById('scopeBranchSelect')?.value || '').trim();
+    const selectedDepartment = (document.getElementById('scopeDepartmentSelect')?.value || '').trim();
+    const hasScopeInputs = !!document.getElementById('scopeBranchSelect') && !!document.getElementById('scopeDepartmentSelect');
+    const branches = hasScopeInputs
+      ? (selectedBranch ? [selectedBranch] : [])
+      : pickScopeArray(existing && existing.branches, existing && existing.branch ? existing.branch : scheduleBranch);
+    const departments = hasScopeInputs
+      ? (selectedDepartment ? [selectedDepartment] : [])
+      : pickScopeArray(existing && existing.departments, existing && existing.department ? existing.department : scheduleDepartment);
+    return {
+      branch: branches[0] || '',
+      branches,
+      department: departments[0] || '',
+      departments
+    };
+  }
+
   function defaultWeekdayShifts() {
     const first = (shifts[0] && shifts[0].name) ? [shifts[0].name] : [];
     return { mon: [...first], tue: [...first], wed: [...first], thu: [...first], fri: [...first], sat: [], sun: [] };
@@ -546,6 +622,7 @@
       document.getElementById('groupName').value = group.name || '';
       const radio = document.querySelector(`input[name="employmentType"][value="${currentGroupEmploymentType}"]`);
       if (radio) radio.checked = true;
+      renderScopeSelectors(group);
     } else {
       currentGroupPunchLocations = Array.isArray(allPunchLocations) ? [...allPunchLocations] : [];
       currentGroupEmploymentType = 'fulltime';
@@ -555,6 +632,7 @@
       currentGroupRotatingDetails = [];
       const defaultRadio = document.querySelector('input[name="employmentType"][value="fulltime"]');
       if (defaultRadio) defaultRadio.checked = true;
+      renderScopeSelectors(null);
     }
 
     const systemRadio = document.querySelector(`input[name="rotatingSystemType"][value="${currentGroupSystemType}"]`);
@@ -897,6 +975,11 @@
       }
     }
 
+    const existing = Number.isInteger(editingGroupIndex) && editingGroupIndex >= 0 && editingGroupIndex < attendanceGroups.length
+      ? attendanceGroups[editingGroupIndex]
+      : null;
+    const scopeFields = buildScopeFields(existing);
+
     const payload = {
       name: groupName,
       members: [...currentGroupMembers],
@@ -909,7 +992,8 @@
       details: ROTATING_SYSTEMS_WITH_DETAILS.includes(systemType) ? rotatingDetails : [],
       weekdayShifts: { ...currentGroupWeekdayShifts },
       punchLocations: [...currentGroupPunchLocations],
-      workOnHoliday: currentGroupEmploymentType === 'parttime'
+      workOnHoliday: currentGroupEmploymentType === 'parttime',
+      ...scopeFields
     };
 
     if (Number.isInteger(editingGroupIndex) && editingGroupIndex >= 0 && editingGroupIndex < attendanceGroups.length) {
