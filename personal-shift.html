@@ -579,9 +579,11 @@
         });
       });
     } else {
-      // fallback: 找員工所在的考勤組（對齊 index.html 行為）
+      // fallback: 只有在「未明確排除」時才透過成員關係取得底稿
+      // 若使用者已明確把考勤組設為「未套用」，則不做 fallback
+      const excluded = Array.isArray(personal.excludedAttendanceGroups) ? personal.excludedAttendanceGroups : [];
       const grp = (G.attendanceGroups || []).find(g => g && Array.isArray(g.members) && g.members.includes(empId));
-      if (grp && grp.scheduleType !== 'manual') {
+      if (grp && !excluded.includes(grp.name) && grp.scheduleType !== 'manual') {
         if (!(isHolidayDate(dateStr, dow) && !grp.workOnHoliday)) {
           const ws = grp.weekdayShifts || {};
           const arr = ws[_DOW_KEYS[dow]];
@@ -592,6 +594,39 @@
       }
     }
     return out;
+  }
+
+  function hasAttendanceRestDate(dateStr, dow) {
+    if (!isDateInAnySchedule(dateStr)) return false;
+
+    const selectedNames = Array.isArray(personal.attendanceGroups) && personal.attendanceGroups.length
+      ? personal.attendanceGroups
+      : null;
+    const groups = [];
+
+    if (selectedNames) {
+      selectedNames.forEach(name => {
+        const grp = (G.attendanceGroups || []).find(g => g && g.name === name && Array.isArray(g.members) && g.members.includes(empId));
+        if (grp) groups.push(grp);
+      });
+    } else {
+      const excluded = Array.isArray(personal.excludedAttendanceGroups) ? personal.excludedAttendanceGroups : [];
+      const grp = (G.attendanceGroups || []).find(g => g && Array.isArray(g.members) && g.members.includes(empId));
+      if (grp && !excluded.includes(grp.name)) groups.push(grp);
+    }
+
+    if (!groups.length) return false;
+
+    return groups.some(grp => {
+      if (!grp || grp.scheduleType === 'manual') return false;
+      if (isHolidayDate(dateStr, dow) && !grp.workOnHoliday) return true;
+
+      const ws = grp.weekdayShifts || {};
+      const raw = ws[_DOW_KEYS[dow]];
+      const arr = Array.isArray(raw) ? raw : (typeof raw === 'string' && raw ? [raw] : []);
+      if (!arr.length) return true;
+      return !arr.some(n => n && n !== '休');
+    });
   }
 
   // ===== 取得時間區間對應的班表可選項目（聯集） =====
@@ -935,14 +970,20 @@
         const inRange = (!rs || ds >= rs) && (!re || ds <= re);
         const hasScheduleData = isDateInAnySchedule(ds);
         const hasPersonalData = !!personal.assignments[ds];
+        const excluded = Array.isArray(personal.excludedAttendanceGroups) ? personal.excludedAttendanceGroups : [];
         const hasMembershipBinding = !hasScheduleBindings &&
-          (G.attendanceGroups || []).some(g => Array.isArray(g.members) && g.members.includes(empId));
+          (G.attendanceGroups || []).some(g => Array.isArray(g.members) && g.members.includes(empId) && !excluded.includes(g.name));
         const canShowDate = hasPersonalData || (hasScheduleData && (hasScheduleBindings || hasMembershipBinding));
 
         if (cell.other) td.classList.add('other-month');
         else if (!inRange) td.classList.add('out-of-range');
 
-        if (!cell.other && canShowDate && isHolidayDate(ds, dow)) td.classList.add('holiday');
+        // 格子紅底只在明確套用的假別組 / individualHolidays 覆蓋時才顯示
+        const isExplicitHolidayCell = (G.individualHolidays||[]).includes(ds)
+          || personal.holidayGroups.some(grp => ((G.holidayGroups||{})[grp]||[]).includes(ds));
+        const isAttendanceRestCell = !hasPersonalData && canShowDate && hasAttendanceRestDate(ds, dow);
+        if (!cell.other && canShowDate && (isExplicitHolidayCell || isAttendanceRestCell)) td.classList.add('holiday');
+        else td.classList.remove('holiday');
         if (ds === todayStr) td.classList.add('today');
 
         const a = personal.assignments[ds];
@@ -953,8 +994,9 @@
             // 其他 off（手動指派、週末、未勾選之假別、autoFill 平日無班別等）→ 視為個人覆蓋（藍底）
             const isSystemHoliday = (G.individualHolidays || []).includes(ds)
               || personal.holidayGroups.some(grp => ((G.holidayGroups || {})[grp] || []).includes(ds));
+            const isAttendanceOff = a.source === 'attendance' || (!a.source && hasAttendanceRestDate(ds, dow));
             const isPersonalOff = a.source === 'manual';
-            if (!cell.other && isSystemHoliday) td.classList.add('holiday');
+            if (!cell.other && (isSystemHoliday || isAttendanceOff)) td.classList.add('holiday');
             const personalCls = isPersonalOff ? ' personal' : '';
             body = `<div class="shift-tag off${personalCls}">休</div>`;
           }
@@ -990,8 +1032,8 @@
               dayTotalH += h;
               return `<div class="shift-tag group" title="班表排班（點擊可覆蓋或清除）">${n}</div>`;
             }).join('');
-          } else if (isHolidayDate(ds, dow)) {
-            // 週末或假別組指定日期：顯示「休」字
+          } else if (isAttendanceRestCell || isExplicitHolidayCell) {
+            // 考勤設定為休，或明確套用假別：顯示「休」字
             body = `<div class="shift-tag off">休</div>`;
           }
         }
@@ -1602,7 +1644,7 @@
       // 假別組明確列出的日期 → 一定休
       if (isExplicitHoliday(ds)) {
         if (mode === 'keep' && existing) continue;
-        personal.assignments[ds] = { type: 'off' };
+        personal.assignments[ds] = { type: 'off', source: 'holiday' };
         continue;
       }
       let dayShifts;
@@ -1635,7 +1677,7 @@
         personal.assignments[ds] = { type: 'work', shiftNames: [...dayShifts] };
       } else if (mode !== 'keep') {
         // keep 模式不強制把無班別的日期設為休假
-        personal.assignments[ds] = { type: 'off' };
+        personal.assignments[ds] = { type: 'off', source: useGroup ? 'attendance' : 'auto' };
       }
     }
   }

@@ -765,8 +765,13 @@
       }
       // 僅顯示 schedules 範圍內的系統排班；範圍外若無個人排班，維持空白
       if (!isDateInAnySchedule(dateStr)) return { list: [], isHolidayOt: false };
+      // 若個人端已把該考勤組設為「未套用」，尊重排除清單不顯示底稿
+      const _pdForExclude = _getPersonalData(empId);
+      const _excluded = _pdForExclude && Array.isArray(_pdForExclude.excludedAttendanceGroups)
+        ? _pdForExclude.excludedAttendanceGroups : [];
       // 否則依考勤組自動計算
       const g = getPersonGroup(empId);
+      if (g && _excluded.includes(g.name)) return { list: [], isHolidayOt: false };
       if (!g || (g.scheduleType && g.scheduleType !== 'auto')) return { list: [], isHolidayOt: false };
       const isHoliday = conflictHolidaySet.has(dateStr);
       const nationalHolidaySet = new Set((holidayGroups || {})['台灣國定假日'] || []);
@@ -838,7 +843,12 @@
         const dateStr = d.toISOString().split('T')[0];
         const hasScheduleData = isDateInAnySchedule(dateStr);
         const hasPersonalData = hasPersonalAssignmentOnDate(p.id, dateStr);
-        const canShowDate = hasScheduleData || hasPersonalData;
+        const _pdCheck = _getPersonalData(p.id);
+        const _excludedAg = _pdCheck && Array.isArray(_pdCheck.excludedAttendanceGroups) ? _pdCheck.excludedAttendanceGroups : [];
+        const _activeAg = _pdCheck && Array.isArray(_pdCheck.attendanceGroups) ? _pdCheck.attendanceGroups : [];
+        const _memberGrp = getPersonGroup(p.id);
+        const hasActiveBinding = _activeAg.length > 0 || (_memberGrp && !_excludedAg.includes(_memberGrp.name));
+        const canShowDate = hasPersonalData || (hasScheduleData && hasActiveBinding);
         const isHolidayDisplay = canShowDate && allHolidaysForDisplay.includes(dateStr);
         const isHolidayActual = conflictHolidaySet.has(dateStr);
         const result = getShiftsForPersonOnDate(p.id, dateStr, d.getDay());
