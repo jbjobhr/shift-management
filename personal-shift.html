@@ -565,34 +565,18 @@
     if (!isDateInAnySchedule(dateStr)) return [];
     const selectedNames = Array.isArray(personal.attendanceGroups) && personal.attendanceGroups.length
       ? personal.attendanceGroups
-      : null; // null = fallback to membership
+      : [];
     const out = [];
-    if (selectedNames) {
-      selectedNames.forEach(name => {
-        const grp = (G.attendanceGroups || []).find(g => g && g.name === name && Array.isArray(g.members) && g.members.includes(empId));
-        if (!grp || grp.scheduleType === 'manual') return;
-        if (isHolidayDate(dateStr, dow) && !grp.workOnHoliday) return;
-        const ws = grp.weekdayShifts || {};
-        const arr = ws[_DOW_KEYS[dow]];
-        (Array.isArray(arr) ? arr : []).forEach(shiftName => {
-          if (shiftName && shiftName !== '休' && !out.includes(shiftName)) out.push(shiftName);
-        });
+    selectedNames.forEach(name => {
+      const grp = (G.attendanceGroups || []).find(g => g && g.name === name && Array.isArray(g.members) && g.members.includes(empId));
+      if (!grp || grp.scheduleType === 'manual') return;
+      if (isHolidayDate(dateStr, dow) && !grp.workOnHoliday) return;
+      const ws = grp.weekdayShifts || {};
+      const arr = ws[_DOW_KEYS[dow]];
+      (Array.isArray(arr) ? arr : []).forEach(shiftName => {
+        if (shiftName && shiftName !== '休' && !out.includes(shiftName)) out.push(shiftName);
       });
-    } else {
-      // fallback: 只有在「未明確排除」時才透過成員關係取得底稿
-      // 若使用者已明確把考勤組設為「未套用」，則不做 fallback
-      const excluded = Array.isArray(personal.excludedAttendanceGroups) ? personal.excludedAttendanceGroups : [];
-      const grp = (G.attendanceGroups || []).find(g => g && Array.isArray(g.members) && g.members.includes(empId));
-      if (grp && !excluded.includes(grp.name) && grp.scheduleType !== 'manual') {
-        if (!(isHolidayDate(dateStr, dow) && !grp.workOnHoliday)) {
-          const ws = grp.weekdayShifts || {};
-          const arr = ws[_DOW_KEYS[dow]];
-          (Array.isArray(arr) ? arr : []).forEach(shiftName => {
-            if (shiftName && shiftName !== '休' && !out.includes(shiftName)) out.push(shiftName);
-          });
-        }
-      }
-    }
+    });
     return out;
   }
 
@@ -601,19 +585,13 @@
 
     const selectedNames = Array.isArray(personal.attendanceGroups) && personal.attendanceGroups.length
       ? personal.attendanceGroups
-      : null;
+      : [];
     const groups = [];
 
-    if (selectedNames) {
-      selectedNames.forEach(name => {
-        const grp = (G.attendanceGroups || []).find(g => g && g.name === name && Array.isArray(g.members) && g.members.includes(empId));
-        if (grp) groups.push(grp);
-      });
-    } else {
-      const excluded = Array.isArray(personal.excludedAttendanceGroups) ? personal.excludedAttendanceGroups : [];
-      const grp = (G.attendanceGroups || []).find(g => g && Array.isArray(g.members) && g.members.includes(empId));
-      if (grp && !excluded.includes(grp.name)) groups.push(grp);
-    }
+    selectedNames.forEach(name => {
+      const grp = (G.attendanceGroups || []).find(g => g && g.name === name && Array.isArray(g.members) && g.members.includes(empId));
+      if (grp) groups.push(grp);
+    });
 
     if (!groups.length) return false;
 
@@ -666,14 +644,7 @@
     const schedules = getSchedulesForDateRange(startDate, endDate);
     const nameSet = new Set();
     schedules.forEach(sched => {
-      let names = [];
-      if (Array.isArray(sched.selectedHolidayGroups) && sched.selectedHolidayGroups.length) {
-        names = sched.selectedHolidayGroups;
-      } else if (Array.isArray(sched.allowedHolidayGroupNames) && sched.allowedHolidayGroupNames.length) {
-        names = sched.allowedHolidayGroupNames;
-      } else if (sched.holidayGroups && typeof sched.holidayGroups === 'object') {
-        names = Object.keys(sched.holidayGroups);
-      }
+      const names = Array.isArray(sched.selectedHolidayGroups) ? sched.selectedHolidayGroups : [];
       names.forEach(n => {
         if ((G.holidayGroups || {})[n]) nameSet.add(n);
       });
@@ -682,22 +653,31 @@
   }
 
   function getAssignedAttendanceGroupNameForRange(startDate, endDate) {
-    const schedules = getSchedulesForDateRange(startDate, endDate);
-    for (const sched of schedules) {
-      const groups = Array.isArray(sched.attendanceGroups) && sched.attendanceGroups.length
-        ? sched.attendanceGroups
-        : (G.attendanceGroups || []);
-      const allowedSet = Array.isArray(sched.allowedAttendanceGroupNames) && sched.allowedAttendanceGroupNames.length
-        ? new Set(sched.allowedAttendanceGroupNames)
-        : null;
-      const matched = groups.find(g => g && g.name && Array.isArray(g.members)
-        && g.members.includes(empId)
-        && (!allowedSet || allowedSet.has(g.name)));
-      if (matched) return matched.name;
+    function getExplicitScheduleAttendanceGroup(sched) {
+      const groups = Array.isArray(sched && sched.attendanceGroups) ? sched.attendanceGroups : [];
+      if (!groups.length) return null;
+      const idx = Number.isInteger(sched && sched.selectedAttendanceGroupIndex)
+        ? sched.selectedAttendanceGroupIndex
+        : -1;
+      if (idx < 0 || idx >= groups.length) return null;
+      return groups[idx] || null;
     }
 
-    const globalMatched = (G.attendanceGroups || []).find(g => g && g.name && Array.isArray(g.members) && g.members.includes(empId));
-    return globalMatched ? globalMatched.name : '';
+    function isMemberInLatestAttendanceGroup(group) {
+      if (!group || !group.name) return false;
+      const latest = (G.attendanceGroups || []).find(x => x && x.name === group.name);
+      const source = latest || group;
+      return Array.isArray(source.members) && source.members.includes(empId);
+    }
+    const schedules = getSchedulesForDateRange(startDate, endDate);
+    for (const sched of schedules) {
+      const explicitGroup = getExplicitScheduleAttendanceGroup(sched);
+      const matched = explicitGroup && explicitGroup.name && isMemberInLatestAttendanceGroup(explicitGroup)
+        ? explicitGroup
+        : null;
+      if (matched) return matched.name;
+    }
+    return '';
   }
 
   // 格式化日期為 M/D（供面板顯示）
@@ -709,19 +689,30 @@
 
   // 傳回當前區間內，每個班表中員工所屬考勤組及其班表日期範圍 [{name, schedStart, schedEnd}]
   function getAssignedAttendanceGroupsWithRanges(startDate, endDate) {
+    function getExplicitScheduleAttendanceGroup(sched) {
+      const groups = Array.isArray(sched && sched.attendanceGroups) ? sched.attendanceGroups : [];
+      if (!groups.length) return null;
+      const idx = Number.isInteger(sched && sched.selectedAttendanceGroupIndex)
+        ? sched.selectedAttendanceGroupIndex
+        : -1;
+      if (idx < 0 || idx >= groups.length) return null;
+      return groups[idx] || null;
+    }
+
+    function isMemberInLatestAttendanceGroup(group) {
+      if (!group || !group.name) return false;
+      const latest = (G.attendanceGroups || []).find(x => x && x.name === group.name);
+      const source = latest || group;
+      return Array.isArray(source.members) && source.members.includes(empId);
+    }
     const schedules = getSchedulesForDateRange(startDate, endDate);
     const result = [];
     const seenNames = new Set();
     for (const sched of schedules) {
-      const groups = Array.isArray(sched.attendanceGroups) && sched.attendanceGroups.length
-        ? sched.attendanceGroups
-        : (G.attendanceGroups || []);
-      const allowedSet = Array.isArray(sched.allowedAttendanceGroupNames) && sched.allowedAttendanceGroupNames.length
-        ? new Set(sched.allowedAttendanceGroupNames)
+      const explicitGroup = getExplicitScheduleAttendanceGroup(sched);
+      const matched = explicitGroup && explicitGroup.name && isMemberInLatestAttendanceGroup(explicitGroup)
+        ? explicitGroup
         : null;
-      const matched = groups.find(g => g && g.name && Array.isArray(g.members)
-        && g.members.includes(empId)
-        && (!allowedSet || allowedSet.has(g.name)));
       if (matched) {
         if (seenNames.has(matched.name)) {
           const existing = result.find(r => r.name === matched.name);
@@ -744,14 +735,7 @@
     const result = [];
     const seenNames = new Set();
     schedules.forEach(sched => {
-      let names = [];
-      if (Array.isArray(sched.selectedHolidayGroups) && sched.selectedHolidayGroups.length) {
-        names = sched.selectedHolidayGroups;
-      } else if (Array.isArray(sched.allowedHolidayGroupNames) && sched.allowedHolidayGroupNames.length) {
-        names = sched.allowedHolidayGroupNames;
-      } else if (sched.holidayGroups && typeof sched.holidayGroups === 'object') {
-        names = Object.keys(sched.holidayGroups);
-      }
+      const names = Array.isArray(sched.selectedHolidayGroups) ? sched.selectedHolidayGroups : [];
       names.forEach(n => {
         if (!(G.holidayGroups || {})[n]) return;
         if (seenNames.has(n)) {
@@ -970,10 +954,7 @@
         const inRange = (!rs || ds >= rs) && (!re || ds <= re);
         const hasScheduleData = isDateInAnySchedule(ds);
         const hasPersonalData = !!personal.assignments[ds];
-        const excluded = Array.isArray(personal.excludedAttendanceGroups) ? personal.excludedAttendanceGroups : [];
-        const hasMembershipBinding = !hasScheduleBindings &&
-          (G.attendanceGroups || []).some(g => Array.isArray(g.members) && g.members.includes(empId) && !excluded.includes(g.name));
-        const canShowDate = hasPersonalData || (hasScheduleData && (hasScheduleBindings || hasMembershipBinding));
+        const canShowDate = hasPersonalData || (hasScheduleData && hasScheduleBindings);
 
         if (cell.other) td.classList.add('other-month');
         else if (!inRange) td.classList.add('out-of-range');
