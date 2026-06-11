@@ -735,6 +735,30 @@
     function isDateInAnySchedule(dateStr) {
       return (schedules || []).some(s => s && s.start && s.end && s.start <= dateStr && dateStr <= s.end);
     }
+    function getSchedulesForDate(dateStr) {
+      return (schedules || []).filter(s => s && s.start && s.end && s.start <= dateStr && dateStr <= s.end);
+    }
+    function getExplicitScheduleHolidayGroupNames(dateStr) {
+      const names = new Set();
+      getSchedulesForDate(dateStr).forEach(s => {
+        (Array.isArray(s.selectedHolidayGroups) ? s.selectedHolidayGroups : []).forEach(name => {
+          if ((holidayGroups || {})[name]) names.add(name);
+        });
+      });
+      return Array.from(names);
+    }
+    function getExplicitScheduleAttendanceGroup(empId, dateStr) {
+      for (const sched of getSchedulesForDate(dateStr)) {
+        const groups = Array.isArray(sched.attendanceGroups) ? sched.attendanceGroups : [];
+        const idx = Number.isInteger(sched.selectedAttendanceGroupIndex) ? sched.selectedAttendanceGroupIndex : -1;
+        if (idx < 0 || idx >= groups.length) continue;
+        const group = groups[idx];
+        if (!group || !group.name) continue;
+        const latest = (G.attendanceGroups || []).find(x => x && x.name === group.name) || group;
+        if (Array.isArray(latest.members) && latest.members.includes(empId)) return latest;
+      }
+      return null;
+    }
     function hasPersonalAssignmentOnDate(empId, dateStr) {
       const pd = _getPersonalData(empId);
       return !!(pd && pd.assignments && pd.assignments[dateStr]);
@@ -742,48 +766,58 @@
     function getShiftsForPersonOnDate(empId, dateStr, dow) {
       // 優先採用個人排班指派
       const pd = _getPersonalData(empId);
+      const excludedHolidayGroups = pd && Array.isArray(pd.excludedHolidayGroups) ? pd.excludedHolidayGroups : [];
+      const excludedAttendanceGroups = pd && Array.isArray(pd.excludedAttendanceGroups) ? pd.excludedAttendanceGroups : [];
+      const explicitHolidayGroups = getExplicitScheduleHolidayGroupNames(dateStr).filter(name => !excludedHolidayGroups.includes(name));
+      const explicitHolidaySet = new Set();
+      explicitHolidayGroups.forEach(grp => {
+        ((holidayGroups || {})[grp] || []).forEach(d => explicitHolidaySet.add(d));
+      });
+      (pd && Array.isArray(pd.holidayGroups) ? pd.holidayGroups : []).forEach(grp => {
+        if (excludedHolidayGroups.includes(grp)) return;
+        ((holidayGroups || {})[grp] || []).forEach(d => explicitHolidaySet.add(d));
+      });
+      (individualHolidays || []).forEach(d => explicitHolidaySet.add(d));
+      const explicitAttendanceGroup = getExplicitScheduleAttendanceGroup(empId, dateStr);
+      const activeAttendanceGroup = explicitAttendanceGroup && !excludedAttendanceGroups.includes(explicitAttendanceGroup.name)
+        ? explicitAttendanceGroup
+        : null;
+      const hasBinding = explicitHolidayGroups.length > 0 || !!activeAttendanceGroup || explicitHolidaySet.has(dateStr);
       if (pd && pd.assignments && pd.assignments[dateStr]) {
         const a = pd.assignments[dateStr];
         const isManual = a.source === 'manual';
         if (a.type === 'off') {
-          // 紅底休假：個別假日 + 該員工已勾選之假別組；其他（含週末、未勾選假別）→ 個人覆蓋藍底
-          const personalHolidaySet = new Set();
-          (pd.holidayGroups || []).forEach(grp => {
-            ((holidayGroups || {})[grp] || []).forEach(d => personalHolidaySet.add(d));
-          });
-          (individualHolidays || []).forEach(d => personalHolidaySet.add(d));
-          const isSystemHoliday = personalHolidaySet.has(dateStr);
+          const isSystemHoliday = explicitHolidaySet.has(dateStr) || (!!activeAttendanceGroup && !((activeAttendanceGroup.weekdayShifts || {})[DOW_KEYS[dow]] || []).length);
           if (isManual || !isSystemHoliday) {
-            return { list: [], isHolidayOt: false, isPersonal: true, isManual };
+            return { list: [], isHolidayOt: false, isPersonal: true, isManual, hasBinding: true, isHolidayDisplay: isSystemHoliday };
           }
+          return { list: [], isHolidayOt: false, isPersonal: true, isManual, hasBinding: true, isHolidayDisplay: true };
         } else if (a.type === 'work') {
           const names = (a.shiftNames || (a.shiftName ? [a.shiftName] : [])).filter(n => n && n !== '休');
           const isOff = names.length === 0 && (a.shiftNames || []).some(n => n === '休');
-          if (isOff) return { list: [], isHolidayOt: false, isPersonal: true, isManual };
-          return { list: names, isHolidayOt: false, isPersonal: true, isManual };
+          if (isOff) return { list: [], isHolidayOt: false, isPersonal: true, isManual, hasBinding: true, isHolidayDisplay: true };
+          return { list: names, isHolidayOt: false, isPersonal: true, isManual, hasBinding: true, isHolidayDisplay: false };
         }
       }
       // 僅顯示 schedules 範圍內的系統排班；範圍外若無個人排班，維持空白
-      if (!isDateInAnySchedule(dateStr)) return { list: [], isHolidayOt: false };
-      // 若個人端已把該考勤組設為「未套用」，尊重排除清單不顯示底稿
-      const _pdForExclude = _getPersonalData(empId);
-      const _excluded = _pdForExclude && Array.isArray(_pdForExclude.excludedAttendanceGroups)
-        ? _pdForExclude.excludedAttendanceGroups : [];
-      // 否則依考勤組自動計算
-      const g = getPersonGroup(empId);
-      if (g && _excluded.includes(g.name)) return { list: [], isHolidayOt: false };
-      if (!g || (g.scheduleType && g.scheduleType !== 'auto')) return { list: [], isHolidayOt: false };
-      const isHoliday = conflictHolidaySet.has(dateStr);
+      if (!isDateInAnySchedule(dateStr)) return { list: [], isHolidayOt: false, hasBinding: false, isHolidayDisplay: false };
+      const g = activeAttendanceGroup;
+      const isHoliday = explicitHolidaySet.has(dateStr);
       const nationalHolidaySet = new Set((holidayGroups || {})['台灣國定假日'] || []);
       const isNationalHoliday = nationalHolidaySet.has(dateStr);
+      if (!g || (g.scheduleType && g.scheduleType !== 'auto')) {
+        return { list: [], isHolidayOt: false, hasBinding, isHolidayDisplay: isHoliday };
+      }
       // 假日優先：默設不排班；除非考勤組勾選「假日仍排班」
-      if (isHoliday && !g.workOnHoliday) return { list: [], isHolidayOt: false };
+      if (isHoliday && !g.workOnHoliday) return { list: [], isHolidayOt: false, hasBinding: true, isHolidayDisplay: true };
       const ws = g.weekdayShifts || {};
       const arr = ws[DOW_KEYS[dow]];
-      const list = Array.isArray(arr) ? arr.filter(n => n) : [];
+      const rawList = Array.isArray(arr) ? arr : [];
+      const list = rawList.filter(n => n && n !== '休');
       const isParttime = g.employmentType === 'parttime';
       const isHolidayOt = list.length > 0 && (isParttime ? isNationalHoliday : isHoliday);
-      return { list, isHolidayOt };
+      const isAttendanceRest = !list.length;
+      return { list, isHolidayOt, hasBinding: true, isHolidayDisplay: isHoliday || isAttendanceRest };
     }
 
     const head = document.getElementById('scheduleHead');
@@ -841,17 +875,11 @@
       let totalHrs = 0;
       const dayShifts = days.map((d, i) => {
         const dateStr = d.toISOString().split('T')[0];
-        const hasScheduleData = isDateInAnySchedule(dateStr);
         const hasPersonalData = hasPersonalAssignmentOnDate(p.id, dateStr);
-        const _pdCheck = _getPersonalData(p.id);
-        const _excludedAg = _pdCheck && Array.isArray(_pdCheck.excludedAttendanceGroups) ? _pdCheck.excludedAttendanceGroups : [];
-        const _activeAg = _pdCheck && Array.isArray(_pdCheck.attendanceGroups) ? _pdCheck.attendanceGroups : [];
-        const _memberGrp = getPersonGroup(p.id);
-        const hasActiveBinding = _activeAg.length > 0 || (_memberGrp && !_excludedAg.includes(_memberGrp.name));
-        const canShowDate = hasPersonalData || (hasScheduleData && hasActiveBinding);
-        const isHolidayDisplay = canShowDate && allHolidaysForDisplay.includes(dateStr);
-        const isHolidayActual = conflictHolidaySet.has(dateStr);
         const result = getShiftsForPersonOnDate(p.id, dateStr, d.getDay());
+        const canShowDate = hasPersonalData || !!result.hasBinding;
+        const isHolidayDisplay = canShowDate && !!result.isHolidayDisplay;
+        const isHolidayActual = !!result.isHolidayDisplay;
         // 班別篩選：僅保留被勾選之班別（未勾選則全顯示）
         const filteredList = selectedShifts.length === 0 ? result.list : result.list.filter(n => selectedShifts.includes(n));
         filteredList.forEach(n => { totalHrs += shiftHoursMap[n] || 0; });
