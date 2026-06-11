@@ -563,19 +563,34 @@
   const _DOW_KEYS = ['sun','mon','tue','wed','thu','fri','sat'];
   function getGroupShiftsForDate(dateStr, dow) {
     if (!isDateInAnySchedule(dateStr)) return [];
-    const selectedNames = Array.isArray(personal.attendanceGroups) ? personal.attendanceGroups : [];
-    if (!selectedNames.length) return [];
+    const selectedNames = Array.isArray(personal.attendanceGroups) && personal.attendanceGroups.length
+      ? personal.attendanceGroups
+      : null; // null = fallback to membership
     const out = [];
-    selectedNames.forEach(name => {
-      const grp = (G.attendanceGroups || []).find(g => g && g.name === name && Array.isArray(g.members) && g.members.includes(empId));
-      if (!grp || grp.scheduleType === 'manual') return;
-      if (isHolidayDate(dateStr, dow) && !grp.workOnHoliday) return;
-      const ws = grp.weekdayShifts || {};
-      const arr = ws[_DOW_KEYS[dow]];
-      (Array.isArray(arr) ? arr : []).forEach(shiftName => {
-        if (shiftName && shiftName !== '休' && !out.includes(shiftName)) out.push(shiftName);
+    if (selectedNames) {
+      selectedNames.forEach(name => {
+        const grp = (G.attendanceGroups || []).find(g => g && g.name === name && Array.isArray(g.members) && g.members.includes(empId));
+        if (!grp || grp.scheduleType === 'manual') return;
+        if (isHolidayDate(dateStr, dow) && !grp.workOnHoliday) return;
+        const ws = grp.weekdayShifts || {};
+        const arr = ws[_DOW_KEYS[dow]];
+        (Array.isArray(arr) ? arr : []).forEach(shiftName => {
+          if (shiftName && shiftName !== '休' && !out.includes(shiftName)) out.push(shiftName);
+        });
       });
-    });
+    } else {
+      // fallback: 找員工所在的考勤組（對齊 index.html 行為）
+      const grp = (G.attendanceGroups || []).find(g => g && Array.isArray(g.members) && g.members.includes(empId));
+      if (grp && grp.scheduleType !== 'manual') {
+        if (!(isHolidayDate(dateStr, dow) && !grp.workOnHoliday)) {
+          const ws = grp.weekdayShifts || {};
+          const arr = ws[_DOW_KEYS[dow]];
+          (Array.isArray(arr) ? arr : []).forEach(shiftName => {
+            if (shiftName && shiftName !== '休' && !out.includes(shiftName)) out.push(shiftName);
+          });
+        }
+      }
+    }
     return out;
   }
 
@@ -920,7 +935,9 @@
         const inRange = (!rs || ds >= rs) && (!re || ds <= re);
         const hasScheduleData = isDateInAnySchedule(ds);
         const hasPersonalData = !!personal.assignments[ds];
-        const canShowDate = hasPersonalData || (hasScheduleData && hasScheduleBindings);
+        const hasMembershipBinding = !hasScheduleBindings &&
+          (G.attendanceGroups || []).some(g => Array.isArray(g.members) && g.members.includes(empId));
+        const canShowDate = hasPersonalData || (hasScheduleData && (hasScheduleBindings || hasMembershipBinding));
 
         if (cell.other) td.classList.add('other-month');
         else if (!inRange) td.classList.add('out-of-range');

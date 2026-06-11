@@ -754,11 +754,13 @@
           (individualHolidays || []).forEach(d => personalHolidaySet.add(d));
           const isSystemHoliday = personalHolidaySet.has(dateStr);
           if (isManual || !isSystemHoliday) {
-            return { list: [], isHolidayOt: false, isPersonal: true };
+            return { list: [], isHolidayOt: false, isPersonal: true, isManual };
           }
         } else if (a.type === 'work') {
-          const names = a.shiftNames || (a.shiftName ? [a.shiftName] : []);
-          return { list: names, isHolidayOt: false, isPersonal: true };
+          const names = (a.shiftNames || (a.shiftName ? [a.shiftName] : [])).filter(n => n && n !== '休');
+          const isOff = names.length === 0 && (a.shiftNames || []).some(n => n === '休');
+          if (isOff) return { list: [], isHolidayOt: false, isPersonal: true, isManual };
+          return { list: names, isHolidayOt: false, isPersonal: true, isManual };
         }
       }
       // 僅顯示 schedules 範圍內的系統排班；範圍外若無個人排班，維持空白
@@ -799,7 +801,6 @@
         </tr>`;
     head.innerHTML = monthHeaderRow + `<tr class="bg-slate-100">
       <th class="sticky left-0 bg-slate-100 z-10 px-3 py-2 text-left min-w-[140px]">姓名</th>
-      <th class="px-2 py-2 min-w-[100px] whitespace-nowrap">考勤組</th>
       <th class="px-2 py-2 min-w-[72px] whitespace-nowrap">總工時</th>
       ${days.map((d, i) => {
         const dateStr = d.toISOString().split('T')[0];
@@ -844,7 +845,7 @@
         // 班別篩選：僅保留被勾選之班別（未勾選則全顯示）
         const filteredList = selectedShifts.length === 0 ? result.list : result.list.filter(n => selectedShifts.includes(n));
         filteredList.forEach(n => { totalHrs += shiftHoursMap[n] || 0; });
-        return { dateStr, canShowDate, isHolidayDisplay, isHolidayActual, assignedShifts: filteredList, isHolidayOt: result.isHolidayOt && filteredList.length > 0, isPersonal: !!result.isPersonal, isPersonalOff: !!result.isPersonal && result.list.length === 0, isMonthBoundary: monthBoundarySet.has(i) };
+        return { dateStr, canShowDate, isHolidayDisplay, isHolidayActual, assignedShifts: filteredList, isHolidayOt: result.isHolidayOt && filteredList.length > 0, isPersonal: !!result.isPersonal, isManual: !!result.isManual, isPersonalOff: !!result.isPersonal && result.list.length === 0, isMonthBoundary: monthBoundarySet.has(i) };
       });
       return { p, totalHrs, dayShifts };
     });
@@ -866,7 +867,6 @@
           <a href="personal-shift.html?empId=${encodeURIComponent(p.id)}&scheduleIndex=${currentScheduleIndex}${viewOverride ? `&start=${viewOverride.start}&end=${viewOverride.end}` : ''}" onclick="syncGlobalData()" class="text-blue-700 hover:text-blue-900 hover:underline cursor-pointer">${p.name}</a>
           <div class="text-xs text-slate-500">${p.id}</div>
         </td>
-        <td class="px-2 py-2 text-center text-xs whitespace-nowrap">${groupCell}</td>
         <td class="px-2 py-2 text-center text-xs font-medium text-blue-700">${totalHrs}h</td>
         ${dayShifts.map(ds => {
           if (!ds.canShowDate) {
@@ -885,12 +885,12 @@
             label = shiftLabel;
             cls = 'holiday-ot';
           } else if (ds.isPersonal && hasShift) {
-            // 個人指派工作班別 → 優先顯示班別（即使該日是假日）
+            // 個人指派工作班別 → 手動=藍底，班表=綠底
             label = shiftLabel;
             cls = 'assigned';
           } else if (ds.isPersonalOff) {
             label = '休';
-            cls = 'holiday';
+            cls = ds.isManual ? 'holiday' : 'holiday';
           } else if (ds.isHolidayDisplay) {
             label = '休';
             cls = 'holiday';
@@ -901,7 +901,7 @@
             label = '';
             cls = '';
           }
-          const personalCls = ds.isPersonal ? ' personal' : '';
+          const personalCls = ds.isManual ? ' personal' : '';
           const boundaryStyle = ds.isMonthBoundary ? ' style="border-left:2px solid #94a3b8"' : '';
           const title = ds.isHolidayOt ? `假日加班：${ds.assignedShifts.join('、')}` : (ds.isPersonal ? '個人指派（點擊編輯）' : '');
           return `<td class="calendar-cell ${cls}${personalCls} text-xs cursor-pointer"${boundaryStyle} title="${title}" onclick="syncGlobalData();window.location.href='personal-shift.html?empId=${encodeURIComponent(p.id)}&scheduleIndex=${currentScheduleIndex}${viewOverride ? `&start=${viewOverride.start}&end=${viewOverride.end}` : ''}'">${label}</td>`;
