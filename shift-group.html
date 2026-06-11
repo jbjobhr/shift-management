@@ -34,7 +34,7 @@
           <input type="text" id="groupName" placeholder="如：A組 - 倉儲" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm">
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div id="scopeSelectorWrap" class="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <label class="block text-sm font-medium text-slate-600 mb-1">分公司/分店/案場</label>
             <select id="scopeBranchSelect" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm"></select>
@@ -596,6 +596,8 @@
     const isEdit = Number.isInteger(editingGroupIndex) && editingGroupIndex >= 0 && editingGroupIndex < attendanceGroups.length;
     const pageTitle = document.getElementById('pageTitle');
     pageTitle.textContent = isEdit ? '編輯考勤組' : '新增考勤組';
+    const scopeWrap = document.getElementById('scopeSelectorWrap');
+    if (scopeWrap) scopeWrap.style.display = mode === 'library' ? 'grid' : 'none';
 
     if (isEdit) {
       const group = attendanceGroups[editingGroupIndex];

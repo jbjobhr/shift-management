@@ -34,7 +34,7 @@
           <input type="text" id="shiftShortName" placeholder="如：早" maxlength="4" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm">
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div id="scopeSelectorWrap" class="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <label class="block text-sm font-medium text-slate-600 mb-1">分公司/分店/案場</label>
             <select id="scopeBranchSelect" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm"></select>
@@ -534,6 +534,8 @@
     const isEdit = editingShiftIndex >= 0 && !!shifts[editingShiftIndex];
     document.getElementById('pageTitle').textContent = isEdit ? `編輯班別：${shifts[editingShiftIndex].name || ''}` : '新增班別';
     document.getElementById('saveBtn').textContent = isEdit ? '更新' : '儲存';
+    const scopeWrap = document.getElementById('scopeSelectorWrap');
+    if (scopeWrap) scopeWrap.style.display = mode === 'library' ? 'grid' : 'none';
     renderScopeSelectors(isEdit ? shifts[editingShiftIndex] : null);
     if (isEdit) {
       applyShiftFields(shifts[editingShiftIndex]);

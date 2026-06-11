@@ -30,7 +30,7 @@
           <input type="text" id="holidayGroupName" placeholder="如：台灣國定假日" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm">
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div id="scopeSelectorWrap" class="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <label class="block text-sm font-medium text-slate-600 mb-1">分公司/分店/案場</label>
             <select id="scopeBranchSelect" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm"></select>
@@ -192,6 +192,8 @@
   function initPage() {
     const isEdit = !!editingGroupName && !!holidayGroups[editingGroupName];
     document.getElementById('pageTitle').textContent = isEdit ? '編輯假別組' : '新增假別組';
+    const scopeWrap = document.getElementById('scopeSelectorWrap');
+    if (scopeWrap) scopeWrap.style.display = mode === 'library' ? 'grid' : 'none';
     const currentMeta = isEdit ? (holidayGroupMeta[editingGroupName] || null) : null;
     renderScopeSelectors(currentMeta);
 
