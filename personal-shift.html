@@ -31,7 +31,8 @@
        休假     : bg #fef2f2 / text #dc2626  (red-50 / red-600)
        個人覆蓋標記: border-left 3px #7c3aed (violet-600, index.html 個人格子研)
     ── ─────────────────────────────────────────────────────── */
-    .shift-tag.work  { background: #dbeafe; color: #1e40af; }                       /* 個人排班 */
+    .shift-tag.work  { background: #dcfce7; color: #166534; }                       /* 班表排班 */
+    .shift-tag.work.personal { background: #dbeafe; color: #1e40af; }               /* 個人手動指派排班 */
     .shift-tag.work.ot { background: #ffedd5; color: #c2410c; border: 1px solid #fdba74; } /* 加班 */
     .shift-tag.off   { background: transparent; color: #dc2626; font-weight: 600; }  /* 休假（透明底，讓格子紅底色透出）*/
     .shift-tag.off.personal { background: #dbeafe; color: #1e40af; /* border-left: 3px solid #7c3aed; */ } /* 個人手動指派休假 */
@@ -141,10 +142,8 @@
         <div class="w-full flex flex-wrap items-center gap-1 text-[11px] pt-1">
          <span class="font-medium text-slate-600 mr-1">優先級順序</span>
          <span id="priorityBaseBadge" class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100">
-          <i data-lucide="layers" class="w-3 h-3"></i><span id="priorityBaseText">班表考勤組 (基底)</span>
+          <i data-lucide="layers" class="w-3 h-3"></i><span id="priorityBaseText">班表排班(基底)</span>
          </span>
-         <span class="text-slate-400">→</span>
-         <span id="prioritySecondBadge" class="px-2 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-100">班表假別組</span>
          <span class="text-slate-400">→</span>
          <span id="priorityPersonalBadge" class="px-2 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-100">個人排班</span>
         </div>
@@ -191,10 +190,10 @@
        </div>
       </div>
 
-     <!-- 個人化指派：假別組/考勤組/班別/崗位/標籤 -->
+    <!-- 班表指派：假別組/考勤組/班別/崗位/標籤 -->
     <div class="flex items-center justify-between">
      <h2 class="text-lg font-bold text-slate-700 flex items-center gap-2">
-      <i data-lucide="settings" class="w-5 h-5 text-slate-500"></i>個人化指派
+      <i data-lucide="settings" class="w-5 h-5 text-slate-500"></i>班表指派
      </h2>
      <div class="flex items-center gap-3"></div>
     </div>
@@ -449,6 +448,8 @@
     assignments: {},   // { 'YYYY-MM-DD': { type:'work'|'off', shiftName? } }
     holidayGroups: [], // 適用的假別組名稱
     attendanceGroups: [],
+    excludedHolidayGroups: [],
+    excludedAttendanceGroups: [],
     shifts: [],        // 可排班別名稱
     positions: [],
     tags: []
@@ -457,6 +458,9 @@
     const raw = localStorage.getItem(PKEY);
     if (raw) personal = Object.assign(personal, JSON.parse(raw));
   } catch (e) { console.warn('load personal failed', e); }
+
+  if (!Array.isArray(personal.excludedHolidayGroups)) personal.excludedHolidayGroups = [];
+  if (!Array.isArray(personal.excludedAttendanceGroups)) personal.excludedAttendanceGroups = [];
 
   // 草稿：使用者選取後需點「Apply」才套用到 personal / localStorage
   let draft = {
@@ -493,19 +497,30 @@
   function applyScheduleAssignedDefaultsIfNeeded() {
     const startDate = personal.rangeStart;
     const endDate = personal.rangeEnd;
+    const hasScheduleOverlap = getSchedulesForDateRange(startDate, endDate).length > 0;
 
-    if (!personal.holidayGroups.length) {
-      const assignedHolidayNames = getAssignedHolidayGroupNamesForRange(startDate, endDate);
-      if (assignedHolidayNames.length) personal.holidayGroups = [...assignedHolidayNames];
+    const assignedHolidayNames = getAssignedHolidayGroupNamesForRange(startDate, endDate);
+    const assignedGroups = getAssignedAttendanceGroupsWithRanges(startDate, endDate);
+    const assignedAttendanceNames = assignedGroups.map(a => a.name).filter(Boolean);
+
+    if (hasScheduleOverlap) {
+      personal.holidayGroups = assignedHolidayNames.filter(n => !personal.excludedHolidayGroups.includes(n));
+      personal.attendanceGroups = assignedAttendanceNames.filter(n => !personal.excludedAttendanceGroups.includes(n));
+    } else {
+      personal.holidayGroups = (personal.holidayGroups || []).filter(n => (G.holidayGroups || {})[n]);
+      personal.attendanceGroups = (personal.attendanceGroups || []).filter(n =>
+        (G.attendanceGroups || []).some(g => g && g.name === n)
+      );
     }
-
-    if (!personal.attendanceGroups.length) {
-      const assignedAttendanceName = getAssignedAttendanceGroupNameForRange(startDate, endDate);
-      if (assignedAttendanceName) personal.attendanceGroups = [assignedAttendanceName];
-    }
-
     draft.holidayGroups = [...personal.holidayGroups];
     draft.attendanceGroups = [...personal.attendanceGroups];
+  }
+
+  function hasScheduleOverlapInCurrentRange() {
+    const startDate = personal.rangeStart;
+    const endDate = personal.rangeEnd;
+    if (!startDate || !endDate) return false;
+    return getSchedulesForDateRange(startDate, endDate).length > 0;
   }
 
   applyScheduleAssignedDefaultsIfNeeded();
@@ -548,14 +563,20 @@
   const _DOW_KEYS = ['sun','mon','tue','wed','thu','fri','sat'];
   function getGroupShiftsForDate(dateStr, dow) {
     if (!isDateInAnySchedule(dateStr)) return [];
-    const grp = (G.attendanceGroups || []).find(
-      g => Array.isArray(g.members) && g.members.includes(empId)
-    );
-    if (!grp || grp.scheduleType === 'manual') return [];
-    if (isHolidayDate(dateStr, dow) && !grp.workOnHoliday) return [];
-    const ws = grp.weekdayShifts || {};
-    const arr = ws[_DOW_KEYS[dow]];
-    return Array.isArray(arr) ? arr.filter(n => n) : [];
+    const selectedNames = Array.isArray(personal.attendanceGroups) ? personal.attendanceGroups : [];
+    if (!selectedNames.length) return [];
+    const out = [];
+    selectedNames.forEach(name => {
+      const grp = (G.attendanceGroups || []).find(g => g && g.name === name && Array.isArray(g.members) && g.members.includes(empId));
+      if (!grp || grp.scheduleType === 'manual') return;
+      if (isHolidayDate(dateStr, dow) && !grp.workOnHoliday) return;
+      const ws = grp.weekdayShifts || {};
+      const arr = ws[_DOW_KEYS[dow]];
+      (Array.isArray(arr) ? arr : []).forEach(shiftName => {
+        if (shiftName && shiftName !== '休' && !out.includes(shiftName)) out.push(shiftName);
+      });
+    });
+    return out;
   }
 
   // ===== 取得時間區間對應的班表可選項目（聯集） =====
@@ -629,33 +650,83 @@
     return globalMatched ? globalMatched.name : '';
   }
 
+  // 格式化日期為 M/D（供面板顯示）
+  function fmtDateShort(dateStr) {
+    if (!dateStr) return '';
+    const [, m, d] = dateStr.split('-').map(Number);
+    return `${m}/${d}`;
+  }
+
+  // 傳回當前區間內，每個班表中員工所屬考勤組及其班表日期範圍 [{name, schedStart, schedEnd}]
+  function getAssignedAttendanceGroupsWithRanges(startDate, endDate) {
+    const schedules = getSchedulesForDateRange(startDate, endDate);
+    const result = [];
+    const seenNames = new Set();
+    for (const sched of schedules) {
+      const groups = Array.isArray(sched.attendanceGroups) && sched.attendanceGroups.length
+        ? sched.attendanceGroups
+        : (G.attendanceGroups || []);
+      const allowedSet = Array.isArray(sched.allowedAttendanceGroupNames) && sched.allowedAttendanceGroupNames.length
+        ? new Set(sched.allowedAttendanceGroupNames)
+        : null;
+      const matched = groups.find(g => g && g.name && Array.isArray(g.members)
+        && g.members.includes(empId)
+        && (!allowedSet || allowedSet.has(g.name)));
+      if (matched) {
+        if (seenNames.has(matched.name)) {
+          const existing = result.find(r => r.name === matched.name);
+          if (existing) {
+            if (sched.start && (!existing.schedStart || sched.start < existing.schedStart)) existing.schedStart = sched.start;
+            if (sched.end && (!existing.schedEnd || sched.end > existing.schedEnd)) existing.schedEnd = sched.end;
+          }
+        } else {
+          seenNames.add(matched.name);
+          result.push({ name: matched.name, schedStart: sched.start || '', schedEnd: sched.end || '' });
+        }
+      }
+    }
+    return result;
+  }
+
+  // 傳回當前區間內，每個班表中已指派假別組及其班表日期範圍 [{name, schedStart, schedEnd}]
+  function getAssignedHolidayGroupsWithRanges(startDate, endDate) {
+    const schedules = getSchedulesForDateRange(startDate, endDate);
+    const result = [];
+    const seenNames = new Set();
+    schedules.forEach(sched => {
+      let names = [];
+      if (Array.isArray(sched.selectedHolidayGroups) && sched.selectedHolidayGroups.length) {
+        names = sched.selectedHolidayGroups;
+      } else if (Array.isArray(sched.allowedHolidayGroupNames) && sched.allowedHolidayGroupNames.length) {
+        names = sched.allowedHolidayGroupNames;
+      } else if (sched.holidayGroups && typeof sched.holidayGroups === 'object') {
+        names = Object.keys(sched.holidayGroups);
+      }
+      names.forEach(n => {
+        if (!(G.holidayGroups || {})[n]) return;
+        if (seenNames.has(n)) {
+          const existing = result.find(r => r.name === n);
+          if (existing) {
+            if (sched.start && (!existing.schedStart || sched.start < existing.schedStart)) existing.schedStart = sched.start;
+            if (sched.end && (!existing.schedEnd || sched.end > existing.schedEnd)) existing.schedEnd = sched.end;
+          }
+        } else {
+          seenNames.add(n);
+          result.push({ name: n, schedStart: sched.start || '', schedEnd: sched.end || '' });
+        }
+      });
+    });
+    return result;
+  }
+
   function updatePriorityLegend() {
     const baseBadge = document.getElementById('priorityBaseBadge');
     const baseText = document.getElementById('priorityBaseText');
-    const secondBadge = document.getElementById('prioritySecondBadge');
     const personalBadge = document.getElementById('priorityPersonalBadge');
-    if (!baseBadge || !baseText || !secondBadge || !personalBadge) return;
+    if (!baseBadge || !baseText || !personalBadge) return;
 
-    let selectedName = (personal.attendanceGroups && personal.attendanceGroups[0]) || '';
-    if (!selectedName) {
-      selectedName = getAssignedAttendanceGroupNameForRange(personal.rangeStart, personal.rangeEnd);
-    }
-    const selectedGroup = (G.attendanceGroups || []).find(g => g && g.name === selectedName);
-    const employmentType = selectedGroup
-      ? (selectedGroup.employmentType || (selectedGroup.workOnHoliday ? 'parttime' : 'fulltime'))
-      : 'fulltime';
-
-    if (employmentType === 'parttime') {
-      baseBadge.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-100';
-      baseText.textContent = '班表假別組 (基底)';
-      secondBadge.className = 'px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100';
-      secondBadge.textContent = '班表考勤組';
-    } else {
-      baseBadge.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100';
-      baseText.textContent = '班表考勤組 (基底)';
-      secondBadge.className = 'px-2 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-100';
-      secondBadge.textContent = '班表假別組';
-    }
+    baseBadge.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100';
+    baseText.textContent = '班表排班(基底)';
     personalBadge.className = 'px-2 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-100';
     personalBadge.textContent = '個人排班';
     lucide.createIcons();
@@ -820,6 +891,7 @@
     const daysInMonth = new Date(year, month+1, 0).getDate();
     const todayStr = fmt(new Date());
     const rs = personal.rangeStart, re = personal.rangeEnd;
+    const hasScheduleBindings = (personal.attendanceGroups || []).length > 0 || (personal.holidayGroups || []).length > 0;
 
     // 週一為首：計算首日之前需填充几天（Sun=0 -> 6，Mon=1 -> 0）
     const leadDays = (firstDay + 6) % 7;
@@ -848,7 +920,7 @@
         const inRange = (!rs || ds >= rs) && (!re || ds <= re);
         const hasScheduleData = isDateInAnySchedule(ds);
         const hasPersonalData = !!personal.assignments[ds];
-        const canShowDate = hasScheduleData || hasPersonalData;
+        const canShowDate = hasPersonalData || (hasScheduleData && hasScheduleBindings);
 
         if (cell.other) td.classList.add('other-month');
         else if (!inRange) td.classList.add('out-of-range');
@@ -864,16 +936,21 @@
             // 其他 off（手動指派、週末、未勾選之假別、autoFill 平日無班別等）→ 視為個人覆蓋（藍底）
             const isSystemHoliday = (G.individualHolidays || []).includes(ds)
               || personal.holidayGroups.some(grp => ((G.holidayGroups || {})[grp] || []).includes(ds));
-            const isPersonalOff = a.source === 'manual' || !isSystemHoliday;
+            const isPersonalOff = a.source === 'manual';
             if (!cell.other && isSystemHoliday) td.classList.add('holiday');
             const personalCls = isPersonalOff ? ' personal' : '';
             body = `<div class="shift-tag off${personalCls}">休</div>`;
           }
           else if (a.type === 'work') {
-            const names = a.shiftNames || (a.shiftName ? [a.shiftName] : []);
+            const namesRaw = a.shiftNames || (a.shiftName ? [a.shiftName] : []);
+            const workItems = namesRaw
+              .map((n, i) => ({ n, i }))
+              .filter(item => item.n && item.n !== '休');
+            const hasRestMarker = namesRaw.some(n => n === '休');
+            const isManual = a.source === 'manual';
             const flags = otMap.otFlags[ds] || [];
-            body = names.length
-              ? names.map((n, i) => {
+            body = workItems.length
+              ? workItems.map(({ n, i }) => {
                   const isOt = flags[i];
                   const h = getShiftHoursByName(n);
                   if (!cell.other) {
@@ -881,9 +958,10 @@
                     dayTotalH += h;
                     if (isOt) weekHasOt = true;
                   }
-                  return `<div class="shift-tag work${isOt ? ' ot' : ''}" title="${isOt ? '已超過每週 40h，該班次計加班' : ''}">${n}${isOt ? ' 加' : ''}</div>`;
+                  const cls = isOt ? 'work ot' : (isManual ? 'work personal' : 'work');
+                  return `<div class="shift-tag ${cls}" title="${isOt ? '已超過每週 40h，該班次計加班' : ''}">${n}${isOt ? ' 加' : ''}</div>`;
                 }).join('')
-              : `<div class="shift-tag work">已排</div>`;
+              : (hasRestMarker ? `<div class="shift-tag off">休</div>` : `<div class="shift-tag ${isManual ? 'work personal' : 'work'}">已排</div>`);
           }
         } else if (!cell.other && inRange && canShowDate) {
           // 無個人指派時，顯示考勤組底稿（紫色虛線標籤）
@@ -1030,7 +1108,7 @@
           return;
         }
       }
-      personal.assignments[assigningDate] = { type: 'work', shiftNames: [...assigningSelected] };
+      personal.assignments[assigningDate] = { type: 'work', shiftNames: [...assigningSelected], source: 'manual' };
     }
     persistPersonal();
     renderCalendar();
@@ -1046,7 +1124,7 @@
     if (type === 'off') {
       personal.assignments[assigningDate] = { type:'off', source:'manual' };
     } else {
-      personal.assignments[assigningDate] = { type:'work', shiftNames: shiftName ? [shiftName] : [] };
+      personal.assignments[assigningDate] = { type:'work', shiftNames: shiftName ? [shiftName] : [], source: 'manual' };
     }
     persistPersonal();
     renderCalendar();
@@ -1163,28 +1241,39 @@
     const c = document.getElementById('personalHolidayGroups');
     const startDate = personal.rangeStart;
     const endDate = personal.rangeEnd;
-    const allowedNames = getAllowedHolidayGroupNamesForRange(startDate, endDate);
-    let names = allowedNames.length > 0
-      ? allowedNames
-      : Object.keys(G.holidayGroups || {});
+    const schedAssignedHg = getAssignedHolidayGroupsWithRanges(startDate, endDate);
+    const schedAssignedHgMap = new Map(schedAssignedHg.map(a => [a.name, a]));
+    const names = schedAssignedHg.map(v => v.name);
     if (!names.length) {
-      c.innerHTML = '<div class="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-500">尚未設定假別組</div>';
+      c.innerHTML = '<div class="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-500">此區間沒有已套用的班表假別組</div>';
       return;
     }
     // 不分已套用/可套用，全部直接列出
     function hgCard(n) {
+      const schedHgInfo = schedAssignedHgMap.get(n);
+      const isScheduleAssigned = !!schedHgInfo;
       const isApplied = draft.holidayGroups.includes(n);
-      const borderCls = isApplied ? 'border-red-300 ring-1 ring-red-200 bg-red-50' : 'bg-white border-slate-200';
+      const borderCls = (isApplied || isScheduleAssigned) ? 'border-red-300 ring-1 ring-red-200 bg-red-50' : 'bg-white border-slate-200';
+      const rangeBadge = isScheduleAssigned
+        ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 shrink-0" title="來自班表">班表 ${fmtDateShort(schedHgInfo.schedStart)}-${fmtDateShort(schedHgInfo.schedEnd)}</span>`
+        : '';
+      const safeN = n.replace(/'/g, "\\'");
+      const actionBtn = isScheduleAssigned
+        ? `<button type="button" onclick="toggleDraftHolidayGroup('${safeN}')"
+            class="shrink-0 px-2 py-1 text-xs font-medium rounded ${isApplied ? 'text-red-600 border border-red-200 hover:bg-red-100' : 'text-emerald-700 border border-emerald-300 hover:bg-emerald-50'}">
+            ${isApplied ? '已套用' : '未套用'}</button>`
+        : `<button type="button" onclick="toggleDraftHolidayGroup('${safeN}')"
+            class="shrink-0 px-2 py-1 text-xs font-medium rounded ${isApplied ? 'text-red-600 border border-red-200 hover:bg-red-100' : 'text-green-700 border border-green-300 hover:bg-green-50'}">
+            ${isApplied ? '移除' : '套用'}</button>`;
       return `<div class="flex items-center gap-2 px-3 py-2 rounded-lg border ${borderCls}">
-        <div class="flex-1 min-w-0">
+        <div class="flex-1 min-w-0 flex flex-wrap items-center gap-1">
           <div class="text-sm font-medium text-slate-800 truncate">${n}</div>
           <div class="text-xs text-slate-500">${(G.holidayGroups[n]||[]).length} 個假日</div>
+          ${rangeBadge}
         </div>
-        <button type="button" onclick="openHolidayGroupDetail('${n.replace(/'/g,"\\'")}' )"
+        <button type="button" onclick="openHolidayGroupDetail('${safeN}')"
           class="shrink-0 px-2 py-1 text-xs text-slate-500 border border-slate-200 rounded hover:bg-slate-100">查看</button>
-        <button type="button" onclick="toggleDraftHolidayGroup('${n.replace(/'/g,"\\'")}' )"
-          class="shrink-0 px-2 py-1 text-xs font-medium rounded ${isApplied ? 'text-red-600 border border-red-200 hover:bg-red-100' : 'text-green-700 border border-green-300 hover:bg-green-50'}">
-          ${isApplied ? '移除' : '套用'}</button>
+        ${actionBtn}
       </div>`;
     }
     // 記錄滾動位置，渲染後還原，避免跳動
@@ -1193,9 +1282,26 @@
     c.scrollTop = prevScroll;
   }
   function toggleDraftHolidayGroup(name){
+    const schedNames = new Set(getAssignedHolidayGroupsWithRanges(personal.rangeStart, personal.rangeEnd).map(v => v.name));
+    const isScheduleAssigned = schedNames.has(name);
     const idx = draft.holidayGroups.indexOf(name);
-    if (idx === -1) draft.holidayGroups.push(name);
-    else draft.holidayGroups.splice(idx, 1);
+
+    if (!isScheduleAssigned && idx === -1 && hasScheduleOverlapInCurrentRange()) {
+      alert('此區間與班表重疊，非班表來源假別組不可套用。');
+      return;
+    }
+
+    if (idx === -1) {
+      draft.holidayGroups.push(name);
+      if (isScheduleAssigned) {
+        personal.excludedHolidayGroups = personal.excludedHolidayGroups.filter(n => n !== name);
+      }
+    } else {
+      draft.holidayGroups.splice(idx, 1);
+      if (isScheduleAssigned && !personal.excludedHolidayGroups.includes(name)) {
+        personal.excludedHolidayGroups.push(name);
+      }
+    }
     setDirty(true);
     renderHolidayGroupsPanel();
   }
@@ -1203,12 +1309,13 @@
     const c = document.getElementById('personalAttendanceGroups');
     const startDate = personal.rangeStart;
     const endDate = personal.rangeEnd;
-    const allowedNames = getAllowedAttendanceGroupNamesForRange(startDate, endDate);
-    const list = allowedNames.length > 0
-      ? (G.attendanceGroups || []).filter(g => allowedNames.includes(g.name))
-      : (G.attendanceGroups || []);
+    const schedAssigned = getAssignedAttendanceGroupsWithRanges(startDate, endDate);
+    const schedAssignedMap = new Map(schedAssigned.map(a => [a.name, a]));
+    const list = schedAssigned
+      .map(v => (G.attendanceGroups || []).find(g => g && g.name === v.name))
+      .filter(Boolean);
     if (!list.length) {
-      c.innerHTML = '<div class="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-500">尚未設定考勤組</div>';
+      c.innerHTML = '<div class="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-500">此區間沒有已套用的班表考勤組</div>';
       return;
     }
     const DOW_LABELS = [['mon','一'],['tue','二'],['wed','三'],['thu','四'],['fri','五'],['sat','六'],['sun','日']];
@@ -1233,37 +1340,33 @@
         </div>`;
       }).join('') + `</div>`;
     }
-    function agCard(g, isApplied) {
-      const borderCls = isApplied ? 'border-green-300 ring-1 ring-green-200 bg-green-50' : 'bg-white border-slate-200';
-      return `<div class="rounded-lg border ${borderCls} p-3">
-        <div class="flex items-center gap-2">
-          <div class="flex-1 min-w-0">
-            <span class="text-sm font-medium text-slate-800">${g.name}</span>
-            <span class="text-xs text-slate-500 ml-1">${(g.members||[]).length} 人</span>
-          </div>
-          <button type="button" onclick="openAttendanceGroupDetail('${g.name.replace(/'/g,"\\'")}' )"
-            class="shrink-0 px-2 py-1 text-xs text-slate-500 border border-slate-200 rounded hover:bg-slate-100">查看</button>
-          <button type="button" onclick="${isApplied ? `clearDraftAttendanceGroup()` : `selectDraftSingle('attendanceGroups','${g.name.replace(/'/g,"\\'")}' )`}"
-            class="shrink-0 px-2 py-1 text-xs font-medium rounded ${isApplied ? 'text-red-600 border border-red-200 hover:bg-red-50' : 'text-green-700 border border-green-300 hover:bg-green-50'}">
-            ${isApplied ? '移除' : '套用'}</button>
-        </div>
-        ${weekdayGrid(g)}
-      </div>`;
-    }
     function agCard(g) {
-      const isApplied = draft.attendanceGroups.includes(g.name);
+      const schedInfo = schedAssignedMap.get(g.name);
+      const isScheduleAssigned = !!schedInfo;
+      const isInDraft = draft.attendanceGroups.includes(g.name);
+      const isApplied = isScheduleAssigned || isInDraft;
       const borderCls = isApplied ? 'border-green-300 ring-1 ring-green-200 bg-green-50' : 'bg-white border-slate-200';
+      const rangeBadge = isScheduleAssigned
+        ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 shrink-0" title="來自班表">班表 ${fmtDateShort(schedInfo.schedStart)}-${fmtDateShort(schedInfo.schedEnd)}</span>`
+        : '';
+      const safeN = g.name.replace(/'/g, "\\'");
+      const actionBtn = isScheduleAssigned
+        ? `<button type="button" onclick="toggleDraftAttendanceGroup('${safeN}')"
+            class="shrink-0 px-2 py-1 text-xs font-medium rounded ${isInDraft ? 'text-red-600 border border-red-200 hover:bg-red-50' : 'text-emerald-700 border border-emerald-300 hover:bg-emerald-50'}">
+            ${isInDraft ? '已套用' : '未套用'}</button>`
+        : `<button type="button" onclick="toggleDraftAttendanceGroup('${safeN}')"
+            class="shrink-0 px-2 py-1 text-xs font-medium rounded ${isInDraft ? 'text-red-600 border border-red-200 hover:bg-red-50' : 'text-green-700 border border-green-300 hover:bg-green-50'}">
+            ${isInDraft ? '移除' : '套用'}</button>`;
       return `<div class="rounded-lg border ${borderCls} p-3">
         <div class="flex items-center gap-2">
-          <div class="flex-1 min-w-0">
+          <div class="flex-1 min-w-0 flex flex-wrap items-center gap-1">
             <span class="text-sm font-medium text-slate-800">${g.name}</span>
-            <span class="text-xs text-slate-500 ml-1">${(g.members||[]).length} 人</span>
+            <span class="text-xs text-slate-500">${(g.members||[]).length} 人</span>
+            ${rangeBadge}
           </div>
-          <button type="button" onclick="openAttendanceGroupDetail('${g.name.replace(/'/g,"\\'")}' )"
+          <button type="button" onclick="openAttendanceGroupDetail('${safeN}')"
             class="shrink-0 px-2 py-1 text-xs text-slate-500 border border-slate-200 rounded hover:bg-slate-100">查看</button>
-          <button type="button" onclick="${isApplied ? `clearDraftAttendanceGroup()` : `selectDraftSingle('attendanceGroups','${g.name.replace(/'/g,"\\'")}' )`}"
-            class="shrink-0 px-2 py-1 text-xs font-medium rounded ${isApplied ? 'text-red-600 border border-red-200 hover:bg-red-50' : 'text-green-700 border border-green-300 hover:bg-green-50'}">
-            ${isApplied ? '移除' : '套用'}</button>
+          ${actionBtn}
         </div>
         ${weekdayGrid(g)}
       </div>`;
@@ -1273,6 +1376,31 @@
     c.innerHTML = list.map(g => agCard(g)).join('');
     c.scrollTop = prevScroll;
     updatePriorityLegend();
+  }
+
+  function toggleDraftAttendanceGroup(name){
+    const schedNames = new Set(getAssignedAttendanceGroupsWithRanges(personal.rangeStart, personal.rangeEnd).map(v => v.name));
+    const isScheduleAssigned = schedNames.has(name);
+    const idx = draft.attendanceGroups.indexOf(name);
+
+    if (!isScheduleAssigned && idx === -1 && hasScheduleOverlapInCurrentRange()) {
+      alert('此區間與班表重疊，非班表來源考勤組不可套用。');
+      return;
+    }
+
+    if (idx === -1) {
+      draft.attendanceGroups.push(name);
+      if (isScheduleAssigned) {
+        personal.excludedAttendanceGroups = personal.excludedAttendanceGroups.filter(n => n !== name);
+      }
+    } else {
+      draft.attendanceGroups.splice(idx, 1);
+      if (isScheduleAssigned && !personal.excludedAttendanceGroups.includes(name)) {
+        personal.excludedAttendanceGroups.push(name);
+      }
+    }
+    setDirty(true);
+    renderAttendanceGroupsPanel();
   }
   function renderShiftsPanel(){
     const c = document.getElementById('personalShifts');
@@ -1431,7 +1559,9 @@
         const v = ws[k];
         const arr = Array.isArray(v) ? v : (typeof v === 'string' && v ? [v] : []);
         if (!groupWeekday[k]) groupWeekday[k] = [];
-        arr.forEach(n => { if (!groupWeekday[k].includes(n)) groupWeekday[k].push(n); });
+        arr.forEach(n => {
+          if (n && n !== '休' && !groupWeekday[k].includes(n)) groupWeekday[k].push(n);
+        });
       });
     });
 
@@ -1450,6 +1580,8 @@
       const ds = fmt(d);
       const dow = d.getDay();
       const existing = personal.assignments[ds];
+      // 手動逐日指派：keep 模式下完全保留，不被班表覆蓋
+      if (mode === 'keep' && existing && existing.source === 'manual') continue;
       // 假別組明確列出的日期 → 一定休
       if (isExplicitHoliday(ds)) {
         if (mode === 'keep' && existing) continue;
@@ -1530,12 +1662,14 @@
   document.getElementById('rangeStart').addEventListener('change', e => {
     personal.rangeStart = e.target.value; persistPersonal();
     if (personal.rangeStart) { viewMonth = new Date(personal.rangeStart); viewMonth.setDate(1); }
+    applyScheduleAssignedDefaultsIfNeeded();
     renderCalendar();
      renderHolidayGroupsPanel();
      renderAttendanceGroupsPanel();
   });
   document.getElementById('rangeEnd').addEventListener('change', e => {
     personal.rangeEnd = e.target.value; persistPersonal();
+    applyScheduleAssignedDefaultsIfNeeded();
     renderCalendar();
      renderHolidayGroupsPanel();
      renderAttendanceGroupsPanel();
@@ -1582,6 +1716,8 @@
   window.savePersonal = savePersonal;
   window.cancelPersonalChanges = cancelPersonalChanges;
   window.clearDraftAttendanceGroup = clearDraftAttendanceGroup;
+  window.toggleDraftHolidayGroup = toggleDraftHolidayGroup;
+  window.toggleDraftAttendanceGroup = toggleDraftAttendanceGroup;
   window.filterPersonalTagDropdown = filterPersonalTagDropdown;
   window.selectPersonalTag = selectPersonalTag;
   window.openHolidayGroupDetail = openHolidayGroupDetail;
