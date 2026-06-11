@@ -135,7 +135,7 @@
               <label class="flex items-center gap-1 text-sm cursor-pointer px-2 py-1 rounded hover:bg-white/70"><input type="radio" name="rotatingSystemType" value="twoWeek" onchange="updateRotatingSystemUI()"><span>兩週變形</span></label>
               <label class="flex items-center gap-1 text-sm cursor-pointer px-2 py-1 rounded hover:bg-white/70"><input type="radio" name="rotatingSystemType" value="fourWeek" onchange="updateRotatingSystemUI()"><span>四週變形</span></label>
               <label class="flex items-center gap-1 text-sm cursor-pointer px-2 py-1 rounded hover:bg-white/70"><input type="radio" name="rotatingSystemType" value="eightWeek" onchange="updateRotatingSystemUI()"><span>八週變形</span></label>
-              <label class="flex items-center gap-1 text-sm cursor-pointer px-2 py-1 rounded hover:bg-white/70"><input type="radio" name="rotatingSystemType" value="none" onchange="updateRotatingSystemUI()"><span>報班/無輪班</span></label>
+              <label class="flex items-center gap-1 text-sm cursor-pointer px-2 py-1 rounded hover:bg-white/70"><input type="radio" name="rotatingSystemType" value="none" onchange="updateRotatingSystemUI()"><span>無規律班</span></label>
             </div>
             <div id="rotatingEffectiveWrap" class="grid grid-cols-1 md:grid-cols-2 gap-3 hidden">
               <div>
@@ -483,12 +483,12 @@
     { value: 'twoWeek', label: '兩週變形', hint: '需填寫生效日期與輪班明細。' },
     { value: 'fourWeek', label: '四週變形', hint: '需填寫生效日期與輪班明細。' },
     { value: 'eightWeek', label: '八週變形', hint: '需填寫生效日期與輪班明細。' },
-    { value: 'none', label: '報班/無輪班', hint: '不使用輪班制度，只保留固定班別或手動排班。' }
+    { value: 'none', label: '無規律班', hint: '不使用輪班制度，只保留固定班別或手動排班。' }
   ];
 
   const ROTATING_SYSTEM_LABELS = {
     general: '一般（單週）',
-    none: '報班/無輪班',
+    none: '無規律班',
     twoWeek: '兩週變形',
     fourWeek: '四週變形',
     eightWeek: '八週變形'
