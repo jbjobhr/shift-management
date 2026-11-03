@@ -137,6 +137,14 @@
           </div>
         </div>
 
+        <div class="border-t border-slate-200 pt-4 mt-4 space-y-3">
+          <label class="block text-sm font-medium text-slate-600 flex items-center gap-2"><i data-lucide="gift" class="w-4 h-4 text-emerald-600"></i>獎勵機制</label>
+          <label class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+            <input type="checkbox" id="shiftHasRewardMechanism">
+            <span>加入獎勵機制</span>
+          </label>
+        </div>
+
         <div class="border-t border-slate-200 pt-4 mt-4">
           <label class="block text-sm font-medium text-slate-600 mb-3 flex items-center gap-2"><i data-lucide="alarm-clock" class="w-4 h-4 text-sky-600"></i>可打卡時段（班表開始）</label>
           <div class="grid grid-cols-2 gap-3">
@@ -169,9 +177,9 @@
 
   const FALLBACK = {
     shifts: [
-      { name: '早班', shortName: '早', start: '08:00', end: '17:00', crossDay: false, hours: 8, hasRest: true, restType: 'fixed', restStart: '12:00', restEnd: '13:00', restMinutes: 60, rest: 1, autoCountOvertime: false, countEarlyArrivalAsOvertime: false, countLateDepartureAsOvertime: false, minOvertimeMinutes: 30, maxOvertimeMinutes: 360, restBeforeOvertimeMinutes: 30, otStart: '', otEnd: '', punchBeforeMinutes: 30, punchAfterMinutes: 30 },
-      { name: '午班', shortName: '午', start: '13:00', end: '17:00', crossDay: false, hours: 4, hasRest: false, restType: 'fixed', restStart: '15:00', restEnd: '15:30', restMinutes: 0, rest: 0, autoCountOvertime: false, countEarlyArrivalAsOvertime: false, countLateDepartureAsOvertime: false, minOvertimeMinutes: 30, maxOvertimeMinutes: 360, restBeforeOvertimeMinutes: 30, otStart: '', otEnd: '', punchBeforeMinutes: 30, punchAfterMinutes: 30 },
-      { name: '晚班', shortName: '晚', start: '18:00', end: '22:00', crossDay: false, hours: 4, hasRest: false, restType: 'fixed', restStart: '20:00', restEnd: '20:30', restMinutes: 0, rest: 0, autoCountOvertime: true, countEarlyArrivalAsOvertime: false, countLateDepartureAsOvertime: true, minOvertimeMinutes: 0, maxOvertimeMinutes: 60, restBeforeOvertimeMinutes: 30, otStart: '22:00', otEnd: '23:00', punchBeforeMinutes: 30, punchAfterMinutes: 30 }
+      { name: '早班', shortName: '早', start: '08:00', end: '17:00', crossDay: false, hours: 8, hasRest: true, restType: 'fixed', restStart: '12:00', restEnd: '13:00', restMinutes: 60, rest: 1, autoCountOvertime: false, countEarlyArrivalAsOvertime: false, countLateDepartureAsOvertime: false, minOvertimeMinutes: 30, maxOvertimeMinutes: 360, restBeforeOvertimeMinutes: 30, otStart: '', otEnd: '', punchBeforeMinutes: 30, punchAfterMinutes: 30, hasRewardMechanism: false },
+      { name: '午班', shortName: '午', start: '13:00', end: '17:00', crossDay: false, hours: 4, hasRest: false, restType: 'fixed', restStart: '15:00', restEnd: '15:30', restMinutes: 0, rest: 0, autoCountOvertime: false, countEarlyArrivalAsOvertime: false, countLateDepartureAsOvertime: false, minOvertimeMinutes: 30, maxOvertimeMinutes: 360, restBeforeOvertimeMinutes: 30, otStart: '', otEnd: '', punchBeforeMinutes: 30, punchAfterMinutes: 30, hasRewardMechanism: false },
+      { name: '晚班', shortName: '晚', start: '18:00', end: '22:00', crossDay: false, hours: 4, hasRest: false, restType: 'fixed', restStart: '20:00', restEnd: '20:30', restMinutes: 0, rest: 0, autoCountOvertime: true, countEarlyArrivalAsOvertime: false, countLateDepartureAsOvertime: true, minOvertimeMinutes: 0, maxOvertimeMinutes: 60, restBeforeOvertimeMinutes: 30, otStart: '22:00', otEnd: '23:00', punchBeforeMinutes: 30, punchAfterMinutes: 30, hasRewardMechanism: false }
     ],
     attendanceGroups: [],
     schedules: [{ shifts: [], attendanceGroups: [] }]
@@ -525,6 +533,7 @@
     document.getElementById('shiftCrossDay').checked = !!inferredCrossDay;
     applyShiftRestFields(shift);
     applyShiftOvertimeFields(shift);
+    document.getElementById('shiftHasRewardMechanism').checked = !!shift.hasRewardMechanism;
     document.getElementById('shiftPunchBeforeMinutes').value = normalizePunchWindowMinutes(shift.punchBeforeMinutes, 30, PUNCH_BEFORE_MAX_MINUTES);
     document.getElementById('shiftPunchAfterMinutes').value = normalizePunchWindowMinutes(shift.punchAfterMinutes, 30, PUNCH_AFTER_MAX_MINUTES);
     updateShiftHoursPreview();
@@ -571,6 +580,7 @@
     const crossDay = !!document.getElementById('shiftCrossDay').checked;
     const restConfig = readShiftRestFields();
     const overtime = readShiftOvertimeFields(end);
+    const hasRewardMechanism = !!document.getElementById('shiftHasRewardMechanism').checked;
     const punchBeforeMinutes = normalizePunchWindowMinutes(document.getElementById('shiftPunchBeforeMinutes').value, 30, PUNCH_BEFORE_MAX_MINUTES);
     const punchAfterMinutes = normalizePunchWindowMinutes(document.getElementById('shiftPunchAfterMinutes').value, 30, PUNCH_AFTER_MAX_MINUTES);
     const duration = calcDurationHours(start, end, crossDay);
@@ -587,7 +597,7 @@
 
     const existing = editingShiftIndex >= 0 && shifts[editingShiftIndex] ? shifts[editingShiftIndex] : null;
     const scopeFields = buildScopeFields(existing);
-    const payload = { name, shortName, start, end, crossDay, hours, ...restConfig, ...overtime, punchBeforeMinutes, punchAfterMinutes, ...scopeFields };
+    const payload = { name, shortName, start, end, crossDay, hours, hasRewardMechanism, ...restConfig, ...overtime, punchBeforeMinutes, punchAfterMinutes, ...scopeFields };
 
     if (editingShiftIndex >= 0 && shifts[editingShiftIndex]) {
       const oldName = shifts[editingShiftIndex].name;

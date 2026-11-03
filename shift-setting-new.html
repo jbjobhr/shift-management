@@ -213,6 +213,13 @@
       </div>
      </div>
     </div>
+    <div class="border-t border-slate-200 pt-4 mt-4 space-y-3">
+     <label class="block text-sm font-medium text-slate-600 flex items-center gap-2"><i data-lucide="gift" class="w-4 h-4 text-emerald-600"></i>獎勵機制</label>
+     <label class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+      <input type="checkbox" id="shiftHasRewardMechanism">
+      <span>加入獎勵機制</span>
+     </label>
+    </div>
     <div class="flex justify-end gap-2 pt-2">
      <button onclick="closeShiftModal()" class="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-md">取消</button> <button id="shiftModalConfirmBtn" onclick="confirmAddShift()" class="px-4 py-2 text-sm bg-[#1e3a5f] text-white rounded-md hover:bg-[#2a4f7f]">確認</button>
     </div>
@@ -1257,6 +1264,7 @@
         <span class="chip bg-amber-100 text-amber-800">工時 ${s.hours}h</span>
         <span class="chip bg-orange-100 text-orange-800">${restSummary}</span>
         ${overtimeSummary ? `<span class="chip bg-rose-100 text-rose-800">${overtimeSummary}</span>` : ''}
+        ${s.hasRewardMechanism ? '<span class="chip bg-emerald-100 text-emerald-800">獎勵</span>' : ''}
         <button onclick="openShiftDetailPage(${i})" class="ml-auto text-blue-400 hover:text-blue-600 text-sm">編輯</button>
         <button onclick="deleteShift(${i})" class="text-red-400 hover:text-red-600 text-sm">刪除</button>
       </div>`;
@@ -1292,6 +1300,7 @@
     document.getElementById('shiftCrossDay').checked = !!inferredCrossDay;
     applyShiftRestFields(s);
     applyShiftOvertimeFields(s);
+    document.getElementById('shiftHasRewardMechanism').checked = !!s.hasRewardMechanism;
     updateShiftHoursPreview();
     document.getElementById('shiftModal').classList.remove('hidden');
   }
@@ -1641,6 +1650,7 @@
       maxOvertimeMinutes: 360,
       restBeforeOvertimeMinutes: 30
     });
+    document.getElementById('shiftHasRewardMechanism').checked = false;
     updateShiftHoursPreview();
     document.getElementById('shiftModal').classList.remove('hidden');
   }
@@ -1738,6 +1748,7 @@
     const restConfig = readShiftRestFields();
     const rest = restConfig.rest;
     const overtime = readShiftOvertimeFields(end);
+    const hasRewardMechanism = !!document.getElementById('shiftHasRewardMechanism').checked;
     const duration = calcDurationHours(start, end, crossDay);
     const hours = calcWorkHours(start, end, rest, crossDay);
 
@@ -1773,7 +1784,7 @@
 
     if (editingShiftIndex >= 0 && shifts[editingShiftIndex]) {
       const oldName = shifts[editingShiftIndex].name;
-      shifts[editingShiftIndex] = { name, shortName, start, end, crossDay, hours, ...restConfig, ...overtime };
+      shifts[editingShiftIndex] = { name, shortName, start, end, crossDay, hours, hasRewardMechanism, ...restConfig, ...overtime };
       // 同步更新考勤組中引用此班別名稱
       if (oldName !== name) {
         attendanceGroups.forEach(g => {
@@ -1788,7 +1799,7 @@
         renderAttendanceGroups();
       }
     } else {
-      shifts.push({ name, shortName, start, end, crossDay, hours, ...restConfig, ...overtime });
+      shifts.push({ name, shortName, start, end, crossDay, hours, hasRewardMechanism, ...restConfig, ...overtime });
     }
     renderShifts();
     renderAllowedOptions();

@@ -216,6 +216,13 @@
       </div>
      </div>
     </div>
+    <div class="border-t border-slate-200 pt-4 mt-4 space-y-3">
+     <label class="block text-sm font-medium text-slate-600 flex items-center gap-2"><i data-lucide="gift" class="w-4 h-4 text-emerald-600"></i>獎勵機制</label>
+     <label class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+      <input type="checkbox" id="shiftHasRewardMechanism">
+      <span>加入獎勵機制</span>
+     </label>
+    </div>
     <div class="border-t border-slate-200 pt-4 mt-4">
      <label class="block text-sm font-medium text-slate-600 mb-3 flex items-center gap-2"><i data-lucide="alarm-clock" class="w-4 h-4 text-sky-600"></i>可打卡時段（班表開始）</label>
      <div class="grid grid-cols-2 gap-3">
@@ -433,9 +440,9 @@
 
   // 全部班表共用的班別清單
   const _ALL_SHIFTS = [
-    { name: '早班', shortName: '早', start: '08:00', end: '17:00', hours: 8, rest: 1, otStart: '', otEnd: '', autoCountOvertime: false, countEarlyArrivalAsOvertime: false, countLateDepartureAsOvertime: false, minOvertimeMinutes: 30, maxOvertimeMinutes: 360, restBeforeOvertimeMinutes: 30, punchBeforeMinutes: 30, punchAfterMinutes: 30 },
-    { name: '午班', shortName: '午', start: '13:00', end: '17:00', hours: 4, rest: 0, otStart: '', otEnd: '', autoCountOvertime: false, countEarlyArrivalAsOvertime: false, countLateDepartureAsOvertime: false, minOvertimeMinutes: 30, maxOvertimeMinutes: 360, restBeforeOvertimeMinutes: 30, punchBeforeMinutes: 30, punchAfterMinutes: 30 },
-    { name: '晚班', shortName: '晚', start: '18:00', end: '22:00', hours: 4, rest: 0, otStart: '22:00', otEnd: '23:00', autoCountOvertime: true, countEarlyArrivalAsOvertime: false, countLateDepartureAsOvertime: true, minOvertimeMinutes: 0, maxOvertimeMinutes: 60, restBeforeOvertimeMinutes: 30, punchBeforeMinutes: 30, punchAfterMinutes: 30 }
+    { name: '早班', shortName: '早', start: '08:00', end: '17:00', hours: 8, rest: 1, otStart: '', otEnd: '', autoCountOvertime: false, countEarlyArrivalAsOvertime: false, countLateDepartureAsOvertime: false, minOvertimeMinutes: 30, maxOvertimeMinutes: 360, restBeforeOvertimeMinutes: 30, punchBeforeMinutes: 30, punchAfterMinutes: 30, hasRewardMechanism: false },
+    { name: '午班', shortName: '午', start: '13:00', end: '17:00', hours: 4, rest: 0, otStart: '', otEnd: '', autoCountOvertime: false, countEarlyArrivalAsOvertime: false, countLateDepartureAsOvertime: false, minOvertimeMinutes: 30, maxOvertimeMinutes: 360, restBeforeOvertimeMinutes: 30, punchBeforeMinutes: 30, punchAfterMinutes: 30, hasRewardMechanism: false },
+    { name: '晚班', shortName: '晚', start: '18:00', end: '22:00', hours: 4, rest: 0, otStart: '22:00', otEnd: '23:00', autoCountOvertime: true, countEarlyArrivalAsOvertime: false, countLateDepartureAsOvertime: true, minOvertimeMinutes: 0, maxOvertimeMinutes: 60, restBeforeOvertimeMinutes: 30, punchBeforeMinutes: 30, punchAfterMinutes: 30, hasRewardMechanism: false }
   ];
 
   // 全部班表共用的假別組清單
@@ -1482,6 +1489,7 @@
         <span class="chip bg-amber-100 text-amber-800">工時 ${s.hours}h</span>
         <span class="chip bg-orange-100 text-orange-800">${restSummary}</span>
         ${overtimeSummary ? `<span class="chip bg-rose-100 text-rose-800">${overtimeSummary}</span>` : ''}
+        ${s.hasRewardMechanism ? '<span class="chip bg-emerald-100 text-emerald-800">獎勵</span>' : ''}
         <span class="chip bg-sky-100 text-sky-800">可打卡 前${punchBeforeMinutes}/後${punchAfterMinutes}分</span>
         <button onclick="openShiftDetailPage(${i})" class="ml-auto text-blue-400 hover:text-blue-600 text-sm">編輯</button>
         <button onclick="deleteShift(${i})" class="text-red-400 hover:text-red-600 text-sm">刪除</button>
@@ -1518,6 +1526,7 @@
     document.getElementById('shiftCrossDay').checked = !!inferredCrossDay;
     applyShiftRestFields(s);
     applyShiftOvertimeFields(s);
+    document.getElementById('shiftHasRewardMechanism').checked = !!s.hasRewardMechanism;
     document.getElementById('shiftPunchBeforeMinutes').value = normalizePunchWindowMinutes(s.punchBeforeMinutes, 30, PUNCH_BEFORE_MAX_MINUTES);
     document.getElementById('shiftPunchAfterMinutes').value = normalizePunchWindowMinutes(s.punchAfterMinutes, 30, PUNCH_AFTER_MAX_MINUTES);
     updateShiftHoursPreview();
@@ -1941,6 +1950,7 @@
       maxOvertimeMinutes: 360,
       restBeforeOvertimeMinutes: 30
     });
+    document.getElementById('shiftHasRewardMechanism').checked = false;
     document.getElementById('shiftPunchBeforeMinutes').value = '30';
     document.getElementById('shiftPunchAfterMinutes').value = '30';
     updateShiftHoursPreview();
@@ -2018,6 +2028,7 @@
     const restConfig = readShiftRestFields();
     const rest = restConfig.rest;
     const overtime = readShiftOvertimeFields(end);
+    const hasRewardMechanism = !!document.getElementById('shiftHasRewardMechanism').checked;
     const punchBeforeMinutes = normalizePunchWindowMinutes(document.getElementById('shiftPunchBeforeMinutes').value, 30, PUNCH_BEFORE_MAX_MINUTES);
     const punchAfterMinutes = normalizePunchWindowMinutes(document.getElementById('shiftPunchAfterMinutes').value, 30, PUNCH_AFTER_MAX_MINUTES);
     const duration = calcDurationHours(start, end, crossDay);
@@ -2055,7 +2066,7 @@
 
     if (editingShiftIndex >= 0 && shifts[editingShiftIndex]) {
       const oldName = shifts[editingShiftIndex].name;
-      shifts[editingShiftIndex] = { name, shortName, start, end, crossDay, hours, ...restConfig, ...overtime, punchBeforeMinutes, punchAfterMinutes };
+      shifts[editingShiftIndex] = { name, shortName, start, end, crossDay, hours, hasRewardMechanism, ...restConfig, ...overtime, punchBeforeMinutes, punchAfterMinutes };
       // 同步更新考勤組中引用此班別名稱
       if (oldName !== name) {
         attendanceGroups.forEach(g => {
@@ -2070,7 +2081,7 @@
         renderAttendanceGroups();
       }
     } else {
-      shifts.push({ name, shortName, start, end, crossDay, hours, ...restConfig, ...overtime, punchBeforeMinutes, punchAfterMinutes });
+      shifts.push({ name, shortName, start, end, crossDay, hours, hasRewardMechanism, ...restConfig, ...overtime, punchBeforeMinutes, punchAfterMinutes });
     }
     renderShifts();
     renderAllowedOptions();
